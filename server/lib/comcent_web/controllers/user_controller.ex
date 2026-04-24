@@ -207,15 +207,13 @@ defmodule ComcentWeb.UserController do
   end
 
   defp validate_create_org_params(params) do
+    # Billing-address fields (country/state/city/zip/user_name) are EE-only and
+    # optional. When present they're validated by OrgBillingAddress.changeset;
+    # when absent the billing_address insert is skipped entirely.
     required_fields = [
       {"name", 3},
       {"subdomain", 3},
-      {"sip_username", 3},
-      {"country", 2},
-      {"state", 2},
-      {"city", 2},
-      {"zip", 2},
-      {"user_name", 2}
+      {"sip_username", 3}
     ]
 
     case Enum.find(required_fields, fn {field, min_length} ->
@@ -228,6 +226,14 @@ defmodule ComcentWeb.UserController do
       nil ->
         validate_username(String.trim(params["sip_username"] || ""))
     end
+  end
+
+  defp has_billing_address?(params) do
+    ["country", "state", "city", "zip", "user_name"]
+    |> Enum.any?(fn field ->
+      value = params[field] |> to_string() |> String.trim()
+      String.length(value) > 0
+    end)
   end
 
   defp validate_username(username) do
@@ -245,7 +251,6 @@ defmodule ComcentWeb.UserController do
 
   defp insert_org(current_user, params) do
     org_id = Ecto.UUID.generate()
-    billing_address_id = Ecto.UUID.generate()
 
     org_attrs = %{
       "name" => String.trim(params["name"] || ""),
@@ -267,26 +272,38 @@ defmodule ComcentWeb.UserController do
       "extension_number" => blank_to_nil(params["user_ext"])
     }
 
-    billing_address_attrs = %{
-      "org_id" => org_id,
-      "username" => String.trim(params["user_name"] || ""),
-      "line_1" => String.trim(params["name"] || ""),
-      "city" => String.trim(params["city"] || ""),
-      "state" => String.trim(params["state"] || ""),
-      "country" => String.trim(params["country"] || ""),
-      "postal_code" => String.trim(params["zip"] || "")
-    }
+    multi =
+      Multi.new()
+      |> Multi.insert(:org, Org.changeset(%Org{id: org_id}, org_attrs))
+      |> Multi.insert(:member, OrgMember.changeset(%OrgMember{}, member_attrs))
 
-    Multi.new()
-    |> Multi.insert(:org, Org.changeset(%Org{id: org_id}, org_attrs))
-    |> Multi.insert(:member, OrgMember.changeset(%OrgMember{}, member_attrs))
-    |> Multi.insert(
-      :billing_address,
-      OrgBillingAddress.changeset(
-        %OrgBillingAddress{id: billing_address_id},
-        billing_address_attrs
-      )
-    )
+    multi =
+      if has_billing_address?(params) do
+        billing_address_id = Ecto.UUID.generate()
+
+        billing_address_attrs = %{
+          "org_id" => org_id,
+          "username" => String.trim(params["user_name"] || ""),
+          "line_1" => String.trim(params["name"] || ""),
+          "city" => String.trim(params["city"] || ""),
+          "state" => String.trim(params["state"] || ""),
+          "country" => String.trim(params["country"] || ""),
+          "postal_code" => String.trim(params["zip"] || "")
+        }
+
+        Multi.insert(
+          multi,
+          :billing_address,
+          OrgBillingAddress.changeset(
+            %OrgBillingAddress{id: billing_address_id},
+            billing_address_attrs
+          )
+        )
+      else
+        multi
+      end
+
+    multi
     |> Repo.transaction()
     |> case do
       {:ok, %{org: org}} ->

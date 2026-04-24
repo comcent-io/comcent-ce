@@ -18,11 +18,13 @@ export const createOrgSchema = z
       }),
     // Regex for validating the username, starts with the letter can have number, dot, underscore and plus sign, no at symbol and space allowed
     sipUsername: usernameSchema,
-    country: z.string().min(2),
-    state: z.string().min(2),
-    zip: z.string().min(2),
-    userName: z.string().min(2), // TODO: do we need it if dont have stripe now
-    city: z.string().min(2),
+    // Billing-address fields are EE-only. In CE they're sent as empty
+    // strings; server skips OrgBillingAddress insert when blank.
+    country: z.string().default(''),
+    state: z.string().default(''),
+    zip: z.string().default(''),
+    userName: z.string().default(''),
+    city: z.string().default(''),
     assignExtAutomatically: z.boolean().default(false),
     autoExtStart: z
       .string()

@@ -39,10 +39,6 @@
     city: '',
     zip: '',
   };
-  let selectedCountryCode = '';
-  let states: { name: string; code: string }[] = [];
-  $: states = selectedCountryCode ? countryStatesMap[selectedCountryCode] || [] : [];
-  $: formData.country = selectedCountryCode;
 
   let errorMessage = '';
   let loading = false;
@@ -53,26 +49,8 @@
   });
 
   async function loadContext() {
-    loading = true;
-    errorMessage = '';
-
-    const result = await getJson<{
-      countries: Country[];
-      countryStatesMap: Record<string, CountryState[]>;
-    }>('/api/v2/user/org-creation-context');
-
-    if (!result.ok) {
-      if (result.status === 401) {
-        await goto('/login');
-        return;
-      }
-      errorMessage = result.error;
-      loading = false;
-      return;
-    }
-
-    countries = result.data.countries ?? [];
-    countryStatesMap = result.data.countryStatesMap ?? {};
+    // CE: billing address is not collected at org creation time. No context
+    // fetch needed.
     loading = false;
   }
 
@@ -87,11 +65,11 @@
       assignExtAutomatically: formData.assignExtAutomatically,
       autoExtStart: (formData.autoExtStart ?? '').trim() || '1000',
       autoExtEnd: (formData.autoExtEnd ?? '').trim() || '9999',
-      userName: formData.userName.trim(),
-      country: selectedCountryCode,
-      state: formData.state.trim(),
-      city: formData.city.trim(),
-      zip: formData.zip.trim(),
+      userName: '',
+      country: '',
+      state: '',
+      city: '',
+      zip: '',
     };
   }
 
@@ -138,7 +116,7 @@
     </div>
   {/if}
   <form method="POST" on:submit={handleOrgCreation}>
-    <div class="grid grid-cols-2 gap-4 pt-14">
+    <div class="mx-auto max-w-xl pt-14">
       <div class="">
         <Card className="mb-4">
           <H3>Your Details</H3>
@@ -293,86 +271,6 @@
           <!--      {/if}-->
         </Card>
       </div>
-      <Card>
-        <h3 class="text-3xl font-bold dark:text-white">Billing Address Details</h3>
-        <div class="mb-4">
-          <label
-            for="userName"
-            class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-          >
-            Billing Name
-          </label>
-          <input
-            type="text"
-            id="userName"
-            name="userName"
-            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-            placeholder="Billing Name"
-            bind:value={formData.userName}
-            required
-          />
-        </div>
-        <div class="mb-4">
-          <label for="country" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-            Country
-          </label>
-          <select
-            id="country"
-            name="country"
-            bind:value={selectedCountryCode}
-            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          >
-            <option disabled selected value="">-- select a country --</option>
-            {#each countries as country}
-              <option value={country.code}>{country.name}</option>
-            {/each}
-          </select>
-        </div>
-        <div class="mb-4">
-          <label for="state" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-            State
-          </label>
-          <select
-            id="state"
-            name="state"
-            bind:value={formData.state}
-            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          >
-            <option disabled selected value="">-- select a state --</option>
-            {#each states as state}
-              <option value={state.name}>{state.name}</option>
-            {/each}
-          </select>
-        </div>
-        <div class="mb-4">
-          <label for="city" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-            City
-          </label>
-          <input
-            type="text"
-            id="city"
-            name="city"
-            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-            placeholder="City"
-            bind:value={formData.city}
-            required
-          />
-        </div>
-        <div>
-          <label for="zip" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-            Zip Code
-          </label>
-          <input
-            bind:value={formData.zip}
-            required
-            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-            id="zip"
-            name="zip"
-            type="text"
-            pattern="[0-9]*"
-          />
-        </div>
-      </Card>
       <div class="mb-4">
         <Button type="submit" progress={orgCreationInProgress}>Create Organization</Button>
       </div>
