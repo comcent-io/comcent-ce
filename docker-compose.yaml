@@ -127,7 +127,8 @@ services:
       - .env
     environment:
       - PUBLIC_APP_BASE_URL=http://localhost:5173
-      - PUBLIC_SIP_WS_URL=ws://localhost/
+      # PUBLIC_SIP_WS_URL comes from .env (ws://localhost:5173/sip-ws) so the
+      # browser goes through Traefik, which routes /sip-ws to the SBC.
     depends_on:
       - postgres
     volumes:
