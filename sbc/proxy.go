@@ -84,7 +84,7 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 	domain := fromURI.Address.Host
 	aor := user + "@" + domain
 
-	if !strings.HasSuffix(domain, "comcent.io") {
+	if !strings.HasSuffix(domain, p.cfg.SIPDomain) {
 		tx.Respond(sip.NewResponseFromRequest(req, 403, "Forbidden", nil))
 		return
 	}
@@ -203,7 +203,7 @@ func (p *Proxy) handleInviteToFS(req *sip.Request, tx sip.ServerTransaction, sou
 	}
 
 	callID := req.CallID().Value()
-	userAORs := comcentUsersForRequest(req)
+	userAORs := comcentUsersForRequest(req, p.cfg.SIPDomain)
 
 	target, ok := p.selectTargetForUsers(userAORs)
 	if !ok {
@@ -307,7 +307,7 @@ func (p *Proxy) handleInviteFromFS(req *sip.Request, tx sip.ServerTransaction) {
 	toUser := req.To().Address.User
 	toDomain := req.To().Address.Host
 
-	if strings.HasSuffix(toDomain, "comcent.io") {
+	if strings.HasSuffix(toDomain, p.cfg.SIPDomain) {
 		p.handleInviteFromFSToUser(req, tx, toUser, toDomain)
 	} else {
 		p.handleInviteFromFSToTrunk(req, tx, toUser)
@@ -970,7 +970,7 @@ func tooManyHops(req *sip.Request) bool {
 func (p *Proxy) authenticateExternalRequest(req *sip.Request, tx sip.ServerTransaction, sourceIP string) bool {
 	fromDomain := req.From().Address.Host
 
-	if strings.HasSuffix(fromDomain, "comcent.io") {
+	if strings.HasSuffix(fromDomain, p.cfg.SIPDomain) {
 		user := req.From().Address.User
 		password, err := p.api.GetUserPassword(user, fromDomain)
 		if err != nil || password == "" {
@@ -1002,7 +1002,7 @@ func (p *Proxy) authenticateExternalRequest(req *sip.Request, tx sip.ServerTrans
 }
 
 func (p *Proxy) authorizeExternalInDialog(req *sip.Request, tx sip.ServerTransaction, state *callState, sourceIP string) bool {
-	if strings.HasSuffix(req.From().Address.Host, "comcent.io") {
+	if strings.HasSuffix(req.From().Address.Host, p.cfg.SIPDomain) {
 		if state.userAddr != "" && req.Source() == state.userAddr {
 			return true
 		}
@@ -1010,10 +1010,10 @@ func (p *Proxy) authorizeExternalInDialog(req *sip.Request, tx sip.ServerTransac
 	return p.authenticateExternalRequest(req, tx, sourceIP)
 }
 
-func comcentUsersForRequest(req *sip.Request) []string {
+func comcentUsersForRequest(req *sip.Request, sipDomain string) []string {
 	users := make([]string, 0, 2)
 	for _, uri := range []sip.Uri{req.From().Address, req.To().Address} {
-		if uri.User == "" || !strings.HasSuffix(uri.Host, "comcent.io") {
+		if uri.User == "" || !strings.HasSuffix(uri.Host, sipDomain) {
 			continue
 		}
 		aor := uri.User + "@" + uri.Host

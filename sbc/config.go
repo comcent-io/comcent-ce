@@ -9,6 +9,7 @@ type Config struct {
 	InternalAPIUser    string
 	InternalAPIPass    string
 	RPCAPIToken        string
+	SIPDomain          string
 }
 
 func loadConfig() Config {
@@ -19,6 +20,7 @@ func loadConfig() Config {
 		InternalAPIUser:    envOrDefault("INTERNAL_API_USERNAME", ""),
 		InternalAPIPass:    envOrDefault("INTERNAL_API_PASSWORD", ""),
 		RPCAPIToken:        envOrDefault("RPC_API_TOKEN", ""),
+		SIPDomain:          envOrDefault("SIP_DOMAIN", "comcent.io"),
 	}
 }
 
