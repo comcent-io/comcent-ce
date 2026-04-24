@@ -174,21 +174,21 @@ services:
     networks:
       - comcent-network
 
-  kamailio:
+  sbc:
     build:
-      context: ../kamailio
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/Dockerfile-sbc
     ports:
       - '5060:5060/udp'
-      - '5061:5061'
-      - '80:80'
+      - '5060:5060/tcp'
+      - '5061:5061/tcp'
     networks:
       comcent-network:
         ipv4_address: 172.31.17.9
     environment:
+      - SIP_DOMAIN=${SIP_DOMAIN:-localhost}
       - PRIVATE_IP=172.31.17.9
       - PUBLIC_IP=${DEV_IP}
-      - RPC_API_TOKEN=${RPC_API_TOKEN}
       - INTERNAL_API_BASE_URL=http://server:4000/internal-api
       - INTERNAL_API_USERNAME=${INTERNAL_API_USERNAME}
       - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD}
@@ -198,7 +198,7 @@ services:
 
   freeswitch:
     build:
-      context: ../freeswitch
+      context: ../freeswitch-ce
       dockerfile: Dockerfile
     volumes:
       - ./fsdata:/usr/local/freeswitch/sounds
@@ -230,7 +230,7 @@ services:
         condition: service_started
       server:
         condition: service_healthy
-      kamailio:
+      sbc:
         condition: service_started
       minio-init:
         condition: service_started
