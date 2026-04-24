@@ -19,7 +19,8 @@ export async function ensureAuthenticated(cookies: any): Promise<AuthenticatedUs
     if (session.status === 401) throw redirect(303, '/login');
     throw error(500, { message: session.error || 'Unable to validate current session' });
   }
-  if (!session.data.user?.hasAgreedToTos) throw redirect(303, '/terms-conditions');
+  // CE: no ToS gate. Self-hosters accept the project's license (AGPL-3.0)
+  // when they deploy; there's no per-user ToS to agree to.
 
   return {
     ...user,
