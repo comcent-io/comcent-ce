@@ -38,7 +38,7 @@ services:
   mailhog:
     image: mailhog/mailhog:v1.0.1
     ports:
-      - '1025:1025'
+      - '11025:1025'
       - '8025:8025'
     networks:
       - comcent-network
@@ -203,7 +203,7 @@ services:
     volumes:
       - ./fsdata:/usr/local/freeswitch/sounds
     ports:
-      - '19000-19100:19000-19100/udp'
+      - '18000-18100:18000-18100/udp'
     networks:
       - comcent-network
     environment:
@@ -211,8 +211,8 @@ services:
       - SOUND_TYPES=music:en-us-callie
       - EXTERNAL_SIP_IP=${DEV_IP}
       - EXTERNAL_RTP_IP=${DEV_IP}
-      - RTP_START_PORT=19000
-      - RTP_END_PORT=19100
+      - RTP_START_PORT=18000
+      - RTP_END_PORT=18100
       - INTERNAL_API_BASE_URL=http://server:4000/internal-api/xml-curl
       - INTERNAL_API_USERNAME=${INTERNAL_API_USERNAME}
       - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD}

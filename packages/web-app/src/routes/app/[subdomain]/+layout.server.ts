@@ -13,6 +13,13 @@ export const load: LayoutServerLoad = async ({ url, cookies, params, fetch }) =>
     organizations: any[];
   }>(`/api/v2/${params.subdomain}/me/context`, user.idToken, fetch);
   if (!result.ok) {
+    // Server returns 303→/org when user isn't a member of this subdomain. The
+    // SSR fetch follows the redirect, which 404s because /org is a SvelteKit
+    // route (not a Phoenix route). Bounce the browser to /org so it can pick
+    // or create an org through the web-app.
+    if (result.status === 404 || result.status === 403 || result.status === 401) {
+      throw redirect(303, '/org');
+    }
     throw new Error(result.error);
   }
 
