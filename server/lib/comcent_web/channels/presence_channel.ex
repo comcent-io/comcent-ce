@@ -19,11 +19,12 @@ defmodule ComcentWeb.PresenceChannel do
     subdomain = socket.assigns.subdomain
     Logger.info("Handling presence update for user #{user_id}: #{presence} in #{subdomain}")
 
-    # Push the message to the client
+    # Push the message to the client. Keys are camelCased to match the
+    # client-side handler (payload.userId, payload.previousPresence).
     push(socket, "presence_update", %{
-      user_id: user_id,
+      userId: user_id,
       presence: presence,
-      previous_presence: previous_presence
+      previousPresence: previous_presence
     })
 
     {:noreply, socket}
