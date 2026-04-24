@@ -8,7 +8,7 @@
   import { getJson, postJson } from '$lib/http';
   import type { CreateOrgSchema } from '../schema';
 
-  const { PUBLIC_ROOT_URL } = env;
+  const { PUBLIC_SIP_DOMAIN } = env;
 
   type CountryState = {
     name: string;
@@ -200,7 +200,7 @@
               class="p-4 mb-4 text-sm text-blue-800 rounded-lg bg-blue-50 dark:bg-gray-800 dark:text-blue-400"
               role="alert"
             >
-              <span class="font-medium">{formData.subdomain}.{PUBLIC_ROOT_URL}</span>
+              <span class="font-medium">{formData.subdomain}.{PUBLIC_SIP_DOMAIN}</span>
               will be your domain.
             </div>
           {/if}
