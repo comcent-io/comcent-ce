@@ -2,9 +2,8 @@ import { ensureAuthenticated } from '$lib/auth';
 import { getAuthedJson } from '$lib/server/api';
 import type { LayoutServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { convertWalletBalanceToDollars } from '$lib/server/payments/money';
 
-export const load: LayoutServerLoad = async ({ url, cookies, params, fetch }) => {
+export const load: LayoutServerLoad = async ({ cookies, params, fetch }) => {
   const user = await ensureAuthenticated(cookies);
   const result = await getAuthedJson<{
     numbers: any[];
@@ -23,25 +22,10 @@ export const load: LayoutServerLoad = async ({ url, cookies, params, fetch }) =>
     throw new Error(result.error);
   }
 
-  const { numbers, memberProfile: member, orgSettings, organizations } = result.data;
+  const { numbers, memberProfile: member, organizations } = result.data;
 
-  const walletBalance = convertWalletBalanceToDollars(orgSettings!.walletBalance);
-  const showLowBalanceAlert = Number(walletBalance) <= orgSettings!.alertThresholdBalance * 1000000;
   if (!member) {
     throw Error('Member not found');
-  }
-
-  if (!url.searchParams.has('redirected')) {
-    if (!orgSettings!.isActive) {
-      // TODO redirect to inactive page
-    }
-    if (orgSettings!.walletBalance <= 0) {
-      if (member!.role == 'ADMIN') {
-        throw redirect(302, `/app/${params.subdomain}/settings/billing/balance?redirected=true`);
-      } else {
-        throw redirect(302, `/app/${params.subdomain}/payments/recharge-wallet?redirected=true`);
-      }
-    }
   }
 
   return {
@@ -55,7 +39,8 @@ export const load: LayoutServerLoad = async ({ url, cookies, params, fetch }) =>
     member: member!,
     numbers,
     basePath: `/app/${params.subdomain}`,
-    showLowBalanceAlert,
-    walletBalance,
+    // CE has no billing/wallet — always false, no redirect to recharge.
+    showLowBalanceAlert: false,
+    walletBalance: 0,
   };
 };

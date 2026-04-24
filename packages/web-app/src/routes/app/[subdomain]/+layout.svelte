@@ -113,77 +113,14 @@
           />
         </a>
       </div>
-      {#if showLowBalanceAlert}
-        <div
-          class="fixed mt-1 top-0 left-1/2 transform -translate-x-1/2 bg-yellow-100 border-yellow-500 text-yellow-700 px-4 py-2 z-50 rounded-lg"
-          style="width: auto; max-width: calc(100% - 2rem);"
-          role="alert"
-        >
-          <div class="flex items-center justify-between">
-            <p class="text-sm font-bold">
-              Low Wallet Balance!! Please top up to continue enjoying our services.
-              {#if data.member.role === 'ADMIN'}
-                <a
-                  href={`${data.basePath}/settings/billing/balance`}
-                  class="text-blue-500 hover:text-blue-700"
-                >
-                  Click here to top up
-                </a>
-              {:else}
-                Please check with your admins.
-              {/if}
-            </p>
-            <button
-              type="button"
-              class="ml-4 text-yellow-500 hover:text-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 rounded-lg text-sm p-1.5"
-              aria-label="close"
-              on:click={closeLowBalanceWarning}
-            >
-              <span class="text-lg">&times;</span>
-            </button>
-          </div>
-        </div>
-      {/if}
+      <!-- Low-balance alert is EE-only (no wallet/billing in CE). -->
+
 
       <!-- Main content and other items remain unchanged -->
 
       <div class="flex items-center lg:order-2">
-        {#if data.member.role === 'ADMIN'}
-          <div
-            use:clickOutside={() => {
-              showWalletBalance = false;
-            }}
-          >
-            <Button
-              type="button"
-              on:click={toggleWalletBalance}
-              progress={fetchingBalance}
-              class="p-2 mr-1 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600"
-            >
-              <span class="sr-only">View balance</span>
-              <DollarIcon />
-            </Button>
-          </div>
-          {#if showWalletBalance}
-            <div
-              class="absolute top-8 right-5 overflow-hidden z-50 my-4 max-w-sm text-base list-none bg-white rounded divide-y divide-gray-100 shadow-lg dark:divide-gray-600 dark:bg-gray-700"
-              id="wallet-balance-display"
-            >
-              <div
-                class="block py-2 px-4 text-base font-medium text-center text-gray-700 bg-gray-50 dark:bg-gray-600 dark:text-gray-300"
-              >
-                Wallet Balance
-              </div>
-              <div class="flex-shrink-0">
-                <div
-                  class="block py-2 px-4 text-base font-medium text-center text-white bg-gray-700 rounded-full border border-white dark:border-gray-700"
-                >
-                  <p>USD {walletBalance}</p>
-                </div>
-              </div>
-            </div>
-          {/if}
-        {/if}
+        <!-- Wallet balance indicator is EE-only -->
+
         <div class="relative">
           <button
             type="button"
@@ -247,51 +184,14 @@
     <div class="overflow-y-auto py-5 px-3 h-full bg-white dark:bg-gray-800">
       <ul class="space-y-2">
         <SideBarLink title="Dashboard" href={`${data.basePath}`} icon={PieIcon} />
-        <SideBarLink title="Promises" href={`${data.basePath}/promises`} icon={PieIcon} />
         {#if data.member.role === 'ADMIN'}
           <SideBarLink title="Call Story" href={`${data.basePath}/call-story`} icon={PieIcon} />
           <SideBarLink title="Members" href={`${data.basePath}/members`} icon={PieIcon} />
           <SideBarLink title="Sip Trunk" href={`${data.basePath}/sip-trunks`} icon={PieIcon} />
           <SideBarLink title="Presence" href={`${data.basePath}/presence`} icon={PieIcon} />
-          <SideBarLink
-            title="Daily Summary"
-            href={`${data.basePath}/daily-summary`}
-            icon={PieIcon}
-          />
           <SideBarLink title="Numbers" href={`${data.basePath}/numbers`} icon={PieIcon} />
           <SideBarLink title="Queues" href={`${data.basePath}/queues`} icon={PieIcon} />
           <SideBarLink title="Voice Bots" href={`${data.basePath}/voice-bots`} icon={PieIcon} />
-          <button
-            class="flex w-full items-center p-2 text-base font-medium text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group mt-4"
-            on:click={() => {
-              showCampaignGroups = !showCampaignGroups;
-            }}
-          >
-            <PieIcon />
-            <span class="ml-3">Campaign</span>
-            <span class="ml-20 mt-1">
-              {#if showCampaignGroups}
-                <AngleDown />
-              {:else}
-                <AngleRight />
-              {/if}
-            </span>
-          </button>
-          {#if showCampaignGroups}
-            <a
-              href={`${data.basePath}/campaign-groups`}
-              class="flex w-full items-center p-2 text-base font-medium text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group ml-6"
-            >
-              Campaign Groups
-            </a>
-
-            <a
-              href={`${data.basePath}/campaign-scripts`}
-              class="flex w-full items-center p-2 text-base font-medium text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group ml-6"
-            >
-              Campaign Scripts
-            </a>
-          {/if}
         {/if}
       </ul>
       <ul class="pt-5 mt-5 space-y-2 border-t border-gray-200 dark:border-gray-700">
@@ -299,16 +199,6 @@
           <SideBarLink
             title="Settings"
             href={`${data.basePath}/settings/webhooks`}
-            icon={SteerIcon}
-          />
-          <SideBarLink
-            title="Billing"
-            href={`${data.basePath}/settings/billing/balance`}
-            icon={SteerIcon}
-          />
-          <SideBarLink
-            title="Compliance"
-            href={`${data.basePath}/settings/compliance/search`}
             icon={SteerIcon}
           />
           <hr class="dark:border-gray-700" />
