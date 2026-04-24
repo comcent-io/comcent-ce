@@ -1,0 +1,26 @@
+http:
+  routers:
+    comcent-api:
+      entryPoints:
+        - web
+      rule: PathPrefix(`/api/v2`) || PathPrefix(`/ws`) || PathPrefix(`/admin`) || PathPrefix(`/health`)
+      service: comcent-api
+      priority: 100
+
+    comcent-webapp:
+      entryPoints:
+        - web
+      rule: PathPrefix(`/`)
+      service: comcent-webapp
+      priority: 1
+
+  services:
+    comcent-api:
+      loadBalancer:
+        servers:
+          - url: http://server:4000
+
+    comcent-webapp:
+      loadBalancer:
+        servers:
+          - url: http://web-app:5174

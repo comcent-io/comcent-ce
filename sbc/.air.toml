@@ -1,0 +1,9 @@
+root = "/app"
+tmp_dir = "/tmp/air"
+
+[build]
+cmd = "go build -o /tmp/air/sbc ."
+bin = "/tmp/air/sbc"
+include_ext = ["go"]
+exclude_dir = ["tmp"]
+delay = 500

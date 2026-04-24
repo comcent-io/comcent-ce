@@ -1,0 +1,69 @@
+FROM node:20.11.1 as deps
+
+# Accept build arguments for npm configuration
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
+ARG NPM_CONFIG_FETCH_RETRIES=5
+ARG NPM_CONFIG_FETCH_RETRY_FACTOR=2
+ARG NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=15000
+ARG NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
+ARG NPM_CONFIG_TIMEOUT=300000
+
+# Set npm configuration
+ENV NPM_CONFIG_REGISTRY=$NPM_CONFIG_REGISTRY \
+  NPM_CONFIG_FETCH_RETRIES=$NPM_CONFIG_FETCH_RETRIES \
+  NPM_CONFIG_FETCH_RETRY_FACTOR=$NPM_CONFIG_FETCH_RETRY_FACTOR \
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=$NPM_CONFIG_FETCH_RETRY_MINTIMEOUT \
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=$NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT \
+  NPM_CONFIG_TIMEOUT=$NPM_CONFIG_TIMEOUT
+
+RUN npm i -g npm@10.2.5
+
+WORKDIR /usr/src/app/packages/web-app
+
+COPY packages/web-app/package*.json ./
+
+RUN npm install --no-fund --no-audit || \
+    (sleep 5 && npm install --no-fund --no-audit) || \
+    (sleep 15 && npm install --no-fund --no-audit)
+
+# Create a separate layer with only production dependencies
+FROM deps as prod-deps
+WORKDIR /usr/src/app/packages/web-app
+RUN npm prune --omit=dev
+
+FROM deps as builder
+WORKDIR /usr/src/app/packages/web-app
+COPY packages/web-app ./
+RUN npm run build
+
+FROM node:20.11.1-slim as runner
+
+# Accept build arguments for npm configuration
+ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
+ARG NPM_CONFIG_FETCH_RETRIES=5
+ARG NPM_CONFIG_FETCH_RETRY_FACTOR=2
+ARG NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=15000
+ARG NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
+ARG NPM_CONFIG_TIMEOUT=300000
+
+# Set npm configuration and environment
+ENV NPM_CONFIG_REGISTRY=$NPM_CONFIG_REGISTRY \
+  NPM_CONFIG_FETCH_RETRIES=$NPM_CONFIG_FETCH_RETRIES \
+  NPM_CONFIG_FETCH_RETRY_FACTOR=$NPM_CONFIG_FETCH_RETRY_FACTOR \
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=$NPM_CONFIG_FETCH_RETRY_MINTIMEOUT \
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=$NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT \
+  NPM_CONFIG_TIMEOUT=$NPM_CONFIG_TIMEOUT \
+  NODE_ENV=production
+
+RUN npm i -g npm@10.2.5
+
+RUN apt-get update -y && apt-get install -y openssl dnsutils iputils-ping curl
+
+WORKDIR /usr/src/app
+RUN mkdir -p packages/web-app/node_modules
+COPY --from=builder /usr/src/app/packages/web-app/package*.json ./packages/web-app/
+COPY --from=prod-deps /usr/src/app/packages/web-app/node_modules ./packages/web-app/node_modules
+COPY --from=builder /usr/src/app/packages/web-app ./packages/web-app/
+
+EXPOSE 3000
+CMD [ "node", "packages/web-app/build/index.js" ]

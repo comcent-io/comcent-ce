@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<scenario name="Unregister Contact">
+  <send retrans="500">
+    <![CDATA[
+
+      REGISTER sip:[field2]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
+      Max-Forwards: 70
+      From: <sip:[field0]@[field2]>;tag=[call_number]
+      To: <sip:[field0]@[field2]>
+      Call-ID: [call_id]
+      CSeq: 1 REGISTER
+      Contact: <sip:[field0]@[local_ip]:[field3];transport=udp>
+      Expires: 0
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <recv response="401" auth="true" />
+
+  <send retrans="500">
+    <![CDATA[
+
+      REGISTER sip:[field2]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
+      Max-Forwards: 70
+      From: <sip:[field0]@[field2]>;tag=[call_number]
+      To: <sip:[field0]@[field2]>
+      Call-ID: [call_id]
+      CSeq: 2 REGISTER
+      Contact: <sip:[field0]@[local_ip]:[field3];transport=udp>
+      Expires: 0
+      [authentication]
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <recv response="200" optional="true" />
+</scenario>

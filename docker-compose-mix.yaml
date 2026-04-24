@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5432:5432
+  rabbitmq:
+    image: rabbitmq:3.12.2-management
+    environment:
+      RABBITMQ_DEFAULT_USER: pavan
+      RABBITMQ_DEFAULT_PASS: testpass
+    ports:
+      - 5672:5672
+      - 15672:15672
+  redis:
+    image: redis:7.4.1
+    ports:
+      - 6379:6379

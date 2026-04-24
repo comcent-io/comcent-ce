@@ -1,0 +1,290 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    env_file:
+      - .env.e2e
+    environment:
+      - POSTGRES_PASSWORD=password
+    ports:
+      - '${E2E_POSTGRES_PORT:-55432}:5432'
+    networks:
+      - comcent-network
+
+  rabbitmq:
+    image: rabbitmq:3.12.2-management
+    env_file:
+      - .env.e2e
+    environment:
+      - RABBITMQ_DEFAULT_USER=kotappa
+      - RABBITMQ_DEFAULT_PASS=password
+    ports:
+      - '${E2E_RABBITMQ_PORT:-55672}:5672'
+      - '${E2E_RABBITMQ_MANAGEMENT_PORT:-55673}:15672'
+    networks:
+      - comcent-network
+
+  redis:
+    image: redis:7.4.1
+    ports:
+      - '${E2E_REDIS_PORT:-56379}:6379'
+    networks:
+      - comcent-network
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - '${E2E_MAILHOG_SMTP_PORT:-51025}:1025'
+      - '${E2E_MAILHOG_HTTP_PORT:-58025}:8025'
+    networks:
+      - comcent-network
+
+  minio:
+    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    command: server /data --console-address ":9001"
+    env_file:
+      - .env.e2e
+    environment:
+      - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
+      - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
+    ports:
+      - '${E2E_MINIO_PORT:-59000}:9000'
+      - '${E2E_MINIO_CONSOLE_PORT:-59001}:9001'
+    networks:
+      - comcent-network
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-03-12T17-29-24Z
+    env_file:
+      - .env.e2e
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set local http://minio:9000 \"$AWS_ACCESS_KEY_ID\" \"$AWS_SECRET_ACCESS_KEY\") do sleep 1; done &&
+      /usr/bin/mc mb -p local/comcent-storage-dev || true
+      "
+    networks:
+      - comcent-network
+
+  server:
+    image: comcent-e2e-server:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-server
+    ports:
+      - '${E2E_SERVER_PORT:-4400}:4000'
+    env_file:
+      - .env.e2e
+    environment:
+      - REDIS_URL=redis://redis
+      - RABBITMQ_URL=amqp://kotappa:password@rabbitmq
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/postgres
+      - S3_ENDPOINT_URL=http://minio:9000
+      - S3_PROXY_DOWNLOADS=true
+      - SMTP_URL=smtp://mailhog:1025
+    command: sh -c "/app/bin/migrate && /app/bin/server start"
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+      - minio-init
+      - mailhog
+    healthcheck:
+      test:
+        ['CMD', 'curl', '--fail', '--silent', 'http://127.0.0.1:4000/health']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 7s
+    networks:
+      - comcent-network
+
+  web-app:
+    image: comcent-e2e-web-app:local
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-web-app
+    env_file:
+      - .env.e2e
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/postgres
+      - PUBLIC_APP_BASE_URL=http://localhost:${E2E_APP_PORT:-4173}
+      - PUBLIC_SIP_WS_URL=ws://localhost:${E2E_SBC_WS_PORT:-4180}
+    depends_on:
+      server:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+    networks:
+      - comcent-network
+
+  traefik:
+    image: traefik:v3.3
+    ports:
+      - '${E2E_APP_PORT:-4173}:80'
+    command:
+      - --entrypoints.web.address=:80
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.watch=true
+      - --accesslog=true
+    volumes:
+      - ./docker/traefik/e2e.yml:/etc/traefik/dynamic.yml:ro
+    depends_on:
+      - server
+      - web-app
+    networks:
+      - comcent-network
+
+  sbc:
+    image: golang:1.26-alpine
+    profiles: ["sbc"]
+    working_dir: /app
+    command: sh -c "apk add --no-cache curl >/dev/null 2>&1; go install github.com/air-verse/air@latest && air -c .air.toml"
+    volumes:
+      - ./sbc:/app
+      - sbc-go-cache:/go
+    environment:
+      - PRIVATE_IP=${E2E_SBC_PRIVATE_IP:-172.29.17.9}
+      - PUBLIC_IP=${E2E_SBC_PRIVATE_IP:-172.29.17.9}
+      - INTERNAL_API_BASE_URL=http://server:4000/internal-api
+      - INTERNAL_API_USERNAME=${INTERNAL_API_USERNAME:-}
+      - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD:-}
+      - RPC_API_TOKEN=${RPC_API_TOKEN:-}
+    ports:
+      - '${E2E_SBC_WS_PORT:-4180}:80'
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        ['CMD', 'curl', '--fail', '--silent', 'http://127.0.0.1:8080/health']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      comcent-network:
+        ipv4_address: 172.29.17.9
+        aliases:
+          - sbc
+
+  sbc-kamailio:
+    profiles: ["kamailio"]
+    build:
+      context: ../kamailio
+      dockerfile: Dockerfile
+    environment:
+      - PRIVATE_IP=${E2E_SBC_PRIVATE_IP:-172.29.17.9}
+      - PUBLIC_IP=${E2E_SBC_PRIVATE_IP:-172.29.17.9}
+      - INTERNAL_API_BASE_URL=http://server:4000/internal-api
+      - INTERNAL_API_USERNAME=${INTERNAL_API_USERNAME:-}
+      - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD:-}
+      - RPC_API_TOKEN=${RPC_API_TOKEN:-}
+    ports:
+      - '${E2E_SBC_WS_PORT:-4180}:80'
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        ['CMD', 'curl', '--fail', '--silent', 'http://127.0.0.1/rpc']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      comcent-network:
+        ipv4_address: 172.29.17.9
+        aliases:
+          - sbc
+
+  freeswitch:
+    build:
+      context: ../freeswitch
+      dockerfile: Dockerfile
+    env_file:
+      - .env.e2e
+    environment:
+      - INTERNAL_API_BASE_URL=http://server:4000/internal-api/xml-curl
+      - EXTERNAL_SIP_IP=${E2E_PUBLIC_IP:-172.29.17.8}
+      - EXTERNAL_RTP_IP=${E2E_PUBLIC_IP:-172.29.17.8}
+      - SIP_BIND_IP=${E2E_FREESWITCH_BIND_IP:-172.29.17.8}
+      - RTP_START_PORT=19000
+      - RTP_END_PORT=19200
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_EC2_METADATA_DISABLED=true
+      - AWS_ENDPOINT_URL=http://minio:9000
+    ports:
+      - '19000-19200:19000-19200/udp'
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      postgres:
+        condition: service_started
+      server:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      comcent-network:
+        ipv4_address: 172.29.17.8
+
+  sipp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-sipp
+    command: sh -c "sleep infinity"
+    working_dir: /tmp
+    volumes:
+      - ./e2e/telephony/sipp:/scenarios:ro
+    networks:
+      - comcent-network
+
+  sipp-uas:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-sipp
+    command: sh -c "sleep infinity"
+    working_dir: /tmp
+    volumes:
+      - ./e2e/telephony/sipp:/scenarios:ro
+    networks:
+      - comcent-network
+
+  sipp-agent-a:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-sipp
+    command: sh -c "sleep infinity"
+    working_dir: /tmp
+    volumes:
+      - ./e2e/telephony/sipp:/scenarios:ro
+    networks:
+      - comcent-network
+
+  sipp-agent-b:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-sipp
+    command: sh -c "sleep infinity"
+    working_dir: /tmp
+    volumes:
+      - ./e2e/telephony/sipp:/scenarios:ro
+    networks:
+      - comcent-network
+
+networks:
+  comcent-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+
+volumes:
+  sbc-go-cache:

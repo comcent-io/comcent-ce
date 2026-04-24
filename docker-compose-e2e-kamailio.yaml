@@ -1,0 +1,21 @@
+# Override: replace Go SBC with Kamailio
+# Usage: docker compose -f docker-compose-e2e-telephony.yaml -f docker-compose-e2e-kamailio.yaml --env-file .env.e2e -p comcent-e2e-telephony ...
+services:
+  kamailio:
+    image: comcent-e2e-kamailio:latest
+    working_dir: /scripts
+    command: []
+    volumes: []
+    env_file:
+      - .env.e2e
+    environment:
+      - PRIVATE_IP=${E2E_KAMAILIO_PRIVATE_IP:-172.29.17.9}
+      - PUBLIC_IP=${E2E_PUBLIC_IP:-172.29.17.9}
+      - INTERNAL_API_BASE_URL=http://server:4000/internal-api
+    healthcheck:
+      test:
+        ['CMD', 'curl', '--fail', '--silent', 'http://127.0.0.1/health']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

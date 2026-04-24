@@ -1,0 +1,80 @@
+{
+  "name": "@comcent/root",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "dotenv -- turbo run dev",
+    "build": "turbo run build",
+    "dev:web-app": "dotenv -- turbo run dev --filter=@comcent/web-app...",
+    "dev:sip-test-tools-ui": "dotenv -- turbo run dev --filter=@comcent/sip-test-tools-ui -- --host 0.0.0.0 --port 5175",
+    "build:web-app": "./tools/build_web_app.sh",
+    "start:web-app": "dotenv -- node packages/web-app/build/index.js",
+    "prepare": "if [ \"$NODE_ENV\" != \"production\" ]; then husky install; fi",
+    "lint": "eslint . --ext .vue,.svelte,.html,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+    "stage-format": "prettier --write",
+    "lint-staged": "lint-staged",
+    "eslint-fix": "eslint --fix",
+    "test:e2e": "dotenvx run --env-file=.env.e2e -- npm run test --prefix e2e",
+    "test:e2e:telephony": "dotenvx run --env-file=.env.e2e -- npm run test:telephony --prefix e2e",
+    "test:e2e:html": "dotenvx run --env-file=.env.e2e -- npm run test:html --prefix e2e",
+    "test:e2e:telephony:html": "dotenvx run --env-file=.env.e2e -- npm run test:telephony:html --prefix e2e",
+    "test:e2e:telephony:sipp:build": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e build sipp sipp-uas",
+    "test:e2e:stack:up": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e up -d --build",
+    "test:e2e:stack:down": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e down --remove-orphans -v",
+    "test:e2e:stack:logs": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e logs --tail=200",
+    "test:e2e:telephony:stack:up": "E2E_SBC_ADMIN_SERVICE=sbc docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e up -d --build",
+    "test:e2e:telephony:stack:up:kamailio": "E2E_SBC_ADMIN_SERVICE=sbc-kamailio COMPOSE_PROFILES=kamailio docker compose -f docker-compose-e2e-telephony.yaml --env-file .env.e2e -p comcent-e2e-telephony up -d --build",
+    "test:e2e:telephony:stack:down": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e down --remove-orphans -v",
+    "test:e2e:telephony:stack:logs": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e logs --tail=200",
+    "test:vscode": "code e2e",
+    "test": "turbo run test",
+    "docker:db:migrate": "docker compose exec -w /app server mix ecto.migrate",
+    "docker:populate-country-state": "docker compose exec -w /code/packages/tools/ comcent-all-in-one node populate_country_state.js",
+    "docker:web-app:build": "docker run --workdir /code -v \"$(pwd)\":/code node:20.11.1 sh -c \"npm i && npm run build\"\n",
+    "check:elixir": "cd server && mix format && mix compile --warnings-as-errors && cd ..",
+    "install:rollup-platform": "./tools/install-rollup-platform.sh"
+  },
+  "lint-staged": {
+    "*.{js,ts,html,css,vue,svelte}": [
+      "npm run eslint-fix",
+      "npm run stage-format"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/comcent-io/comcent-ce.git"
+  },
+  "author": "",
+  "workspaces": [
+    "packages/sip-test-tools-ui",
+    "packages/tools"
+  ],
+  "engines": {
+    "node": "^20.11.1",
+    "npm": "^10.2.4"
+  },
+  "devDependencies": {
+    "@dotenvx/dotenvx": "^0.15.0",
+    "@eslint/eslintrc": "^3.2.0",
+    "@eslint/js": "^9.16.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "dotenv-cli": "^7.3.0",
+    "eslint": "^9.16.0",
+    "globals": "^15.13.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "natural-compare-lite": "^1.4.0",
+    "turbo": "^1.12.4",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "marked": "^16.4.1"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-arm64": "^4.46.2",
+    "@rollup/rollup-darwin-x64": "^4.46.2",
+    "@rollup/rollup-linux-x64-gnu": "^4.46.2"
+  }
+}

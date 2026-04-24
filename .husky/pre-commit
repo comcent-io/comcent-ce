@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+npm run lint-staged
+lint_result=$?
+
+# Check if linting succeeded
+if [ $lint_result -eq 0 ]; then
+  current_branch=$(git symbolic-ref --short HEAD)
+  protected_branches=("main" "dev")
+
+  # Check if the current branch is protected
+  for branch in "${protected_branches[@]}"; do
+    if [ "$branch" == "$current_branch" ]; then
+      echo "Prevented direct commit to branch '$current_branch'"
+      exit 1
+    fi
+  done
+else
+  echo "Linting and formatting errors encountered."
+  exit $lint_result
+fi
+
+npm run check:elixir
+elixir_result=$?
+
+if [ $elixir_result -ne 0 ]; then
+  echo "Elixir checks failed."
+  exit $elixir_result
+fi

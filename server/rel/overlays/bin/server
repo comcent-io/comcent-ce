@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+# Get the container's IP address
+CONTAINER_IP=$(hostname -i)
+
+# Configure for long names (FQDN) instead of short names
+export RELEASE_DISTRIBUTION=name
+export RELEASE_NODE="comcent@${CONTAINER_IP}"
+export RELEASE_COOKIE="${RELEASE_COOKIE:-comcent_cookie}"
+
+cd -P -- "$(dirname -- "$0")"
+PHX_SERVER=true exec ./comcent start

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<scenario name="UAS Answer with PCAP Audio">
+  <!-- Receive INVITE from FreeSwitch -->
+  <recv request="INVITE" />
+
+  <send>
+    <![CDATA[
+
+      SIP/2.0 100 Trying
+      [last_Via:]
+      [last_From:]
+      [last_To:]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <send>
+    <![CDATA[
+
+      SIP/2.0 180 Ringing
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[pid]SIPpTag00[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Contact: <sip:[local_ip]:[local_port];transport=udp>
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <!-- 3 s ring before answering — gives the RINGING span a visible width
+       in the call-story UI without adding meaningful test-run time. -->
+  <pause milliseconds="3000" />
+
+  <send>
+    <![CDATA[
+
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[pid]SIPpTag00[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Contact: <sip:[local_ip]:[local_port];transport=udp>
+      Content-Type: application/sdp
+      Content-Length: [len]
+
+      v=0
+      o=user1 53655765 2353687637 IN IP4 [local_ip]
+      s=-
+      c=IN IP4 [local_ip]
+      t=0 0
+      m=audio [auto_media_port] RTP/AVP 0 101
+      a=rtpmap:0 PCMU/8000
+      a=rtpmap:101 telephone-event/8000
+      a=fmtp:101 0-15
+
+    ]]>
+  </send>
+
+  <recv request="ACK" />
+
+  <!-- Play the customer-side audio PCAP toward FreeSwitch using play_pcap.pl.
+       play-audio.sh reads the FreeSwitch RTP port from the SIPp messages log
+       (-trace_msg writes it in real-time) and calls play_pcap.pl in the
+       background.  Using a separate script avoids shell-quoting issues with
+       awk $2 inside XML exec attributes. -->
+  <nop>
+    <action>
+      <exec command="sh /scenarios/play-audio.sh"/>
+    </action>
+  </nop>
+
+  <recv request="BYE" />
+
+  <send>
+    <![CDATA[
+
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+
+    ]]>
+  </send>
+</scenario>

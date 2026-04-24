@@ -1,0 +1,41 @@
+rtp:
+  portStart: 11000
+  portEnd: 11100
+
+sip:
+  port: 5061
+
+webrtc:
+  portStart: 10000
+  portEnd: 10010
+
+network:
+  publicIP: 192.168.31.23
+
+kamailio:
+  staticIP: 172.31.17.9
+  dockerIP: 172.31.17.9
+  localhostIP: 127.0.0.1
+  port: 5060
+
+logLevel: info
+
+env: dev
+
+calls:
+  phoneNumbers:
+    countryCode: "+91"
+    validFirstDigits: ["6", "7", "8", "9"]
+    remainingDigits: 9
+  queueNumber: "replaceMe"
+  numberOfCalls: 5
+
+agents:
+  - username: replaceMe
+    password: replaceMe
+  - username: replaceMe
+    password: replaceMe
+  - username: replaceMe
+    password: replaceMe
+  - username: replaceMe
+    password: replaceMe

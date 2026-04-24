@@ -1,0 +1,22 @@
+{
+  "name": "@comcent/tools",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "lodash": "^4.17.15",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.24.0",
+    "@types/node": "^20.5.3",
+    "eslint": "^8.28.0",
+    "eslint-config-prettier": "^8.5.0",
+    "prettier": "^3.0.2"
+  }
+}

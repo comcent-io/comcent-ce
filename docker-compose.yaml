@@ -1,0 +1,253 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: password
+    ports:
+      - '5432:5432'
+    networks:
+      - comcent-network
+
+  rabbitmq:
+    image: rabbitmq:3.12.2-management
+    environment:
+      - RABBITMQ_DEFAULT_USER=${DEV_RABBITMQ_USERNAME}
+      - RABBITMQ_DEFAULT_PASS=${DEV_RABBITMQ_PASSWORD}
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    networks:
+      - comcent-network
+
+  redis:
+    image: redis:7.4.1
+    ports:
+      - 6379:6379
+    networks:
+      - comcent-network
+
+  redis-ui:
+    image: redis/redisinsight:2.62
+    ports:
+      - 5540:5540
+    networks:
+      - comcent-network
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+    networks:
+      - comcent-network
+
+  minio:
+    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
+      - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    networks:
+      - comcent-network
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-03-12T17-29-24Z
+    depends_on:
+      - minio
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - STORAGE_BUCKET_NAME=${STORAGE_BUCKET_NAME}
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set dev-minio http://minio:9000 $$AWS_ACCESS_KEY_ID $$AWS_SECRET_ACCESS_KEY; do
+        sleep 1;
+      done;
+      mc mb --ignore-existing dev-minio/$$STORAGE_BUCKET_NAME;
+      "
+    networks:
+      - comcent-network
+
+  server:
+    image: hexpm/elixir:1.18.3-erlang-27.3-debian-bullseye-20250317-slim
+    ports:
+      - '4000:4000'
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis
+      - RABBITMQ_URL=amqp://${DEV_RABBITMQ_USERNAME}:${DEV_RABBITMQ_PASSWORD}@rabbitmq
+      - S3_ENDPOINT_URL=http://minio:9000
+      - S3_PROXY_DOWNLOADS=true
+      - SMTP_URL=smtp://mailhog:1025
+      - PUBLIC_ROOT_URL=http://localhost:5173
+    depends_on:
+      - postgres
+      - minio
+      - minio-init
+      - mailhog
+    volumes:
+      - ./server:/app
+      - server_deps:/app/deps
+      - server_build:/app/_build
+      - server_mix_home:/root/.mix
+      - server_hex_home:/root/.hex
+    working_dir: /app
+    command: >-
+      sh -c "
+      apt-get update -y && apt-get install -y build-essential git curl &&
+      mix local.hex --force --if-missing && mix local.rebar --force --if-missing;
+      LOCK_HASH=$$(md5sum /app/mix.lock 2>/dev/null | awk '{print $$1}');
+      CACHED=$$(cat /app/deps/.mix-lock-hash 2>/dev/null || echo '');
+      if [ \"$$LOCK_HASH\" != \"$$CACHED\" ]; then
+        mix deps.get && echo $$LOCK_HASH > /app/deps/.mix-lock-hash;
+      fi;
+      mix ecto.migrate && mix phx.server
+      "
+    healthcheck:
+      test:
+        ['CMD', 'curl', '--fail', '--silent', 'http://127.0.0.1:4000/health']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 7s
+    networks:
+      - comcent-network
+
+  web-app:
+    image: node:20.11.1
+    env_file:
+      - .env
+    environment:
+      - PUBLIC_APP_BASE_URL=http://localhost:5173
+      - PUBLIC_SIP_WS_URL=ws://localhost/
+    depends_on:
+      - postgres
+    volumes:
+      - ./packages/web-app:/webapp
+      - web_app_node_modules:/webapp/node_modules
+      - web_app_npm_cache:/root/.npm
+    working_dir: /webapp
+    command: >-
+      sh -c "
+      set -e;
+      LOCK_HASH=$$(md5sum /webapp/package-lock.json 2>/dev/null | awk '{print $$1}');
+      CACHED=$$(cat /webapp/node_modules/.package-lock-hash 2>/dev/null || echo '');
+      PHOENIX_FILE=/webapp/node_modules/phoenix/priv/static/phoenix.mjs;
+      if [ -f \"$$PHOENIX_FILE\" ]; then
+        node --input-type=module -e \"await import('file://' + process.argv[1])\" \"$$PHOENIX_FILE\" >/dev/null 2>&1 || find /webapp/node_modules -mindepth 1 -maxdepth 1 -exec rm -rf {} +;
+      fi;
+      if [ ! -d /webapp/node_modules ] || [ \"$$LOCK_HASH\" != \"$$CACHED\" ]; then
+        npm install --no-fund --no-audit ||
+        (sleep 5 && npm install --no-fund --no-audit) ||
+        (sleep 15 && npm install --no-fund --no-audit);
+        mkdir -p /webapp/node_modules && echo $$LOCK_HASH > /webapp/node_modules/.package-lock-hash;
+      fi;
+      npm run dev
+      "
+    networks:
+      - comcent-network
+
+  traefik:
+    image: traefik:v3.3
+    ports:
+      - '5173:80'
+    command:
+      - --entrypoints.web.address=:80
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.watch=true
+      - --accesslog=true
+    volumes:
+      - ./docker/traefik/dev.yml:/etc/traefik/dynamic.yml:ro
+    depends_on:
+      server:
+        condition: service_healthy
+      web-app:
+        condition: service_started
+    networks:
+      - comcent-network
+
+  kamailio:
+    build:
+      context: ../kamailio
+      dockerfile: Dockerfile
+    ports:
+      - '5060:5060/udp'
+      - '5061:5061'
+      - '80:80'
+    networks:
+      comcent-network:
+        ipv4_address: 172.31.17.9
+    environment:
+      - PRIVATE_IP=172.31.17.9
+      - PUBLIC_IP=${DEV_IP}
+      - RPC_API_TOKEN=${RPC_API_TOKEN}
+      - INTERNAL_API_BASE_URL=http://server:4000/internal-api
+      - INTERNAL_API_USERNAME=${INTERNAL_API_USERNAME}
+      - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD}
+    depends_on:
+      server:
+        condition: service_healthy
+
+  freeswitch:
+    build:
+      context: ../freeswitch
+      dockerfile: Dockerfile
+    volumes:
+      - ./fsdata:/usr/local/freeswitch/sounds
+    ports:
+      - '19000-19100:19000-19100/udp'
+    networks:
+      - comcent-network
+    environment:
+      - SOUND_RATES=8000:32000
+      - SOUND_TYPES=music:en-us-callie
+      - EXTERNAL_SIP_IP=${DEV_IP}
+      - EXTERNAL_RTP_IP=${DEV_IP}
+      - RTP_START_PORT=19000
+      - RTP_END_PORT=19100
+      - INTERNAL_API_BASE_URL=http://server:4000/internal-api/xml-curl
+      - INTERNAL_API_USERNAME=${INTERNAL_API_USERNAME}
+      - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${BUCKET_REGION}
+      - AWS_EC2_METADATA_DISABLED=true
+      - AWS_ENDPOINT_URL=http://minio:9000
+    env_file:
+      - .env
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      postgres:
+        condition: service_started
+      server:
+        condition: service_healthy
+      kamailio:
+        condition: service_started
+      minio-init:
+        condition: service_started
+
+networks:
+  comcent-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/16
+
+volumes:
+  postgres_data:
+  minio_data:
+  server_deps:
+  server_build:
+  server_mix_home:
+  server_hex_home:
+  web_app_node_modules:
+  web_app_npm_cache:

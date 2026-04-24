@@ -1,0 +1,48 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[typescript]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  },
+  "[svelte]": {
+    "editor.defaultFormatter": "svelte.svelte-vscode"
+  },
+  "cSpell.words": [
+    "Comcent",
+    "Freeswitch",
+    "freeswitches",
+    "kamailio",
+    "Laddr",
+    "libcluster",
+    "Msgf",
+    "PCMU",
+    "Raddr",
+    "sendgrid",
+    "sipgo",
+    "SSRC",
+    "switchx",
+    "upgrader",
+    "webrtc",
+    "unhold",
+    "recase"
+  ],
+  "[go]": {
+    "editor.defaultFormatter": "golang.go"
+  },
+  "[dockerfile]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+  },
+  "[dotenv]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  },
+  "[properties]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format"
+  },
+<<<<<<< Updated upstream
+  "elixirLS.projectDir": "server"
+=======
+  "[elixir]": {
+    "editor.defaultFormatter": "JakeBecker.elixir-ls"
+  }
+>>>>>>> Stashed changes
+}

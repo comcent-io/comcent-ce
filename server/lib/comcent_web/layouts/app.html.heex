@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" class={if assigns[:admin_layout], do: "h-full", else: "[scrollbar-gutter:stable]"}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <.live_title suffix=" · Comcent">
+      <%= assigns[:page_title] || "Comcent" %>
+    </.live_title>
+    
+    <%= if assigns[:admin_layout] do %>
+      <!-- Admin Layout - Tailwind CSS -->
+      <script src="https://cdn.tailwindcss.com"></script>
+      <script>
+        tailwind.config = {
+          darkMode: 'class',
+          theme: {
+            extend: {
+              colors: {
+                primary: '#3B82F6',
+                secondary: '#1E40AF',
+                accent: '#10B981'
+              }
+            }
+          }
+        }
+      </script>
+      <style>
+        /* Smooth transitions for theme switching */
+        * {
+          transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+        
+        /* Ensure full screen coverage */
+        html, body {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+        }
+        
+        /* Full viewport background */
+        body {
+          background-color: #f9fafb; /* bg-gray-50 */
+        }
+        
+        body.dark {
+          background-color: #111827; /* bg-gray-900 */
+        }
+
+        /* Gradient background for visual appeal */
+        .gradient-bg {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .gradient-bg-dark {
+          background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+        }
+      </style>
+    <% else %>
+      <!-- Regular Layout -->
+      <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"} />
+      <%= if assigns[:include_flowbite] do %>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/1.8.0/flowbite.min.css" rel="stylesheet" />
+      <% end %>
+      <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}>
+      </script>
+      <%= if assigns[:include_flowbite] do %>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/1.8.0/flowbite.min.js"></script>
+      <% end %>
+    <% end %>
+  </head>
+  <body class={if assigns[:admin_layout], do: "bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-300", else: "bg-white antialiased"}>
+    <%= @inner_content %>
+    
+    <%= if assigns[:admin_layout] do %>
+      <!-- Admin Theme Toggle Script -->
+      <script>
+        // Theme functionality with system mode support
+        (function() {
+          const themeToggle = document.getElementById('theme-toggle');
+          const themeDropdown = document.getElementById('theme-dropdown');
+          const html = document.documentElement;
+          const body = document.body;
+          const sunIcon = document.getElementById('sun-icon');
+          const moonIcon = document.getElementById('moon-icon');
+          const systemIcon = document.getElementById('system-icon');
+          
+          // Check for saved theme preference or default to 'system'
+          const currentTheme = localStorage.getItem('theme') || 'system';
+          
+          // Function to apply theme
+          function applyTheme(theme) {
+            if (theme === 'dark') {
+              html.classList.add('dark');
+              body.classList.add('dark');
+            } else if (theme === 'light') {
+              html.classList.remove('dark');
+              body.classList.remove('dark');
+            } else if (theme === 'system') {
+              // Check system preference
+              if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                html.classList.add('dark');
+                body.classList.add('dark');
+              } else {
+                html.classList.remove('dark');
+                body.classList.remove('dark');
+              }
+            }
+            
+            // Update icon visibility
+            if (sunIcon) sunIcon.classList.add('hidden');
+            if (moonIcon) moonIcon.classList.add('hidden');
+            if (systemIcon) systemIcon.classList.add('hidden');
+            
+            if (theme === 'light' && sunIcon) {
+              sunIcon.classList.remove('hidden');
+            } else if (theme === 'dark' && moonIcon) {
+              moonIcon.classList.remove('hidden');
+            } else if (theme === 'system' && systemIcon) {
+              systemIcon.classList.remove('hidden');
+            }
+          }
+          
+          // Apply the saved theme
+          applyTheme(currentTheme);
+          
+          // Listen for system theme changes when in system mode
+          if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+              if (localStorage.getItem('theme') === 'system') {
+                applyTheme('system');
+              }
+            });
+          }
+          
+          // Theme toggle button click - show dropdown
+          if (themeToggle) {
+            themeToggle.addEventListener('click', function(e) {
+              e.stopPropagation();
+              if (themeDropdown) {
+                themeDropdown.classList.toggle('hidden');
+              }
+            });
+          }
+          
+          // Theme option clicks
+          document.querySelectorAll('.theme-option').forEach(option => {
+            option.addEventListener('click', function() {
+              const theme = this.dataset.theme;
+              localStorage.setItem('theme', theme);
+              applyTheme(theme);
+              if (themeDropdown) {
+                themeDropdown.classList.add('hidden');
+              }
+            });
+          });
+          
+          // Close dropdown when clicking outside
+          document.addEventListener('click', function() {
+            if (themeDropdown) {
+              themeDropdown.classList.add('hidden');
+            }
+          });
+          
+          // Prevent dropdown from closing when clicking inside it
+          if (themeDropdown) {
+            themeDropdown.addEventListener('click', function(e) {
+              e.stopPropagation();
+            });
+          }
+        })();
+      </script>
+    <% end %>
+  </body>
+</html>

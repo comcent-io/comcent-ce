@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!--
+  UAS that accepts an INVITE, returns 180 Ringing, and never answers.
+  Used by dial-group timeout tests: the caller keeps ringing until the
+  DialGroup node's timeout elapses and the upstream side sends a CANCEL,
+  at which point the scenario completes cleanly (200 to CANCEL, 487 to
+  INVITE, and the final ACK).
+-->
+<scenario name="UAS Ring Forever">
+  <recv request="INVITE" />
+
+  <send>
+    <![CDATA[
+
+      SIP/2.0 100 Trying
+      [last_Via:]
+      [last_From:]
+      [last_To:]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <send>
+    <![CDATA[
+
+      SIP/2.0 180 Ringing
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[pid]SIPpTag00[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Contact: <sip:[local_ip]:[local_port];transport=udp>
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <recv request="CANCEL" />
+
+  <send>
+    <![CDATA[
+
+      SIP/2.0 200 OK
+      [last_Via:]
+      [last_From:]
+      [last_To:]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <send>
+    <![CDATA[
+
+      SIP/2.0 487 Request Terminated
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[pid]SIPpTag00[call_number]
+      [last_Call-ID:]
+      CSeq: [last_cseq_number] INVITE
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <recv request="ACK" />
+</scenario>

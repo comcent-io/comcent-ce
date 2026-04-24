@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<scenario name="Basic UAS Reject">
+  <recv request="INVITE" />
+
+  <!--
+    Simulate a human glancing at the phone before tapping Decline. We send
+    180 Ringing immediately so the phone shows a ringing state on the
+    caller side, pause ~1.5 s, then return 486 Busy Here. Without this
+    pause the RINGING span in call_stories is zero-length and there's
+    nothing visible in the UI between QUEUE_ATTEMPT_STARTED and
+    QUEUE_ATTEMPT_FAILED.
+  -->
+  <send>
+    <![CDATA[
+
+      SIP/2.0 180 Ringing
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[pid]SIPpTag00[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Contact: <sip:[local_ip]:[local_port];transport=udp>
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <pause milliseconds="1500" />
+
+  <send>
+    <![CDATA[
+
+      SIP/2.0 486 Busy Here
+      [last_Via:]
+      [last_From:]
+      [last_To:];tag=[pid]SIPpTag00[call_number]
+      [last_Call-ID:]
+      [last_CSeq:]
+      Contact: <sip:[local_ip]:[local_port];transport=udp>
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <recv request="ACK" timeout="5000" />
+</scenario>

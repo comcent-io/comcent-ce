@@ -1,0 +1,26 @@
+FROM debian:bookworm-slim
+
+ARG SIPP_VERSION=v3.7.7
+
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    cmake \
+    git \
+    iputils-ping \
+    libncurses-dev \
+    libpcap-dev \
+    libsctp-dev \
+    libssl-dev \
+    pkg-config \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch ${SIPP_VERSION} https://github.com/SIPp/sipp.git /usr/local/src/sipp \
+  && cd /usr/local/src/sipp \
+  && git submodule update --init \
+  && cmake -S . -B build \
+  && cmake --build build -j"$(nproc)" \
+  && cp build/sipp /usr/local/bin/sipp
+
+WORKDIR /scenarios

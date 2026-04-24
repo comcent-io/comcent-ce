@@ -1,0 +1,9 @@
+.DS_Store
+node_modules
+/build
+/.svelte-kit
+/.vite/
+/package
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+static/widget

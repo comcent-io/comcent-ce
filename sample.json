@@ -1,0 +1,162 @@
+{
+    "results": {
+        "channels": [
+            {
+                "alternatives": [
+                    {
+                        "words": [
+                            {
+                                "end": 20.935001,
+                                "word": "and",
+                                "start": 20.695,
+                                "sentiment": "neutral",
+                                "confidence": 0.5336914,
+                                "punctuated_word": "And",
+                                "sentiment_score": -0.02048720419406891
+                            },
+                            {
+                                "end": 21.675,
+                                "word": "just",
+                                "start": 21.175,
+                                "sentiment": "neutral",
+                                "confidence": 0.51220703,
+                                "punctuated_word": "Just.",
+                                "sentiment_score": -0.015151187777519226
+                            },
+                            {
+                                "end": 29.273539,
+                                "word": "hi",
+                                "start": 28.773539,
+                                "sentiment": "neutral",
+                                "confidence": 0.29541016,
+                                "punctuated_word": "Hi",
+                                "sentiment_score": 0.06103911995887756
+                            },
+                            {
+                                "end": 32.758156,
+                                "word": "hello",
+                                "start": 32.439384,
+                                "sentiment": "neutral",
+                                "confidence": 0.97558594,
+                                "punctuated_word": "Hello?",
+                                "sentiment_score": -0.023531373590230945
+                            },
+                            {
+                                "end": 36.503693,
+                                "word": "hello",
+                                "start": 36.105232,
+                                "sentiment": "neutral",
+                                "confidence": 0.9614258,
+                                "punctuated_word": "Hello?",
+                                "sentiment_score": -0.07530463486909866
+                            },
+                            {
+                                "end": 37.380306,
+                                "word": "hello",
+                                "start": 36.981846,
+                                "sentiment": "neutral",
+                                "confidence": 0.35009766,
+                                "punctuated_word": "Hello?",
+                                "sentiment_score": -0.08935854583978653
+                            },
+                            {
+                                "end": 38.655384,
+                                "word": "hello",
+                                "start": 38.256924,
+                                "sentiment": "neutral",
+                                "confidence": 0.9638672,
+                                "punctuated_word": "Hello?",
+                                "sentiment_score": -0.1018424779176712
+                            },
+                            {
+                                "end": 39.85077,
+                                "word": "hello",
+                                "start": 39.531998,
+                                "sentiment": "neutral",
+                                "confidence": 0.9682617,
+                                "punctuated_word": "Hello?",
+                                "sentiment_score": -0.09860578179359436
+                            },
+                            {
+                                "end": 44.89835,
+                                "word": "hello",
+                                "start": 44.57879,
+                                "sentiment": "neutral",
+                                "confidence": 0.6933594,
+                                "punctuated_word": "Hello?",
+                                "sentiment_score": -0.09424933046102524
+                            },
+                            {
+                                "end": 46.815712,
+                                "word": "hello",
+                                "start": 46.416264,
+                                "sentiment": "neutral",
+                                "confidence": 0.9941406,
+                                "punctuated_word": "Hello?",
+                                "sentiment_score": -0.08954574167728424
+                            },
+                            {
+                                "end": 48.812965,
+                                "word": "hello",
+                                "start": 48.413513,
+                                "sentiment": "neutral",
+                                "confidence": 0.9892578,
+                                "punctuated_word": "Hello?",
+                                "sentiment_score": -0.08232009410858154
+                            },
+                            {
+                                "end": 50.171097,
+                                "word": "hello",
+                                "start": 49.851536,
+                                "sentiment": "neutral",
+                                "confidence": 0.9794922,
+                                "punctuated_word": "Hello?",
+                                "sentiment_score": -0.05470876023173332
+                            }
+                        ],
+                        "confidence": 0.76464844,
+                        "transcript": "And Just. Hi Hello? Hello? Hello? Hello? Hello? Hello? Hello? Hello? Hello?"
+                    }
+                ]
+            }
+        ],
+        "sentiments": {
+            "average": {
+                "sentiment": "neutral",
+                "sentiment_score": -0.0659797029061751
+            },
+            "segments": [
+                {
+                    "text": "And Just. Hi Hello? Hello? Hello? Hello? Hello? Hello? Hello? Hello? Hello?",
+                    "end_word": 11,
+                    "sentiment": "neutral",
+                    "start_word": 0,
+                    "sentiment_score": -0.06597970426082611
+                }
+            ]
+        }
+    },
+    "metadata": {
+        "models": [
+            "1ed36bac-f71c-4f3f-a31f-02fd6525c489"
+        ],
+        "sha256": "528ef93510ff8914fd05877974f2d1eef69f5ca635b9ccfed4f3464ea7e005bf",
+        "created": "2025-07-25T03:15:29.688Z",
+        "channels": 1,
+        "duration": 54.619938,
+        "model_info": {
+            "1ed36bac-f71c-4f3f-a31f-02fd6525c489": {
+                "arch": "base",
+                "name": "general",
+                "version": "2024-01-26.8851"
+            }
+        },
+        "request_id": "f442f3f7-c6d9-435e-8090-d75f9b665df5",
+        "sentiment_info": {
+            "model_uuid": "80ab3179-d113-4254-bd6b-4a2f96498695",
+            "input_tokens": 22,
+            "output_tokens": 22
+        },
+        "transaction_key": "deprecated"
+    }
+}

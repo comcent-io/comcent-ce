@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <title>Test Widget</title>
+</head>
+<body>
+
+<h1>Test Widget</h1>
+
+<script>
+    function startWidget() {
+        console.log('startWidget on load')
+        const widget = new window.ComcentDialerWidget({
+            token: '',
+            delegate: {
+                onCallReceived(data) {
+                    console.log('onCallReceived', data)
+                },
+                onOutboundNumberChanged(data) {
+                    console.log('onOutboundNumberChanged', data)
+                }
+            }});
+        widget.load();
+    }
+</script>
+<script src='http://localhost:5173/widget/index.js' onload='startWidget()'></script>
+<link rel='stylesheet' href='http://localhost:5173/widget/style.css'>
+</body>
+</html>
