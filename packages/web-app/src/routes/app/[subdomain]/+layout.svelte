@@ -256,6 +256,7 @@
     {origin}
     appBaseUrl={configuredAppBaseUrl || origin}
     sipWsUrl={configuredSipWsUrl}
+    sipDomain={env.PUBLIC_SIP_DOMAIN}
     bind:this={dialerWidget}
   />
 

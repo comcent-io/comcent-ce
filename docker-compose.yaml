@@ -1,3 +1,5 @@
+# CE dev uses EE ports + 1000 so both stacks can run side-by-side on one host.
+# Container-internal ports stay standard so nothing downstream changes.
 services:
   postgres:
     image: pgvector/pgvector:pg15
@@ -6,7 +8,7 @@ services:
     environment:
       POSTGRES_PASSWORD: password
     ports:
-      - '5432:5432'
+      - '6432:5432'
     networks:
       - comcent-network
 
@@ -16,22 +18,22 @@ services:
       - RABBITMQ_DEFAULT_USER=${DEV_RABBITMQ_USERNAME}
       - RABBITMQ_DEFAULT_PASS=${DEV_RABBITMQ_PASSWORD}
     ports:
-      - '5672:5672'
-      - '15672:15672'
+      - '6672:5672'
+      - '16672:15672'
     networks:
       - comcent-network
 
   redis:
     image: redis:7.4.1
     ports:
-      - 6379:6379
+      - 7379:6379
     networks:
       - comcent-network
 
   redis-ui:
     image: redis/redisinsight:2.62
     ports:
-      - 5540:5540
+      - 6540:5540
     networks:
       - comcent-network
 
@@ -39,7 +41,7 @@ services:
     image: mailhog/mailhog:v1.0.1
     ports:
       - '11025:1025'
-      - '8025:8025'
+      - '9025:8025'
     networks:
       - comcent-network
 
@@ -50,8 +52,8 @@ services:
       - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
       - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - '10000:9000'
+      - '10001:9001'
     volumes:
       - minio_data:/data
     networks:
@@ -78,7 +80,7 @@ services:
   server:
     image: hexpm/elixir:1.18.3-erlang-27.3-debian-bullseye-20250317-slim
     ports:
-      - '4000:4000'
+      - '5400:4000'
     env_file:
       - .env
     environment:
@@ -87,7 +89,7 @@ services:
       - S3_ENDPOINT_URL=http://minio:9000
       - S3_PROXY_DOWNLOADS=true
       - SMTP_URL=smtp://mailhog:1025
-      - PUBLIC_ROOT_URL=http://localhost:5173
+      - PUBLIC_ROOT_URL=http://localhost:6173
     depends_on:
       - postgres
       - minio
@@ -126,8 +128,8 @@ services:
     env_file:
       - .env
     environment:
-      - PUBLIC_APP_BASE_URL=http://localhost:5173
-      # PUBLIC_SIP_WS_URL comes from .env (ws://localhost:5173/sip-ws) so the
+      - PUBLIC_APP_BASE_URL=http://localhost:6173
+      # PUBLIC_SIP_WS_URL comes from .env (ws://localhost:6173/sip-ws) so the
       # browser goes through Traefik, which routes /sip-ws to the SBC.
     depends_on:
       - postgres
@@ -159,7 +161,7 @@ services:
   traefik:
     image: traefik:v3.3
     ports:
-      - '5173:80'
+      - '6173:80'
     command:
       - --entrypoints.web.address=:80
       - --providers.file.filename=/etc/traefik/dynamic.yml
@@ -180,9 +182,9 @@ services:
       context: .
       dockerfile: docker/Dockerfile-sbc
     ports:
-      - '5060:5060/udp'
-      - '5060:5060/tcp'
-      - '5061:5061/tcp'
+      - '6060:5060/udp'
+      - '6060:5060/tcp'
+      - '6061:5061/tcp'
     networks:
       comcent-network:
         ipv4_address: 172.31.17.9
