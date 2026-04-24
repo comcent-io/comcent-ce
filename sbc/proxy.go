@@ -981,12 +981,7 @@ func (p *Proxy) authenticateExternalRequest(req *sip.Request, tx sip.ServerTrans
 			sendAuthChallenge(tx, req, fromDomain)
 			return false
 		}
-		subdomain := strings.Split(fromDomain, ".")[0]
-		balance, err := p.api.GetWalletBalance(subdomain)
-		if err != nil || balance <= 0 {
-			tx.Respond(sip.NewResponseFromRequest(req, 402, "Payment Required", nil))
-			return false
-		}
+		// CE: no billing/wallet gate. Wallet balance check is EE-only.
 		return true
 	}
 

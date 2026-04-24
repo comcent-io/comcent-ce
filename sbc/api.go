@@ -122,28 +122,6 @@ func (a *InternalAPI) GetSIPTrunk(number string) (*TrunkData, error) {
 	return &data, nil
 }
 
-func (a *InternalAPI) GetWalletBalance(subdomain string) (float64, error) {
-	resp, err := a.post("/org/walletBalance", url.Values{
-		"subdomain": {subdomain},
-	})
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return 0, fmt.Errorf("wallet API returned %d", resp.StatusCode)
-	}
-
-	var result struct {
-		Balance float64 `json:"balance"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return 0, err
-	}
-	return result.Balance, nil
-}
-
 func (a *InternalAPI) UpdateUserPresence(subdomain, action, username string) {
 	resp, err := a.post("/user/presence", url.Values{
 		"subdomain": {subdomain},
