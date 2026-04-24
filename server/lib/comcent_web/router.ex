@@ -75,6 +75,8 @@ defmodule ComcentWeb.Router do
     get("/call-story/:call_story_id/summary", CallStoryController, :get_summary)
     get("/call-story/:call_story_id/sentiment", CallStoryController, :get_sentiment)
     get("/call-stories", CallStoryController, :get_call_stories)
+    get("/daily-summaries", DailySummaryController, :get_daily_summaries)
+    get("/daily-summaries/sentiment-counts", DailySummaryController, :get_sentiment_counts)
     get("/settings/ai-analysis", OrgAiSettingsController, :get)
     post("/settings/ai-analysis", OrgAiSettingsController, :update)
     get("/numbers", NumberController, :get_numbers)
@@ -145,8 +147,9 @@ defmodule ComcentWeb.Router do
     delete("/me/api-keys/:api_key", MemberController, :delete_api_key)
     get("/dashboard/aggregate-presence", MemberController, :get_aggregate_presence)
     get("/calls/live", DashboardController, :get_live_calls)
-
-
+    get("/promises", PromiseController, :get_promises)
+    put("/promises/close", PromiseController, :close_promises)
+    put("/promises/:promise_id/assign", PromiseController, :update_assigned_to)
   end
 
   scope "/api/v2/:subdomain/widget", ComcentWeb do

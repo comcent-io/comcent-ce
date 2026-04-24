@@ -184,11 +184,17 @@
     <div class="overflow-y-auto py-5 px-3 h-full bg-white dark:bg-gray-800">
       <ul class="space-y-2">
         <SideBarLink title="Dashboard" href={`${data.basePath}`} icon={PieIcon} />
+        <SideBarLink title="Promises" href={`${data.basePath}/promises`} icon={PieIcon} />
         {#if data.member.role === 'ADMIN'}
           <SideBarLink title="Call Story" href={`${data.basePath}/call-story`} icon={PieIcon} />
           <SideBarLink title="Members" href={`${data.basePath}/members`} icon={PieIcon} />
           <SideBarLink title="Sip Trunk" href={`${data.basePath}/sip-trunks`} icon={PieIcon} />
           <SideBarLink title="Presence" href={`${data.basePath}/presence`} icon={PieIcon} />
+          <SideBarLink
+            title="Daily Summary"
+            href={`${data.basePath}/daily-summary`}
+            icon={PieIcon}
+          />
           <SideBarLink title="Numbers" href={`${data.basePath}/numbers`} icon={PieIcon} />
           <SideBarLink title="Queues" href={`${data.basePath}/queues`} icon={PieIcon} />
           <SideBarLink title="Voice Bots" href={`${data.basePath}/voice-bots`} icon={PieIcon} />
