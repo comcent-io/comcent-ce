@@ -1,0 +1,267 @@
+# Comcent CE — deployment docker-compose.
+#
+# For OSS self-hosters. One domain fronts server (API), web-app, and
+# the SIP WebSocket. Raw SIP and RTP media ports sit outside Traefik
+# (different protocol).
+#
+# Quick start:
+#   mkdir comcent-ce && cd comcent-ce
+#   curl -O https://raw.githubusercontent.com/comcent-io/comcent-ce/main/docker-compose.deploy.yaml
+#   curl -O https://raw.githubusercontent.com/comcent-io/comcent-ce/main/.env.deploy.example
+#   mv .env.deploy.example .env
+#   # edit .env — set COMCENT_DOMAIN, LETSENCRYPT_EMAIL, DATABASE/REDIS/RABBITMQ passwords,
+#   # DEEPGRAM_API_KEY, OPENAI_API_KEY, AWS storage creds
+#   docker compose -f docker-compose.deploy.yaml up -d
+#   docker compose -f docker-compose.deploy.yaml logs -f server
+#
+# Requirements on the host:
+#   - Public DNS A record: ${COMCENT_DOMAIN} -> your droplet IP
+#   - Inbound ports open: 80, 443 (HTTP/HTTPS), 5060 UDP/TCP (SIP),
+#     5061 TCP (SIP/TLS), 19000-19100 UDP (RTP media)
+#   - Docker 24+ and docker compose plugin
+#
+# All persistent data lives in named volumes (postgres_data, etc.).
+# Back these up on your schedule.
+
+services:
+  # ---------------------------------------------------------------------------
+  # Reverse proxy — terminates TLS, routes to server/web-app, ACME for certs
+  # ---------------------------------------------------------------------------
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    command:
+      - --api.dashboard=false
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=comcent-network
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      # Force HTTPS
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      # Let's Encrypt HTTP-01 challenge
+      - --certificatesresolvers.letsencrypt.acme.email=${LETSENCRYPT_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --accesslog=true
+      - --log.level=INFO
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - comcent-network
+
+  # ---------------------------------------------------------------------------
+  # Data services
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-comcent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-comcent}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', '${POSTGRES_USER:-comcent}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - comcent-network
+
+  redis:
+    image: redis:7.4.1
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - comcent-network
+
+  rabbitmq:
+    image: rabbitmq:3.12.2-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-comcent}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - comcent-network
+
+  # ---------------------------------------------------------------------------
+  # Comcent Elixir API server
+  # ---------------------------------------------------------------------------
+  server:
+    image: ghcr.io/comcent-io/comcent-ce:${COMCENT_VERSION:-latest}
+    # Fallback to local build if image not yet published to GHCR:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PHX_HOST: ${COMCENT_DOMAIN}
+      PHX_SERVER: 'true'
+      PORT: '4000'
+      DATABASE_URL: postgres://${POSTGRES_USER:-comcent}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-comcent}
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-comcent}:${RABBITMQ_PASSWORD}@rabbitmq
+      PUBLIC_ROOT_URL: https://${COMCENT_DOMAIN}
+      APP_BASE_URL: https://${COMCENT_DOMAIN}
+      SIP_DOMAIN: ${COMCENT_DOMAIN}
+      # SBC is the in-tree Go SBC replacing Kamailio in CE
+      KAMAILIO_SIP_URI: sip:${COMCENT_DOMAIN}
+      CLUSTER_STRATEGY: gossip
+      POSTGRES_SSL_ENABLED: 'false'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.comcent-api.rule=Host(`${COMCENT_DOMAIN}`) && (PathPrefix(`/api/`) || PathPrefix(`/ws`) || PathPrefix(`/health`) || PathPrefix(`/internal-api`))'
+      - 'traefik.http.routers.comcent-api.entrypoints=websecure'
+      - 'traefik.http.routers.comcent-api.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.comcent-api.priority=100'
+      - 'traefik.http.services.comcent-api.loadbalancer.server.port=4000'
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', '--silent', 'http://127.0.0.1:4000/health']
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - comcent-network
+
+  # ---------------------------------------------------------------------------
+  # Comcent web-app (SvelteKit SSR)
+  # ---------------------------------------------------------------------------
+  web-app:
+    image: ghcr.io/comcent-io/comcent-ce-webapp:${COMCENT_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-web-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: '3000'
+      ORIGIN: https://${COMCENT_DOMAIN}
+      PUBLIC_APP_BASE_URL: https://${COMCENT_DOMAIN}
+      PUBLIC_ROOT_URL: ${COMCENT_DOMAIN}
+      PUBLIC_SIP_WS_URL: wss://${COMCENT_DOMAIN}/sip-ws
+      PUBLIC_SIP_DOMAIN: ${COMCENT_DOMAIN}
+      INTERNAL_API_BASE_URL: http://server:4000/internal-api
+    depends_on:
+      server:
+        condition: service_healthy
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.comcent-webapp.rule=Host(`${COMCENT_DOMAIN}`)'
+      - 'traefik.http.routers.comcent-webapp.entrypoints=websecure'
+      - 'traefik.http.routers.comcent-webapp.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.comcent-webapp.priority=1'
+      - 'traefik.http.services.comcent-webapp.loadbalancer.server.port=3000'
+    networks:
+      - comcent-network
+
+  # ---------------------------------------------------------------------------
+  # Go SBC — SIP proxy / registrar / dispatcher (replaces Kamailio in CE)
+  # Listens on 5060 UDP+TCP for SIP signaling, 5061 TCP for SIP/TLS.
+  # Not behind Traefik: SIP is not HTTP.
+  # ---------------------------------------------------------------------------
+  sbc:
+    image: ghcr.io/comcent-io/comcent-ce-sbc:${COMCENT_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-sbc
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      INTERNAL_API_BASE_URL: http://server:4000/internal-api
+      INTERNAL_API_USERNAME: ${INTERNAL_API_USERNAME:-internal_api}
+      INTERNAL_API_PASSWORD: ${INTERNAL_API_PASSWORD}
+      SIP_DOMAIN: ${COMCENT_DOMAIN}
+    ports:
+      - '5060:5060/udp'
+      - '5060:5060/tcp'
+      - '5061:5061/tcp'
+    depends_on:
+      server:
+        condition: service_healthy
+    # SIP WebSocket can be fronted by Traefik for TLS termination (wss://)
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.sip-ws.rule=Host(`${COMCENT_DOMAIN}`) && PathPrefix(`/sip-ws`)'
+      - 'traefik.http.routers.sip-ws.entrypoints=websecure'
+      - 'traefik.http.routers.sip-ws.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.sip-ws.priority=200'
+      - 'traefik.http.services.sip-ws.loadbalancer.server.port=5062'
+    networks:
+      - comcent-network
+
+  # ---------------------------------------------------------------------------
+  # FreeSWITCH — media server for RTP. Not behind Traefik (raw RTP, not HTTP).
+  # ---------------------------------------------------------------------------
+  freeswitch:
+    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      EXTERNAL_SIP_IP: ${PUBLIC_IP}
+      EXTERNAL_RTP_IP: ${PUBLIC_IP}
+      RTP_START_PORT: '19000'
+      RTP_END_PORT: '19100'
+      INTERNAL_API_BASE_URL: http://server:4000/internal-api/xml-curl
+      INTERNAL_API_USERNAME: ${INTERNAL_API_USERNAME:-internal_api}
+      INTERNAL_API_PASSWORD: ${INTERNAL_API_PASSWORD}
+      SIP_DOMAIN: ${COMCENT_DOMAIN}
+    ports:
+      - '19000-19100:19000-19100/udp'
+    depends_on:
+      server:
+        condition: service_healthy
+      sbc:
+        condition: service_started
+    networks:
+      - comcent-network
+
+  # ---------------------------------------------------------------------------
+  # Voice bot (AI) — OPTIONAL. Uncomment to enable real-time AI voice agent.
+  # Needs DEEPGRAM_API_KEY and OPENAI_API_KEY in .env.
+  # ---------------------------------------------------------------------------
+  # voice-bot:
+  #   image: ghcr.io/comcent-io/go-voice-bot-ce:${VOICE_BOT_VERSION:-latest}
+  #   restart: unless-stopped
+  #   env_file: .env
+  #   environment:
+  #     COMCENT_API_URL: http://server:4000
+  #     SIP_DOMAIN: ${COMCENT_DOMAIN}
+  #     SIP_REGISTER_URL: sip:sbc:5060
+  #   depends_on:
+  #     server:
+  #       condition: service_healthy
+  #   networks:
+  #     - comcent-network
+
+networks:
+  comcent-network:
+    name: comcent-network
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  traefik_letsencrypt:

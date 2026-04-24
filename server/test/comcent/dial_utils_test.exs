@@ -11,7 +11,7 @@ defmodule Comcent.DialUtilsTest do
       System.put_env("KAMAILIO_SIP_URI", "192.168.1.100")
 
       expected =
-        "sofia/internal/test_user@test_subdomain.comcent.io;fs_path=192.168.1.100,[media_webrtc=true]sofia/internal/test_user@test_subdomain.comcent.io;fs_path=192.168.1.100"
+        "sofia/internal/test_user@test_subdomain.example.com;fs_path=192.168.1.100,[media_webrtc=true]sofia/internal/test_user@test_subdomain.example.com;fs_path=192.168.1.100"
 
       assert DialUtils.create_dial_string_for_user("test_user", "test_subdomain") == expected
 
