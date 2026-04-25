@@ -402,19 +402,16 @@ defmodule ComcentWeb.Internal.DialplanController do
   end
 
   defp can_make_calls_by_org_id(org_id) do
-    # Check if the org has enough wallet balance and is active
+    # CE: no wallet/billing — gate calls only on org.is_active.
     query =
       from(o in "orgs",
         where: o.id == ^org_id,
-        select: %{
-          wallet_balance: o.wallet_balance,
-          is_active: o.is_active
-        }
+        select: %{is_active: o.is_active}
       )
 
     case Repo.one(query) do
       nil -> false
-      org -> org.wallet_balance > 0 && org.is_active
+      org -> org.is_active
     end
   end
 
