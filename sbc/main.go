@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net"
@@ -61,7 +62,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	publicClient, err := sipgo.NewClient(publicUA)
+	// Reuse the public listener socket so outgoing requests carry
+	// Via=PublicIP:PublicSIPPort. Without this sipgo opens an ephemeral
+	// socket and stamps Via with 0.0.0.0:<random>, which makes peers
+	// route responses to a port no NAT mapping covers.
+	publicClient, err := sipgo.NewClient(
+		publicUA,
+		sipgo.WithClientHostname(cfg.PublicIP),
+		sipgo.WithClientPort(cfg.PublicSIPPort),
+		sipgo.WithClientConnectionAddr("0.0.0.0:5060"),
+	)
 	if err != nil {
 		slog.Error("Failed to create public client", "error", err)
 		os.Exit(1)
@@ -131,8 +141,26 @@ func main() {
 	// Port 80: mixed HTTP (health/rpc) + WebSocket (SIP over WS)
 	// WebSocket uses public server (external WebRTC agents)
 	g.Go(func() error {
-		return startMuxListener(ctx, publicSrv, dispatcher, cfg, "0.0.0.0:80")
+		return startMuxListener(ctx, publicSrv, dispatcher, cfg, "0.0.0.0:80", nil)
 	})
+
+	// WSS listener — only when cert paths are configured (production).
+	// In dev we expose plain WS on a different host port and skip TLS entirely.
+	if cfg.WSSCertPath != "" && cfg.WSSKeyPath != "" {
+		g.Go(func() error {
+			reloader, err := waitForCertReloader(ctx, cfg.WSSCertPath, cfg.WSSKeyPath)
+			if err != nil {
+				return fmt.Errorf("WSS cert reloader: %w", err)
+			}
+			tlsCfg := &tls.Config{
+				GetCertificate: reloader.Get,
+				MinVersion:     tls.VersionTLS12,
+			}
+			addr := fmt.Sprintf("0.0.0.0:%d", cfg.WSSPort)
+			slog.Info("WSS listener", "addr", addr, "cert", cfg.WSSCertPath)
+			return startMuxListener(ctx, publicSrv, dispatcher, cfg, addr, tlsCfg)
+		})
+	}
 
 	// Port 8080: health-only for Docker healthcheck
 	g.Go(func() error {
@@ -148,17 +176,43 @@ func main() {
 	})
 
 	// Auto-discover FS on startup
+	// Auto-discover FS by hostname and re-resolve every 30s so docker-compose
+	// restart-races (FS gets a new container IP after we start) can't strand
+	// the dispatcher on a dead address.
 	go func() {
-		time.Sleep(2 * time.Second)
-		addrs, err := net.LookupHost("freeswitch")
-		if err != nil {
-			slog.Info("FS auto-discovery: freeswitch hostname not found", "error", err)
-			return
-		}
-		for _, addr := range addrs {
-			uri := "sip:" + addr + ":5070"
-			dispatcher.AddTarget(uri)
-			slog.Info("FS auto-discovered", "uri", uri)
+		known := map[string]bool{}
+		tick := time.NewTicker(30 * time.Second)
+		defer tick.Stop()
+		first := time.NewTimer(2 * time.Second)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-first.C:
+			case <-tick.C:
+			}
+			addrs, err := net.LookupHost("freeswitch")
+			if err != nil {
+				slog.Debug("FS auto-discovery lookup failed", "error", err)
+				continue
+			}
+			seen := map[string]bool{}
+			for _, addr := range addrs {
+				uri := "sip:" + addr + ":5070"
+				seen[uri] = true
+				if !known[uri] {
+					dispatcher.AddTarget(uri)
+					known[uri] = true
+					slog.Info("FS auto-discovered", "uri", uri)
+				}
+			}
+			for uri := range known {
+				if !seen[uri] {
+					dispatcher.RemoveTarget(uri)
+					delete(known, uri)
+					slog.Info("FS auto-discovery: target removed (no longer resolves)", "uri", uri)
+				}
+			}
 		}
 	}()
 
@@ -170,8 +224,14 @@ func main() {
 	slog.Info("SBC shutdown complete")
 }
 
-func startMuxListener(ctx context.Context, srv *sipgo.Server, dispatcher *Dispatcher, cfg Config, addr string) error {
-	tcpLn, err := net.Listen("tcp", addr)
+func startMuxListener(ctx context.Context, srv *sipgo.Server, dispatcher *Dispatcher, cfg Config, addr string, tlsCfg *tls.Config) error {
+	var tcpLn net.Listener
+	var err error
+	if tlsCfg != nil {
+		tcpLn, err = tls.Listen("tcp", addr, tlsCfg)
+	} else {
+		tcpLn, err = net.Listen("tcp", addr)
+	}
 	if err != nil {
 		return err
 	}
@@ -192,7 +252,11 @@ func startMuxListener(ctx context.Context, srv *sipgo.Server, dispatcher *Dispat
 	})
 	httpMux.HandleFunc("/rpc", dispatcher.handleRPC(cfg.RPCAPIToken))
 
-	slog.Info("Mixed HTTP+WS listener", "addr", addr)
+	proto := "plain"
+	if tlsCfg != nil {
+		proto = "tls"
+	}
+	slog.Info("Mixed HTTP+WS listener", "addr", addr, "proto", proto)
 
 	for {
 		conn, err := tcpLn.Accept()

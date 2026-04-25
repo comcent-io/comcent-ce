@@ -82,7 +82,7 @@ defmodule Comcent.NewCallStoryProcessor do
   end
 
   defp extract_agent_transcript(transcript_text) do
-    domain = Application.fetch_env!(:comcent, :sip_domain)
+    domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
     transcript_text
     |> String.split("\n\n")

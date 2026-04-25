@@ -61,10 +61,10 @@ defmodule Comcent.QueueScheduler do
   end
 
   def via_tuple(queue_id, subdomain) do
-    sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+    sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
     {:via, Horde.Registry,
-     {Comcent.Registry, "queue_scheduler_#{queue_id}@#{subdomain}.#{sip_domain}"}}
+     {Comcent.Registry, "queue_scheduler_#{queue_id}@#{subdomain}.#{sip_user_root_domain}"}}
   end
 
   def add_waiting_call(pid, call_details),

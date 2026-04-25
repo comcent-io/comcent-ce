@@ -2,7 +2,7 @@
   import type { LayoutData } from './$types';
   import DialerWidget from '$lib/components/DialerWidget/DialerWidget.svelte';
   import { browser } from '$app/environment';
-  import { env } from '$env/dynamic/public';
+  import { publicAppBaseUrl, publicSipUserRootDomain, publicSipWsUrl } from '$lib/publicConfig';
   import { page } from '$app/stores';
   import PieIcon from '$lib/components/Icons/PieIcon.svelte';
   import SteerIcon from '$lib/components/Icons/SteerIcon.svelte';
@@ -79,8 +79,8 @@
   if (browser) {
     origin = window.location.origin;
   }
-  const configuredAppBaseUrl = env.PUBLIC_APP_BASE_URL || null;
-  const configuredSipWsUrl = env.PUBLIC_SIP_WS_URL || null;
+  const configuredAppBaseUrl = publicAppBaseUrl;
+  const configuredSipWsUrl = publicSipWsUrl;
 </script>
 
 <div class="antialiased bg-gray-50 dark:bg-gray-900">
@@ -262,7 +262,7 @@
     {origin}
     appBaseUrl={configuredAppBaseUrl || origin}
     sipWsUrl={configuredSipWsUrl}
-    sipDomain={env.PUBLIC_SIP_DOMAIN}
+    sipDomain={publicSipUserRootDomain}
     bind:this={dialerWidget}
   />
 

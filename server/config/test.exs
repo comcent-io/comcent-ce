@@ -3,7 +3,7 @@ import Config
 # Test defaults for env-driven config — runtime.exs is also loaded in test
 # mode but needs these to be set either via env vars or (preferred for CI)
 # via this file so tests don't depend on the developer's .env.
-config :comcent, :sip_domain, System.get_env("SIP_DOMAIN", "example.com")
+config :comcent, :sip_user_root_domain, System.get_env("SIP_USER_ROOT_DOMAIN", "example.com")
 config :comcent, :app_base_url, System.get_env("APP_BASE_URL", "https://app.example.com")
 
 # Configure your database

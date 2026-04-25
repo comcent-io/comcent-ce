@@ -108,7 +108,8 @@ services:
       - .env.e2e
     environment:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/postgres
-      - PUBLIC_APP_BASE_URL=http://localhost:${E2E_APP_PORT:-4173}
+      - PUBLIC_BASE_URL=http://localhost:${E2E_APP_PORT:-4173}
+      # E2E hits the SBC directly on port 4180, bypassing Traefik.
       - PUBLIC_SIP_WS_URL=ws://localhost:${E2E_SBC_WS_PORT:-4180}
     depends_on:
       server:
@@ -150,6 +151,7 @@ services:
       - INTERNAL_API_USERNAME=${INTERNAL_API_USERNAME:-}
       - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD:-}
       - RPC_API_TOKEN=${RPC_API_TOKEN:-}
+      - SIP_USER_ROOT_DOMAIN=localhost
     ports:
       - '${E2E_SBC_WS_PORT:-4180}:80'
     depends_on:

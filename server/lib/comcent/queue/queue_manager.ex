@@ -26,12 +26,12 @@ defmodule Comcent.QueueManager do
     query =
       from(q in Queue, join: o in Org, on: q.org_id == o.id, select: {q.id, q.name, o.subdomain})
 
-    sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+    sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
     Repo.all(query)
     |> Enum.each(fn {queue_id, queue_name, subdomain} ->
       start_queue_manager_worker(queue_id, subdomain)
-      Logger.info("Started queue scheduler for #{queue_name}@#{subdomain}.#{sip_domain}")
+      Logger.info("Started queue scheduler for #{queue_name}@#{subdomain}.#{sip_user_root_domain}")
     end)
 
     Logger.info("\n=== Started queue scheduler processes ===\n")
@@ -45,11 +45,11 @@ defmodule Comcent.QueueManager do
   end
 
   def stop_queue_manager_worker(queue_id, subdomain) do
-    sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+    sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
     case Horde.Registry.lookup(
            Comcent.Registry,
-           "queue_scheduler_#{queue_id}@#{subdomain}.#{sip_domain}"
+           "queue_scheduler_#{queue_id}@#{subdomain}.#{sip_user_root_domain}"
          ) do
       [{pid, _}] ->
         Horde.DynamicSupervisor.terminate_child(Comcent.DynamicSupervisor, pid)
@@ -78,11 +78,11 @@ defmodule Comcent.QueueManager do
   end
 
   def get_worker_pid(queue_id, subdomain) do
-    sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+    sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
     case Horde.Registry.lookup(
            Comcent.Registry,
-           "queue_scheduler_#{queue_id}@#{subdomain}.#{sip_domain}"
+           "queue_scheduler_#{queue_id}@#{subdomain}.#{sip_user_root_domain}"
          ) do
       [{pid, _}] -> pid
       [] -> nil

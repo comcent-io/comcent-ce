@@ -192,19 +192,17 @@ defmodule Comcent.Repo.OrgMember do
 
   ## Parameters
     - subdomain: The organization's subdomain
-    - username: The username of the user (should be decoded by the caller)
+    - user_id: The user_id of the member (already resolved by the caller)
 
   ## Returns
     - :ok on success
     - {:error, reason} on failure
   """
-  def revert_member_presence_from_on_call(subdomain, username) do
+  def revert_member_presence_from_on_call(subdomain, user_id) do
     alias Comcent.RedisClient
 
-    user_id = get_user_id_by_username_and_subdomain(username, subdomain)
-
     Logger.info(
-      "Reverting member presence from On Call to #{username} for subdomain #{subdomain}"
+      "Reverting member presence from On Call for user #{user_id} in subdomain #{subdomain}"
     )
 
     # Get the previous presence from Redis

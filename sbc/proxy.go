@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/emiago/sipgo"
@@ -84,7 +85,7 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 	domain := fromURI.Address.Host
 	aor := user + "@" + domain
 
-	if !strings.HasSuffix(domain, p.cfg.SIPDomain) {
+	if !strings.HasSuffix(domain, p.cfg.SIPUserRootDomain) {
 		tx.Respond(sip.NewResponseFromRequest(req, 403, "Forbidden", nil))
 		return
 	}
@@ -113,6 +114,14 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 	}
 
 	contactHeader := req.GetHeader("Contact")
+
+	// RFC 3261: an `expires` parameter on the Contact header takes precedence
+	// over the Expires header. SIP.js (and most WS clients) only set the param.
+	if contactHeader != nil {
+		if v, ok := contactExpiresParam(contactHeader.Value()); ok {
+			expires = v
+		}
+	}
 
 	// Contact: * with Expires: 0 → unregister all contacts for this AOR
 	if contactHeader != nil && contactHeader.Value() == "*" && expires == 0 {
@@ -203,7 +212,7 @@ func (p *Proxy) handleInviteToFS(req *sip.Request, tx sip.ServerTransaction, sou
 	}
 
 	callID := req.CallID().Value()
-	userAORs := comcentUsersForRequest(req, p.cfg.SIPDomain)
+	userAORs := comcentUsersForRequest(req, p.cfg.SIPUserRootDomain)
 
 	target, ok := p.selectTargetForUsers(userAORs)
 	if !ok {
@@ -307,7 +316,7 @@ func (p *Proxy) handleInviteFromFS(req *sip.Request, tx sip.ServerTransaction) {
 	toUser := req.To().Address.User
 	toDomain := req.To().Address.Host
 
-	if strings.HasSuffix(toDomain, p.cfg.SIPDomain) {
+	if strings.HasSuffix(toDomain, p.cfg.SIPUserRootDomain) {
 		p.handleInviteFromFSToUser(req, tx, toUser, toDomain)
 	} else {
 		p.handleInviteFromFSToTrunk(req, tx, toUser)
@@ -330,10 +339,7 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 		return
 	}
 
-	// Use first matching contact (fan-out TODO)
-	contact := contacts[0]
-	slog.Info("Proxy: FS→user", "aor", aor, "address", contact.Address,
-		"webrtc", contact.IsWebRTC, "contacts", len(contacts))
+	slog.Info("Proxy: FS→user fork", "aor", aor, "contacts", len(contacts), "webrtc", isWebRTC)
 
 	fsAddr := sourceAddrFromRequest(req)
 	fsURI := requestContactURI(req, sip.Uri{Host: strings.Split(fsAddr, ":")[0], Port: parsePort(fsAddr)})
@@ -345,80 +351,194 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 		}
 	}()
 
-	// 100 Trying
+	// 100 Trying — locally generated, suppress upstream 100s.
 	tx.Respond(sip.NewResponseFromRequest(req, 100, "Trying", nil))
 
-	// Build forwarded INVITE with R-URI pointing to user's contact
-	userURI := contactDestinationURI(contact, toUser, toDomain)
-
-	fwdReq, ok := p.buildForwardRequestWithURI(req, userURI)
-	if !ok {
-		tx.Respond(sip.NewResponseFromRequest(req, 483, "Too Many Hops", nil))
-		return
+	type branch struct {
+		contact  *Contact
+		fwdReq   *sip.Request
+		clientTx sip.ClientTransaction
+		// Set once a final response has been observed for this branch so we
+		// don't re-cancel it (CANCEL on a terminated tx is harmless but noisy).
+		final atomic.Bool
 	}
-	fwdReq.SetDestination(contact.Address)
-	if contact.IsWebRTC {
-		fwdReq.SetTransport("ws")
+	type branchResult struct {
+		idx  int
+		resp *sip.Response
+		err  error
 	}
 
-	// Double Record-Route: outgoing (public) first, then incoming (private)
-	p.addRecordRoute(fwdReq, "from_fs")
+	results := make(chan branchResult, len(contacts)*8)
+	branchCtx, cancelAll := context.WithCancel(context.Background())
+	defer cancelAll()
 
-	// Forward via public client (SBC→user)
-	clientTx, err := p.publicClient.TransactionRequest(context.Background(), fwdReq, sipgo.ClientRequestAddVia)
-	if err != nil {
-		slog.Error("Failed to forward INVITE to user", "aor", aor, "error", err)
+	type prep struct {
+		c      *Contact
+		fwdReq *sip.Request
+	}
+	preps := make([]*prep, 0, len(contacts))
+	for _, c := range contacts {
+		c := c
+		userURI := contactDestinationURI(c, toUser, toDomain)
+		fwdReq, ok := p.buildForwardRequestWithURI(req, userURI)
+		if !ok {
+			slog.Warn("Fork branch buildForwardRequest failed", "aor", aor, "address", c.Address)
+			continue
+		}
+		fwdReq.SetDestination(c.Address)
+		if c.IsWebRTC {
+			fwdReq.SetTransport("ws")
+		}
+		p.addRecordRoute(fwdReq, "from_fs")
+		preps = append(preps, &prep{c: c, fwdReq: fwdReq})
+	}
+
+	branches := make([]*branch, len(preps))
+
+	for i, p2 := range preps {
+		i, p2 := i, p2
+		go func() {
+			slog.Info("Fork branch sending",
+				"aor", aor, "branch", i, "address", p2.c.Address, "webrtc", p2.c.IsWebRTC,
+				"transport", p2.fwdReq.Transport(), "destination", p2.fwdReq.Destination(),
+				"r-uri", p2.fwdReq.Recipient.String())
+			clientTx, err := p.publicClient.TransactionRequest(branchCtx, p2.fwdReq, sipgo.ClientRequestAddVia)
+			if err != nil {
+				slog.Error("Fork branch send failed", "aor", aor, "branch", i, "address", p2.c.Address, "error", err)
+				results <- branchResult{idx: i, err: err}
+				return
+			}
+			b := &branch{contact: p2.c, fwdReq: p2.fwdReq, clientTx: clientTx}
+			branches[i] = b
+			slog.Info("Fork branch sent", "aor", aor, "branch", i, "address", p2.c.Address)
+			defer clientTx.Terminate()
+			for {
+				select {
+				case resp, ok := <-clientTx.Responses():
+					if !ok {
+						return
+					}
+					results <- branchResult{idx: i, resp: resp}
+					if resp.StatusCode >= 200 {
+						b.final.Store(true)
+						return
+					}
+				case <-clientTx.Done():
+					if cerr := clientTx.Err(); cerr != nil {
+						results <- branchResult{idx: i, err: cerr}
+					}
+					b.final.Store(true)
+					return
+				case <-branchCtx.Done():
+					return
+				}
+			}
+		}()
+	}
+
+	if len(preps) == 0 {
 		tx.Respond(sip.NewResponseFromRequest(req, 480, "Temporarily Unavailable", nil))
 		return
 	}
-	defer clientTx.Terminate()
 
-	p.activeTx.Store(callID, &activeTxEntry{tx: clientTx, req: fwdReq, client: p.publicClient})
-	defer p.activeTx.Delete(callID)
+	cancelBranch := func(b *branch) {
+		if b == nil || b.final.Load() {
+			return
+		}
+		cancelReq := sip.NewRequest(sip.CANCEL, b.fwdReq.Recipient)
+		cancelReq.AppendHeader(sip.HeaderClone(b.fwdReq.Via()))
+		cancelReq.AppendHeader(sip.HeaderClone(b.fwdReq.From()))
+		cancelReq.AppendHeader(sip.HeaderClone(b.fwdReq.To()))
+		cancelReq.AppendHeader(sip.HeaderClone(b.fwdReq.CallID()))
+		sip.CopyHeaders("Route", b.fwdReq, cancelReq)
+		cancelReq.SetSource(b.fwdReq.Source())
+		cancelReq.SetDestination(b.fwdReq.Destination())
+		cancelReq.SetTransport(b.fwdReq.Transport())
+		if err := p.publicClient.WriteRequest(cancelReq); err != nil {
+			slog.Debug("CANCEL on fork sibling failed", "address", b.contact.Address, "error", err)
+		}
+	}
 
+	// Upstream CANCEL → cancel every branch.
 	tx.OnCancel(func(cancelReq *sip.Request) {
-		p.cancelOutgoing(callID)
+		for _, b := range branches {
+			cancelBranch(b)
+		}
 	})
 
-	for {
+	p.activeTx.Store(callID, &activeTxEntry{tx: nil, req: req, client: p.publicClient})
+	defer p.activeTx.Delete(callID)
+
+	pending := len(preps)
+	relayedProvisional := false
+	var bestFinal *sip.Response
+
+	for pending > 0 {
 		select {
-		case resp, ok := <-clientTx.Responses():
-			if !ok {
-				return
+		case r := <-results:
+			if r.err != nil {
+				pending--
+				continue
+			}
+			resp := r.resp
+			if resp == nil {
+				pending--
+				continue
 			}
 			if resp.StatusCode == 100 {
 				continue
 			}
-
-			relay := sip.NewResponseFromRequest(req, resp.StatusCode, resp.Reason, resp.Body())
-			copyResponseHeaders(resp, relay)
-			tx.Respond(relay)
-
-			if resp.StatusCode >= 200 {
-				if resp.StatusCode < 300 {
-					p.callsMu.Lock()
-					p.calls[callID] = &callState{
-						fsAddr:   fsAddr,
-						fsURI:    fsURI,
-						userAddr: contact.Address,
-						userURI:  contact.URI,
-						userAORs: []string{aor},
-						isWebRTC: contact.IsWebRTC,
-					}
-					p.callsMu.Unlock()
-					established = true
-					slog.Info("Proxy: FS→user established", "aor", aor, "callID", callID)
+			if resp.StatusCode < 200 {
+				if !relayedProvisional {
+					relayedProvisional = true
+					relay := sip.NewResponseFromRequest(req, resp.StatusCode, resp.Reason, resp.Body())
+					copyResponseHeaders(resp, relay)
+					tx.Respond(relay)
 				}
+				continue
+			}
+			pending--
+			if resp.StatusCode < 300 {
+				winner := branches[r.idx]
+				relay := sip.NewResponseFromRequest(req, resp.StatusCode, resp.Reason, resp.Body())
+				copyResponseHeaders(resp, relay)
+				tx.Respond(relay)
+				p.callsMu.Lock()
+				p.calls[callID] = &callState{
+					fsAddr:   fsAddr,
+					fsURI:    fsURI,
+					userAddr: winner.contact.Address,
+					userURI:  winner.contact.URI,
+					userAORs: []string{aor},
+					isWebRTC: winner.contact.IsWebRTC,
+				}
+				p.callsMu.Unlock()
+				established = true
+				slog.Info("Proxy: FS→user established", "aor", aor, "callID", callID,
+					"winner", winner.contact.Address, "webrtc", winner.contact.IsWebRTC,
+					"branches", len(branches))
+				for i, sib := range branches {
+					if i != r.idx {
+						cancelBranch(sib)
+					}
+				}
+				cancelAll()
 				return
 			}
-
-		case <-clientTx.Done():
-			if err := clientTx.Err(); err != nil {
-				slog.Error("INVITE to user transaction failed", "error", err)
-				tx.Respond(sip.NewResponseFromRequest(req, 408, "Request Timeout", nil))
+			if bestFinal == nil || resp.StatusCode < bestFinal.StatusCode {
+				bestFinal = resp
 			}
+		case <-branchCtx.Done():
 			return
 		}
+	}
+
+	if bestFinal != nil {
+		relay := sip.NewResponseFromRequest(req, bestFinal.StatusCode, bestFinal.Reason, bestFinal.Body())
+		copyResponseHeaders(bestFinal, relay)
+		tx.Respond(relay)
+	} else {
+		tx.Respond(sip.NewResponseFromRequest(req, 480, "Temporarily Unavailable", nil))
 	}
 }
 
@@ -660,12 +780,36 @@ func (p *Proxy) relayInDialog(req *sip.Request, tx sip.ServerTransaction) {
 		}
 	}
 
+	if req.Method == sip.BYE {
+		slog.Info("BYE relay → start",
+			"callid", callID,
+			"isFS", isFS,
+			"isWebRTC", state.isWebRTC,
+			"destination", fwdReq.Destination(),
+			"transport", fwdReq.Transport(),
+			"recipient", fwdReq.Recipient.String(),
+			"userAddr", state.userAddr,
+			"userURI", state.userURI,
+			"fsAddr", state.fsAddr,
+		)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	startedAt := time.Now()
 	resp, err := client.Do(ctx, fwdReq, sipgo.ClientRequestAddVia)
+	elapsed := time.Since(startedAt)
 	if err != nil {
-		slog.Error("In-dialog relay failed", "method", req.Method, "error", err)
+		slog.Error("In-dialog relay failed",
+			"method", req.Method,
+			"callid", callID,
+			"isFS", isFS,
+			"destination", fwdReq.Destination(),
+			"transport", fwdReq.Transport(),
+			"elapsed_ms", elapsed.Milliseconds(),
+			"error", err,
+		)
 		if req.Method == sip.BYE {
 			tx.Respond(sip.NewResponseFromRequest(req, 200, "OK", nil))
 			p.cleanupCall(callID, state)
@@ -673,6 +817,18 @@ func (p *Proxy) relayInDialog(req *sip.Request, tx sip.ServerTransaction) {
 		}
 		tx.Respond(sip.NewResponseFromRequest(req, 408, "Request Timeout", nil))
 		return
+	}
+
+	if req.Method == sip.BYE {
+		slog.Info("BYE relay ← response",
+			"callid", callID,
+			"isFS", isFS,
+			"status", resp.StatusCode,
+			"reason", resp.Reason,
+			"elapsed_ms", elapsed.Milliseconds(),
+			"resp_source", resp.Source(),
+			"resp_transport", resp.Transport(),
+		)
 	}
 
 	if req.Method == sip.BYE && resp.StatusCode == 481 {
@@ -893,9 +1049,12 @@ func (p *Proxy) buildForwardRequestWithURIAndRoute(req *sip.Request, uri sip.Uri
 
 // addRecordRoute adds double Record-Route for the SBC's two interfaces.
 // Order depends on direction so each side's route set resolves correctly.
+// Ports come from cfg (PublicSIPPort/PrivateSIPPort) so dev with Docker
+// port-mapping (host:6060 → container:5060) advertises the host-side port
+// that external peers can actually reach.
 func (p *Proxy) addRecordRoute(req *sip.Request, direction string) {
-	publicRR := fmt.Sprintf("<sip:%s:5060;lr>", p.cfg.PublicIP)
-	privateRR := fmt.Sprintf("<sip:%s:5065;lr>", p.cfg.PrivateIP)
+	publicRR := fmt.Sprintf("<sip:%s:%d;lr>", p.cfg.PublicIP, p.cfg.PublicSIPPort)
+	privateRR := fmt.Sprintf("<sip:%s:%d;lr>", p.cfg.PrivateIP, p.cfg.PrivateSIPPort)
 
 	if direction == "to_fs" {
 		// Caller→FS: packet enters public, exits private
@@ -970,7 +1129,7 @@ func tooManyHops(req *sip.Request) bool {
 func (p *Proxy) authenticateExternalRequest(req *sip.Request, tx sip.ServerTransaction, sourceIP string) bool {
 	fromDomain := req.From().Address.Host
 
-	if strings.HasSuffix(fromDomain, p.cfg.SIPDomain) {
+	if strings.HasSuffix(fromDomain, p.cfg.SIPUserRootDomain) {
 		user := req.From().Address.User
 		password, err := p.api.GetUserPassword(user, fromDomain)
 		if err != nil || password == "" {
@@ -981,7 +1140,6 @@ func (p *Proxy) authenticateExternalRequest(req *sip.Request, tx sip.ServerTrans
 			sendAuthChallenge(tx, req, fromDomain)
 			return false
 		}
-		// CE: no billing/wallet gate. Wallet balance check is EE-only.
 		return true
 	}
 
@@ -1002,7 +1160,7 @@ func (p *Proxy) authenticateExternalRequest(req *sip.Request, tx sip.ServerTrans
 }
 
 func (p *Proxy) authorizeExternalInDialog(req *sip.Request, tx sip.ServerTransaction, state *callState, sourceIP string) bool {
-	if strings.HasSuffix(req.From().Address.Host, p.cfg.SIPDomain) {
+	if strings.HasSuffix(req.From().Address.Host, p.cfg.SIPUserRootDomain) {
 		if state.userAddr != "" && req.Source() == state.userAddr {
 			return true
 		}
@@ -1010,10 +1168,10 @@ func (p *Proxy) authorizeExternalInDialog(req *sip.Request, tx sip.ServerTransac
 	return p.authenticateExternalRequest(req, tx, sourceIP)
 }
 
-func comcentUsersForRequest(req *sip.Request, sipDomain string) []string {
+func comcentUsersForRequest(req *sip.Request, sipUserRootDomain string) []string {
 	users := make([]string, 0, 2)
 	for _, uri := range []sip.Uri{req.From().Address, req.To().Address} {
-		if uri.User == "" || !strings.HasSuffix(uri.Host, sipDomain) {
+		if uri.User == "" || !strings.HasSuffix(uri.Host, sipUserRootDomain) {
 			continue
 		}
 		aor := uri.User + "@" + uri.Host
@@ -1114,6 +1272,26 @@ func (p *Proxy) filterRouteValueForHop(value, keepHop string) string {
 		kept = append(kept, trimmed)
 	}
 	return strings.Join(kept, ", ")
+}
+
+// contactExpiresParam parses an `expires=N` parameter from a Contact header
+// value. RFC 3261 §10.2.1 says this param overrides the Expires header.
+func contactExpiresParam(value string) (int, bool) {
+	rest := value
+	if idx := strings.IndexByte(rest, '>'); idx >= 0 {
+		rest = rest[idx+1:]
+	}
+	for _, raw := range strings.Split(rest, ";") {
+		p := strings.TrimSpace(raw)
+		if !strings.HasPrefix(strings.ToLower(p), "expires=") {
+			continue
+		}
+		v := strings.TrimSpace(p[len("expires="):])
+		if n, err := strconv.Atoi(v); err == nil {
+			return n, true
+		}
+	}
+	return 0, false
 }
 
 func extractContactURI(value, fallback string) string {

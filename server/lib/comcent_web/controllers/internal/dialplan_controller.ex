@@ -51,9 +51,23 @@ defmodule ComcentWeb.Internal.DialplanController do
          outbound_number,
          context
        ) do
+    sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
+
+    # Treat any INVITE whose From host ends with our SIP user root domain as
+    # internally-initiated (agent dialer → outbound trunk / colleague), even
+    # if FS's Caller-Context is "public". This covers the CE topology where
+    # the Go SBC handles registrations itself and FS sees the agent leg as
+    # an unauthenticated peer (so its profile-default context "public" leaks
+    # through). EE-with-Kamailio doesn't hit this because Kamailio injects
+    # auth before the call reaches FS.
+    is_internal =
+      context == "default" or
+        (is_binary(from_domain) and is_binary(sip_user_root_domain) and
+           sip_user_root_domain != "" and String.ends_with?(from_domain, sip_user_root_domain))
+
     cond do
       # Internally Initiated call
-      context == "default" ->
+      is_internal ->
         Logger.info("Call initiated from internal agent.")
         referred_from = params["variable_sip_h_Referred-By"]
         Logger.info("referredFrom: #{referred_from}")
@@ -85,7 +99,7 @@ defmodule ComcentWeb.Internal.DialplanController do
               if member do
                 {:ok,
                  dial_member_dialplan(member, subdomain, "default", %{
-                   address: "#{from_user}@#{caller_subdomain}.#{Application.fetch_env!(:comcent, :sip_domain)}",
+                   address: "#{from_user}@#{caller_subdomain}.#{Application.fetch_env!(:comcent, :sip_user_root_domain)}",
                    name: caller_member[:user][:name] || ""
                  })}
               else
@@ -103,7 +117,7 @@ defmodule ComcentWeb.Internal.DialplanController do
 
               {:ok,
                dial_member_dialplan(member, caller_subdomain, "default", %{
-                 address: "#{from_user}@#{caller_subdomain}.#{Application.fetch_env!(:comcent, :sip_domain)}",
+                 address: "#{from_user}@#{caller_subdomain}.#{Application.fetch_env!(:comcent, :sip_user_root_domain)}",
                  name: caller_member[:user][:name] || ""
                })}
             else
@@ -135,7 +149,7 @@ defmodule ComcentWeb.Internal.DialplanController do
                 {:not_found, not_allowed_response()}
               else
                 Logger.info("Dialing #{destination_number} via #{number.number}")
-                {:ok, dial_trunk_dialplan(number, destination_number, caller_subdomain)}
+                {:ok, dial_trunk_dialplan(number, destination_number, caller_subdomain, context)}
               end
             end
           end
@@ -203,7 +217,7 @@ defmodule ComcentWeb.Internal.DialplanController do
                 else
                   # external redirect
                   Logger.info("External redirect found.")
-                  {:ok, dial_trunk_dialplan(number, destination_number, number.org.subdomain)}
+                  {:ok, dial_trunk_dialplan(number, destination_number, number.org.subdomain, context)}
                 end
               end
             end
@@ -486,7 +500,7 @@ defmodule ComcentWeb.Internal.DialplanController do
     """
   end
 
-  defp dial_trunk_dialplan(number, to_user, subdomain) do
+  defp dial_trunk_dialplan(number, to_user, subdomain, context \\ "default") do
     # Get dial string from DialUtils
     dial_string =
       DialUtils.create_dial_string_for_sip_trunk(
@@ -495,10 +509,16 @@ defmodule ComcentWeb.Internal.DialplanController do
         number.sip_trunk.outbound_contact
       )
 
+    # Echo back the caller-context FS sent us — otherwise FS won't match this
+    # dialplan to the call. CE topology gets caller-context="public" for
+    # outbound (the SBC handles registrations, FS sees an unauthenticated
+    # peer); EE-with-Kamailio gets "default".
+    context = context || "default"
+
     """
     <document type="freeswitch/xml">
       <section name="dialplan">
-        <context name="default">
+        <context name="#{context}">
           <extension name="dynamicMatch">
             <condition field="${comcent_context_id}" expression="^.+$" break="never">
               <action application="export" data="comcent_context_id=${comcent_context_id}"/>

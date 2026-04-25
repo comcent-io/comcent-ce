@@ -6,9 +6,9 @@
   import { onDestroy, onMount } from 'svelte';
   import { Socket } from 'phoenix';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
-  import { env } from '$env/dynamic/public';
+  import { publicSipUserRootDomain } from '$lib/publicConfig';
 
-  const sipDomain = env.PUBLIC_SIP_DOMAIN || 'example.com';
+  const sipDomain = publicSipUserRootDomain || 'example.com';
 
   let members: any[] = [];
   let lastFetchKey = '';

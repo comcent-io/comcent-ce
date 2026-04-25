@@ -3,14 +3,14 @@ import { getAuthedJson } from '$lib/server/api';
 import type { LayoutServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 
-export const load: LayoutServerLoad = async ({ cookies, params, fetch }) => {
+export const load: LayoutServerLoad = async ({ cookies, params }) => {
   const user = await ensureAuthenticated(cookies);
   const result = await getAuthedJson<{
     numbers: any[];
     memberProfile: any;
     orgSettings: any;
     organizations: any[];
-  }>(`/api/v2/${params.subdomain}/me/context`, user.idToken, fetch);
+  }>(`/api/v2/${params.subdomain}/me/context`, user.idToken);
   if (!result.ok) {
     // Server returns 303→/org when user isn't a member of this subdomain. The
     // SSR fetch follows the redirect, which 404s because /org is a SvelteKit

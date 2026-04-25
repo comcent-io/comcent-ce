@@ -127,7 +127,15 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
-  host = System.get_env("PHX_HOST") || "example.com"
+  host =
+    System.get_env("PHX_HOST") ||
+      (case System.get_env("PUBLIC_BASE_URL") do
+         nil -> nil
+         "" -> nil
+         url -> URI.parse(url).host
+       end) ||
+      "example.com"
+
   port = String.to_integer(System.get_env("PORT") || "4000")
 
   config :comcent, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
@@ -331,35 +339,43 @@ source_email =
 
 config :comcent, Comcent.Mailer, source_email: source_email
 
-# Public Root URL Configuration
+# Domain Configuration — derive everything from PUBLIC_BASE_URL.
+# Self-hosters only set PUBLIC_BASE_URL (e.g. https://cpaas.example.com).
+# Individual vars (PUBLIC_ROOT_URL, SIP_USER_ROOT_DOMAIN, APP_BASE_URL) still
+# work as overrides for unusual deployments.
+public_base_url = System.get_env("PUBLIC_BASE_URL")
+
+base_uri =
+  case public_base_url do
+    nil -> nil
+    "" -> nil
+    url -> URI.parse(url)
+  end
+
 public_root_url =
   System.get_env("PUBLIC_ROOT_URL") ||
+    public_base_url ||
     raise """
-    environment variable PUBLIC_ROOT_URL is missing.
+    environment variable PUBLIC_BASE_URL is missing.
+    Example: PUBLIC_BASE_URL=https://cpaas.example.com
     """
 
 config :comcent, :public_root_url, public_root_url
 
-# SIP Domain Configuration
-# Used for SIP address formatting, domain detection in call routing,
-# and Registry keys. Self-hosters set this to their own domain; defaults
-# kept unset so missing config fails loudly at boot rather than silently
-# using a wrong domain.
-sip_domain =
-  System.get_env("SIP_DOMAIN") ||
+sip_user_root_domain =
+  System.get_env("SIP_USER_ROOT_DOMAIN") ||
+    (base_uri && base_uri.host) ||
     raise """
-    environment variable SIP_DOMAIN is missing.
-    Example: SIP_DOMAIN=sip.example.com
+    environment variable PUBLIC_BASE_URL is missing.
+    Example: PUBLIC_BASE_URL=https://cpaas.example.com
     """
 
-config :comcent, :sip_domain, sip_domain
+config :comcent, :sip_user_root_domain, sip_user_root_domain
 
-# App Base URL — used by email templates for clickable links back to the web app.
-# Fallback derives from PUBLIC_APP_BASE_URL (which is shared with the Svelte
-# frontend); either one works.
 app_base_url =
   System.get_env("APP_BASE_URL") ||
     System.get_env("PUBLIC_APP_BASE_URL") ||
+    public_base_url ||
     "https://app.example.com"
 
 config :comcent, :app_base_url, app_base_url

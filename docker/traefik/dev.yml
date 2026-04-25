@@ -7,14 +7,6 @@ http:
       service: comcent-api
       priority: 100
 
-    # SIP over WebSocket — browser dialer connects here, SBC upgrades to WS.
-    comcent-sip-ws:
-      entryPoints:
-        - web
-      rule: PathPrefix(`/sip-ws`)
-      service: comcent-sip-ws
-      priority: 200
-
     comcent-webapp:
       entryPoints:
         - web
@@ -22,16 +14,17 @@ http:
       service: comcent-webapp
       priority: 1
 
+  # SIP-over-WS is NOT proxied through Traefik. The browser dialer connects
+  # directly to the SBC on its own host port (ws://localhost:6080/sip-ws in dev,
+  # wss://${COMCENT_DOMAIN}:5063/sip-ws in prod). Going via Traefik confuses
+  # sipgo's WebSocket connection-pool keying so server-initiated requests
+  # (BYE from FreeSWITCH→agent) fail to reuse the inbound connection.
+
   services:
     comcent-api:
       loadBalancer:
         servers:
           - url: http://server:4000
-
-    comcent-sip-ws:
-      loadBalancer:
-        servers:
-          - url: http://sbc:80
 
     comcent-webapp:
       loadBalancer:

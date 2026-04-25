@@ -35,14 +35,14 @@ defmodule ComcentWeb.UserController do
           conn |> put_status(:unauthorized) |> json(%{error: "Invalid email."})
 
         member ->
-          sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+          sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
           claims = %{
             "sub" => member.user.id,
             "name" => member.user.name,
             "email" => member.user.email,
             "picture" => member.user.picture,
-            "sipAddress" => "#{member.username}@#{subdomain}.#{sip_domain}",
+            "sipAddress" => "#{member.username}@#{subdomain}.#{sip_user_root_domain}",
             "sipUsername" => member.username,
             "subdomain" => subdomain
           }

@@ -60,15 +60,15 @@ defmodule Comcent.Call.Persistence do
   end
 
   def get_subdomain_from_story(call_story) when is_map(call_story) do
-    sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+    sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
     cond do
       Map.has_key?(call_story, :current_party) and
-          string_contains?(call_story.current_party, sip_domain) ->
+          string_contains?(call_story.current_party, sip_user_root_domain) ->
         extract_subdomain(call_story.current_party)
 
       Map.has_key?(call_story, :caller) and
-          string_contains?(call_story.caller, sip_domain) ->
+          string_contains?(call_story.caller, sip_user_root_domain) ->
         extract_subdomain(call_story.caller)
 
       Map.has_key?(call_story, :callee) and call_story.callee != nil ->

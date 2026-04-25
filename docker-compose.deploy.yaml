@@ -108,15 +108,14 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      PHX_HOST: ${COMCENT_DOMAIN}
+      # Single source of truth — runtime.exs derives PHX_HOST,
+      # SIP_USER_ROOT_DOMAIN, public_root_url, and app_base_url from this.
+      PUBLIC_BASE_URL: https://${COMCENT_DOMAIN}
       PHX_SERVER: 'true'
       PORT: '4000'
       DATABASE_URL: postgres://${POSTGRES_USER:-comcent}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-comcent}
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-comcent}:${RABBITMQ_PASSWORD}@rabbitmq
-      PUBLIC_ROOT_URL: https://${COMCENT_DOMAIN}
-      APP_BASE_URL: https://${COMCENT_DOMAIN}
-      SIP_DOMAIN: ${COMCENT_DOMAIN}
       # SBC is the in-tree Go SBC replacing Kamailio in CE
       KAMAILIO_SIP_URI: sip:${COMCENT_DOMAIN}
       CLUSTER_STRATEGY: gossip
@@ -157,11 +156,15 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: '3000'
+      # SvelteKit derives PUBLIC_APP_BASE_URL and the SIP user-root domain
+      # shown in the UI from PUBLIC_BASE_URL via $lib/publicConfig. ORIGIN is consumed by
+      # adapter-node for url.origin behind Traefik. PUBLIC_SIP_WS_URL is
+      # set explicitly because the SBC serves WSS on its own host port
+      # (not 443 — Traefik holds that), so the default derivation would
+      # land on the wrong port.
+      PUBLIC_BASE_URL: https://${COMCENT_DOMAIN}
       ORIGIN: https://${COMCENT_DOMAIN}
-      PUBLIC_APP_BASE_URL: https://${COMCENT_DOMAIN}
-      PUBLIC_ROOT_URL: ${COMCENT_DOMAIN}
-      PUBLIC_SIP_WS_URL: wss://${COMCENT_DOMAIN}/sip-ws
-      PUBLIC_SIP_DOMAIN: ${COMCENT_DOMAIN}
+      PUBLIC_SIP_WS_URL: wss://${COMCENT_DOMAIN}:${SIP_WSS_PORT:-5063}/sip-ws
       INTERNAL_API_BASE_URL: http://server:4000/internal-api
     depends_on:
       server:
@@ -178,8 +181,12 @@ services:
 
   # ---------------------------------------------------------------------------
   # Go SBC — SIP proxy / registrar / dispatcher (replaces Kamailio in CE)
-  # Listens on 5060 UDP+TCP for SIP signaling, 5061 TCP for SIP/TLS.
-  # Not behind Traefik: SIP is not HTTP.
+  # Listens on 5060 UDP+TCP for SIP signaling, 5061 TCP for SIP/TLS, and
+  # serves SIP-over-WSS directly on host port ${SIP_WSS_PORT:-5063}.
+  # SBC terminates TLS itself using the Let's Encrypt cert Traefik already
+  # issued for ${COMCENT_DOMAIN} (extracted into a shared volume by the
+  # cert-dumper sidecar). Going through Traefik would mask the browser's
+  # source addr from sipgo and break BYE relay back to the WebRTC agent.
   # ---------------------------------------------------------------------------
   sbc:
     image: ghcr.io/comcent-io/comcent-ce-sbc:${COMCENT_VERSION:-latest}
@@ -192,22 +199,53 @@ services:
       INTERNAL_API_BASE_URL: http://server:4000/internal-api
       INTERNAL_API_USERNAME: ${INTERNAL_API_USERNAME:-internal_api}
       INTERNAL_API_PASSWORD: ${INTERNAL_API_PASSWORD}
-      SIP_DOMAIN: ${COMCENT_DOMAIN}
+      SIP_USER_ROOT_DOMAIN: ${COMCENT_DOMAIN}
+      WSS_CERT_PATH: /certs/certs/${COMCENT_DOMAIN}.crt
+      WSS_KEY_PATH: /certs/private/${COMCENT_DOMAIN}.key
+      WSS_PORT: '5063'
     ports:
       - '5060:5060/udp'
       - '5060:5060/tcp'
       - '5061:5061/tcp'
+      - '${SIP_WSS_PORT:-5063}:5063/tcp'
+    volumes:
+      - sbc_certs:/certs:ro
     depends_on:
       server:
         condition: service_healthy
-    # SIP WebSocket can be fronted by Traefik for TLS termination (wss://)
-    labels:
-      - 'traefik.enable=true'
-      - 'traefik.http.routers.sip-ws.rule=Host(`${COMCENT_DOMAIN}`) && PathPrefix(`/sip-ws`)'
-      - 'traefik.http.routers.sip-ws.entrypoints=websecure'
-      - 'traefik.http.routers.sip-ws.tls.certresolver=letsencrypt'
-      - 'traefik.http.routers.sip-ws.priority=200'
-      - 'traefik.http.services.sip-ws.loadbalancer.server.port=5062'
+      cert-dumper:
+        condition: service_started
+    networks:
+      - comcent-network
+
+  # ---------------------------------------------------------------------------
+  # Cert dumper — watches Traefik's acme.json and writes per-domain PEM files
+  # into a shared volume so the SBC can serve WSS with the same Let's Encrypt
+  # cert Traefik issues for ${COMCENT_DOMAIN}. Re-runs on every acme.json
+  # change (cert renewal); SBC re-reads the files every 5 minutes.
+  # ---------------------------------------------------------------------------
+  cert-dumper:
+    image: ldez/traefik-certs-dumper:v2.8.4
+    restart: unless-stopped
+    entrypoint: sh
+    command:
+      - -c
+      - |
+        until [ -e /letsencrypt/acme.json ]; do
+          echo "waiting for /letsencrypt/acme.json …"
+          sleep 5
+        done
+        exec traefik-certs-dumper file \
+          --version v2 \
+          --watch \
+          --source /letsencrypt/acme.json \
+          --dest /certs
+    volumes:
+      - traefik_letsencrypt:/letsencrypt:ro
+      - sbc_certs:/certs
+    depends_on:
+      traefik:
+        condition: service_started
     networks:
       - comcent-network
 
@@ -226,6 +264,8 @@ services:
       INTERNAL_API_BASE_URL: http://server:4000/internal-api/xml-curl
       INTERNAL_API_USERNAME: ${INTERNAL_API_USERNAME:-internal_api}
       INTERNAL_API_PASSWORD: ${INTERNAL_API_PASSWORD}
+      # FreeSWITCH image (separate repo) reads SIP_DOMAIN — kept under that name
+      # for image compatibility. Same value as SIP_USER_ROOT_DOMAIN elsewhere.
       SIP_DOMAIN: ${COMCENT_DOMAIN}
     ports:
       - '19000-19100:19000-19100/udp'
@@ -247,7 +287,7 @@ services:
   #   env_file: .env
   #   environment:
   #     COMCENT_API_URL: http://server:4000
-  #     SIP_DOMAIN: ${COMCENT_DOMAIN}
+  #     SIP_USER_ROOT_DOMAIN: ${COMCENT_DOMAIN}
   #     SIP_REGISTER_URL: sip:sbc:5060
   #   depends_on:
   #     server:
@@ -265,3 +305,4 @@ volumes:
   redis_data:
   rabbitmq_data:
   traefik_letsencrypt:
+  sbc_certs:

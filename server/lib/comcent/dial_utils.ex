@@ -7,7 +7,8 @@ defmodule Comcent.DialUtils do
   @doc """
   Creates a dial string for a user.
 
-  Uses the `:sip_domain` application config (backed by SIP_DOMAIN env var).
+  Uses the `:sip_user_root_domain` application config (backed by SIP_USER_ROOT_DOMAIN env var,
+  or derived from PUBLIC_BASE_URL).
   """
   def create_dial_string_for_user(username, subdomain, channel_vars \\ nil) do
     create_dial_targets_for_user(username, subdomain, channel_vars)
@@ -16,8 +17,8 @@ defmodule Comcent.DialUtils do
 
   def create_dial_targets_for_user(username, subdomain, channel_vars \\ nil) do
     kamailio_sip_uri = System.get_env("KAMAILIO_SIP_URI") || ""
-    sip_domain = Application.fetch_env!(:comcent, :sip_domain)
-    base_dial = "sofia/internal/#{username}@#{subdomain}.#{sip_domain};fs_path=#{kamailio_sip_uri}"
+    sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
+    base_dial = "sofia/internal/#{username}@#{subdomain}.#{sip_user_root_domain};fs_path=#{kamailio_sip_uri}"
     build_user_dial_targets(base_dial, channel_vars)
   end
 

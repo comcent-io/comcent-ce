@@ -1,13 +1,15 @@
 import { parsePhoneNumber } from 'libphonenumber-js';
 
 const KAMAILIO_SIP_URI = process.env.KAMAILIO_SIP_URI;
-const SIP_DOMAIN = process.env.SIP_DOMAIN;
-if (!SIP_DOMAIN) {
-  throw new Error('SIP_DOMAIN env var is required');
+const SIP_USER_ROOT_DOMAIN =
+  process.env.SIP_USER_ROOT_DOMAIN ||
+  (process.env.PUBLIC_BASE_URL ? new URL(process.env.PUBLIC_BASE_URL).hostname : undefined);
+if (!SIP_USER_ROOT_DOMAIN) {
+  throw new Error('PUBLIC_BASE_URL (or SIP_USER_ROOT_DOMAIN override) env var is required');
 }
 
 export function createDialStringForUser(username: string, subdomain: string) {
-  const dString = `sofia/internal/${username}@${subdomain}.${SIP_DOMAIN};fs_path=${KAMAILIO_SIP_URI}`;
+  const dString = `sofia/internal/${username}@${subdomain}.${SIP_USER_ROOT_DOMAIN};fs_path=${KAMAILIO_SIP_URI}`;
   return [dString, `[media_webrtc=true]${dString}`].join(',');
 }
 

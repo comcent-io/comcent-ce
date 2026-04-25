@@ -242,14 +242,14 @@ defmodule ComcentWeb.MemberController do
           }
         end)
 
-      sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+      sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
       json(conn, %{
         name: member_profile.name,
         username: member_profile.username,
         subdomain: subdomain,
         sip_password: member_profile.sip_password,
-        serverDomain: "ws.#{subdomain}.#{sip_domain}",
+        serverDomain: "ws.#{subdomain}.#{sip_user_root_domain}",
         outboundNumbers: outbound_numbers
       })
     else

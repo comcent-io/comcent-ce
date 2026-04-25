@@ -89,7 +89,6 @@ services:
       - S3_ENDPOINT_URL=http://minio:9000
       - S3_PROXY_DOWNLOADS=true
       - SMTP_URL=smtp://mailhog:1025
-      - PUBLIC_ROOT_URL=http://localhost:6173
     depends_on:
       - postgres
       - minio
@@ -127,10 +126,9 @@ services:
     image: node:20.11.1
     env_file:
       - .env
-    environment:
-      - PUBLIC_APP_BASE_URL=http://localhost:6173
-      # PUBLIC_SIP_WS_URL comes from .env (ws://localhost:6173/sip-ws) so the
-      # browser goes through Traefik, which routes /sip-ws to the SBC.
+    # Domain config is derived from PUBLIC_BASE_URL in .env (http://localhost:6173).
+    # The SIP WebSocket goes straight to the SBC at ws://localhost:6080/sip-ws
+    # (bypasses Traefik so source-IP/port matches sipgo's connection pool).
     depends_on:
       - postgres
     volumes:
@@ -177,6 +175,8 @@ services:
     networks:
       - comcent-network
 
+  # Go SBC (the in-tree CE SIP proxy). Default proxy.
+  # Run with `docker compose --profile kamailio up` (and stop sbc) to A/B test.
   sbc:
     build:
       context: .
@@ -185,16 +185,51 @@ services:
       - '6060:5060/udp'
       - '6060:5060/tcp'
       - '6061:5061/tcp'
+      - '6080:80/tcp'
     networks:
       comcent-network:
         ipv4_address: 172.31.17.9
     environment:
-      - SIP_DOMAIN=${SIP_DOMAIN:-localhost}
+      - SIP_USER_ROOT_DOMAIN=localhost
       - PRIVATE_IP=172.31.17.9
       - PUBLIC_IP=${DEV_IP}
+      - PUBLIC_SIP_PORT=6060
       - INTERNAL_API_BASE_URL=http://server:4000/internal-api
       - INTERNAL_API_USERNAME=${INTERNAL_API_USERNAME}
       - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD}
+    depends_on:
+      server:
+        condition: service_healthy
+
+  # Kamailio-CE — the EE-proven SIP proxy, forked into a public-friendly repo.
+  # Off by default; run with `docker compose --profile kamailio up` to A/B
+  # against the Go SBC. Bound to the same private IP so swap is transparent.
+  # PUBLIC_IP and PRIVATE_IP feed the advertise= clauses in kamailio.cfg via
+  # Kamailio's defenv directive.
+  kamailio:
+    profiles: [kamailio]
+    build:
+      context: ../kamailio-ce
+      dockerfile: Dockerfile
+    ports:
+      - '6060:5060/udp'
+      - '6060:5060/tcp'
+      - '6080:80/tcp'
+    networks:
+      comcent-network:
+        ipv4_address: 172.31.17.9
+    environment:
+      - PRIVATE_IP=172.31.17.9
+      - PUBLIC_IP=${DEV_IP}
+      - SIP_USER_ROOT_DOMAIN=localhost
+      - INTERNAL_API_BASE_URL=http://server:4000/internal-api
+      - INTERNAL_API_USERNAME=${INTERNAL_API_USERNAME}
+      - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD}
+      - RPC_API_TOKEN=${RPC_API_TOKEN}
+      - ENABLE_TLS=false
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
     depends_on:
       server:
         condition: service_healthy

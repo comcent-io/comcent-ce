@@ -823,13 +823,13 @@ defmodule Comcent.CallSession do
             user
           end
 
-        sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+        sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
         cond do
           is_nil(user) ->
             nil
 
-          String.ends_with?(user, sip_domain) ->
+          String.ends_with?(user, sip_user_root_domain) ->
             user
 
           true ->
@@ -848,10 +848,10 @@ defmodule Comcent.CallSession do
     else
       _ ->
         sip_address = body["variable_sip_req_uri"] || ""
-        sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+        sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
         cond do
-          String.ends_with?(sip_address, sip_domain) ->
+          String.ends_with?(sip_address, sip_user_root_domain) ->
             sip_address
 
           true ->
@@ -876,9 +876,9 @@ defmodule Comcent.CallSession do
   defp parse_comcent_party(nil), do: :error
 
   defp parse_comcent_party(party) when is_binary(party) do
-    sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+    sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
-    if String.contains?(party, sip_domain) do
+    if String.contains?(party, sip_user_root_domain) do
       [user, domain] = String.split(party, "@")
 
       case String.split(domain, ".") do

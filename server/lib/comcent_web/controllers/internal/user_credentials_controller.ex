@@ -7,8 +7,8 @@ defmodule ComcentWeb.Internal.UserCredentialsController do
     Logger.info("params: #{inspect(params)}")
 
     # Extract subdomain from domain
-    sip_domain = Application.fetch_env!(:comcent, :sip_domain)
-    [subdomain | _] = String.split(domain, ".#{sip_domain}")
+    sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
+    [subdomain | _] = String.split(domain, ".#{sip_user_root_domain}")
 
     # Find the OrgMember based on username and org subdomain
     case find_org_member(subdomain, username) do

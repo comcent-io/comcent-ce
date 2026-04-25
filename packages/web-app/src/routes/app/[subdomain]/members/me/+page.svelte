@@ -2,9 +2,9 @@
   import { page } from '$app/stores';
   import { deleteJson, postJson } from '$lib/http';
   import toast from 'svelte-french-toast';
-  import { env } from '$env/dynamic/public';
+  import { publicSipUserRootDomain } from '$lib/publicConfig';
   export let data;
-  const sipDomain = env.PUBLIC_SIP_DOMAIN || 'example.com';
+  const sipDomain = publicSipUserRootDomain || 'example.com';
   let isLoading = false;
   let hasChanged = false;
   let showNewKeyModal = false;

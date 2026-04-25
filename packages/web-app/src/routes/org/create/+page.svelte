@@ -1,14 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { env } from '$env/dynamic/public';
+  import { publicSipUserRootDomain } from '$lib/publicConfig';
   import Card from '$lib/components/Card.svelte';
   import H3 from '$lib/components/html/H3.svelte';
   import Button from '$lib/components/Button.svelte';
   import { getJson, postJson } from '$lib/http';
   import type { CreateOrgSchema } from '../schema';
-
-  const { PUBLIC_SIP_DOMAIN } = env;
 
   type CountryState = {
     name: string;
@@ -178,7 +176,7 @@
               class="p-4 mb-4 text-sm text-blue-800 rounded-lg bg-blue-50 dark:bg-gray-800 dark:text-blue-400"
               role="alert"
             >
-              <span class="font-medium">{formData.subdomain}.{PUBLIC_SIP_DOMAIN}</span>
+              <span class="font-medium">{formData.subdomain}.{publicSipUserRootDomain}</span>
               will be your domain.
             </div>
           {/if}

@@ -19,9 +19,9 @@ defmodule ComcentWeb.Internal.DirectoryController do
       |> put_resp_content_type("text/xml")
       |> send_resp(200, not_found_response())
     else
-      sip_domain = Application.fetch_env!(:comcent, :sip_domain)
+      sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
-      if !String.ends_with?(domain, sip_domain) do
+      if !String.ends_with?(domain, sip_user_root_domain) do
         conn
         |> put_resp_content_type("text/xml")
         |> send_resp(200, not_found_response())

@@ -1,10 +1,8 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { env } from '$env/dynamic/public';
-  import { getJson, postJson, putJson } from '$lib/http';
+  import { getJson, postJson } from '$lib/http';
   import toast from 'svelte-french-toast';
   import { onMount } from 'svelte';
-  let loadScript: any;
   import SkeletonLoadingList from '$lib/components/SkeletonLoadingList.svelte';
   import Button from '$lib/components/Button.svelte';
   import Card from '$lib/components/Card.svelte';
@@ -13,15 +11,10 @@
   let alertThresholdBalance = 5;
   let balance = '...';
   let billingAddress: any = null;
-  let isTopUp = false;
-  let paypal: any;
-  let topUpAmount: number;
   let loading = false;
-  const { PUBLIC_PAYPAL_CLIENT_ID } = env;
 
   onMount(async () => {
     loading = true;
-    ({ loadScript } = await import('@paypal/paypal-js'));
     const [alertResult, balanceResult, billingAddressResult] = await Promise.all([
       getJson<{ alertThresholdBalance: number }>(
         `/api/v2/${$page.params.subdomain}/billing/alert-threshold`,
@@ -57,92 +50,6 @@
     toast.success('Updated successfully');
     saveProgress = false;
   }
-
-  function validateTopUpAmount() {
-    if (topUpAmount < 40) {
-      toast.error('Top-up amount should be at least $40');
-      return false;
-    } else if (topUpAmount % 10 != 0) {
-      toast.error('Top-up amount should be a multiple of $10');
-      return false;
-    }
-    return true;
-  }
-
-  async function renderPaymentButton() {
-    try {
-      paypal = await loadScript({ clientId: PUBLIC_PAYPAL_CLIENT_ID });
-    } catch (error: any) {
-      toast.error('failed to load the PayPal JS SDK script', error.message);
-    }
-
-    if (paypal && !isTopUp) {
-      try {
-        await paypal
-          .Buttons({
-            style: {
-              layout: 'vertical',
-              color: 'blue',
-              shape: 'rect',
-              label: 'paypal',
-              borderRadius: 10,
-            },
-            createOrder: function (data: any, actions: any) {
-              if (!validateTopUpAmount()) {
-                throw new Error('Invalid top-up amount');
-              }
-              return actions.order.create({
-                payer: {
-                  address: {
-                    admin_area_2: billingAddress.city,
-                    admin_area_1: billingAddress.state,
-                    postal_code: billingAddress.postalCode,
-                    country_code: billingAddress.country,
-                  },
-                },
-                purchase_units: [
-                  {
-                    amount: {
-                      currency_code: 'USD',
-                      value: topUpAmount,
-                    },
-                  },
-                ],
-              });
-            },
-            onApprove: async function (data: any, actions: any) {
-              toast.success(`Payment successful! Your balance has been updated.`);
-              const orderId = data.orderID;
-              await actions.order.capture();
-              await updateWalletBalance(orderId);
-            },
-            onError: function (error: any) {
-              if (error.message === 'Invalid top-up amount') {
-                return;
-              }
-              toast.error(`Enter valid top up amount`);
-            },
-            onCancel: function () {
-              toast.error('Payment cancelled');
-            },
-          })
-          .render('#paypal-button-container');
-        isTopUp = true;
-      } catch (error: any) {
-        toast.error('failed to render the PayPal Buttons', error.message);
-      }
-    }
-  }
-
-  async function updateWalletBalance(orderId: string) {
-    const result = await putJson(`/api/v2/${$page.params.subdomain}/billing/balance`, {
-      orderId,
-      paymentGateway: 'Paypal',
-    });
-    if (!result.ok) {
-      toast.error(result.error);
-    }
-  }
 </script>
 
 <h3 class="text-3xl font-bold dark:text-white my-4 mt-4">Balance</h3>
@@ -155,26 +62,7 @@
         <div class="flex flex-col items-center w-40 ml-48">
           <H6>Balance USD</H6>
           <H6>{balance}</H6>
-          <input
-            type="number"
-            id="amount"
-            name="amount"
-            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 mt-4"
-            placeholder="Amount to Top up"
-            bind:value={topUpAmount}
-          />
-          <Button
-            on:click={() => {
-              if (validateTopUpAmount()) {
-                renderPaymentButton();
-              }
-            }}
-            className="mt-4"
-          >
-            Top Up
-          </Button>
         </div>
-        <div id="paypal-button-container" class="mt-4 w-96 ml-20"></div>
         <div class="flex flex-col items-center mb-5 mt-10 cursor-pointer">
           <label
             for="alertThresholdBalance"

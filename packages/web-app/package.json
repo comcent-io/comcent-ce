@@ -58,7 +58,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.465.0",
     "@aws-sdk/s3-request-presigner": "^3.465.0",
-    "@paypal/paypal-js": "^8.1.1",
     "@sentry/node": "8.0.0",
     "@sentry/sveltekit": "8.0.0",
     "@toast-ui/editor": "^3.2.2",
