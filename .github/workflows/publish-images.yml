@@ -1,0 +1,95 @@
+name: Publish images
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { name: server,  dockerfile: docker/Dockerfile-server,  image: comcent-ce-server }
+          - { name: web-app, dockerfile: docker/Dockerfile-web-app, image: comcent-ce-webapp }
+          - { name: sbc,     dockerfile: docker/Dockerfile-sbc,     image: comcent-ce-sbc }
+        platform:
+          - { name: linux/amd64, runner: ubuntu-latest,    suffix: amd64 }
+          - { name: linux/arm64, runner: ubuntu-24.04-arm, suffix: arm64 }
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.service.dockerfile }}
+          platforms: ${{ matrix.platform.name }}
+          outputs: type=image,name=ghcr.io/comcent-io/${{ matrix.service.image }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.service.name }}-${{ matrix.platform.suffix }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}-${{ matrix.platform.suffix }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.service.name }}-${{ matrix.platform.suffix }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { name: server,  image: comcent-ce-server }
+          - { name: web-app, image: comcent-ce-webapp }
+          - { name: sbc,     image: comcent-ce-sbc }
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-${{ matrix.service.name }}-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest list
+        working-directory: /tmp/digests
+        run: |
+          IMG="ghcr.io/comcent-io/${{ matrix.service.image }}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          docker buildx imagetools create \
+            -t "${IMG}:latest" \
+            -t "${IMG}:main" \
+            -t "${IMG}:sha-${SHORT_SHA}" \
+            $(printf "${IMG}@sha256:%s " *)

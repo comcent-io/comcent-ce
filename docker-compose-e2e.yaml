@@ -174,9 +174,7 @@ services:
           - sbc
 
   freeswitch:
-    build:
-      context: ../freeswitch
-      dockerfile: Dockerfile
+    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-latest}
     env_file:
       - .env.e2e
     environment:
