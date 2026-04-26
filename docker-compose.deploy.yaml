@@ -106,6 +106,9 @@ services:
       context: .
       dockerfile: docker/Dockerfile-server
     restart: unless-stopped
+    # Run schema migrations before starting the Phoenix server. Idempotent —
+    # already-applied migrations are skipped — so it's safe on every restart.
+    command: sh -c "/app/bin/migrate && /app/bin/server start"
     env_file: .env
     environment:
       # Single source of truth — runtime.exs derives PHX_HOST,
