@@ -98,29 +98,33 @@ defmodule ComcentWeb.Internal.ConfigurationController do
   end
 
   defp generate_configuration(%{"key_value" => "acl.conf"}) do
-    fs_local_network = System.get_env("FS_LOCAL_NETWORK") || ""
+    # The "private" list is referenced by the internal sofia profile's
+    # local-network-acl. ALLOWED → FS treats the destination as local and uses
+    # rtp-ip (private bind) in SDP. DENIED → FS uses ext-rtp-ip.
+    #
+    # Order matters (FreeSWITCH stops at the first matching node):
+    #   1. SBC IP — denied first so a wider FS_LOCAL_NETWORK CIDR can't
+    #      accidentally allow it.
+    #   2. FS_LOCAL_NETWORK CIDRs — explicit allows for the docker subnet (or
+    #      whatever LAN FreeSWITCH and trunk peers share).
+    #   3. Default "allow" catches everything else, so unmarked peers still
+    #      reach FS over symmetric-RTP / NAT-detected paths the same as before.
+    sbc_deny =
+      case System.get_env("SBC_IP") do
+        nil -> ""
+        "" -> ""
+        entry ->
+          cidr = if String.contains?(entry, "/"), do: entry, else: "#{entry}/32"
+          ~s(<node type="deny" cidr="#{cidr}"/>)
+      end
 
-    local_networks =
-      fs_local_network
-      |> String.split(",")
-      |> Enum.map(fn network ->
-        """
-        <node type="allow" cidr="#{network}"/>
-        """
-      end)
-      |> Enum.join("\n")
-
-    kamailio_ips = System.get_env("KAMAILIO_IPS") || ""
-
-    kamailio_ips_denied =
-      kamailio_ips
-      |> String.split(",")
-      |> Enum.map(fn ip ->
-        """
-        <node type="deny" cidr="#{ip}/32"/>
-        """
-      end)
-      |> Enum.join("\n")
+    fs_local_allows =
+      (System.get_env("FS_LOCAL_NETWORK") || "")
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.map(&~s(<node type="allow" cidr="#{&1}"/>))
+      |> Enum.join("\n              ")
 
     """
     <document type="freeswitch/xml">
@@ -129,8 +133,8 @@ defmodule ComcentWeb.Internal.ConfigurationController do
           <network-lists>
             <list name="deny" default="deny"></list>
             <list name="private" default="deny">
-              #{kamailio_ips_denied}
-              #{local_networks}
+              #{sbc_deny}
+              #{fs_local_allows}
             </list>
           </network-lists>
         </configuration>

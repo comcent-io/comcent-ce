@@ -116,8 +116,11 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-comcent}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-comcent}
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-comcent}:${RABBITMQ_PASSWORD}@rabbitmq
-      # SBC is the in-tree Go SBC replacing Kamailio in CE
-      KAMAILIO_SIP_URI: sip:${COMCENT_DOMAIN}
+      # In-tree Go SBC's pinned IP — dial_utils derives fs_path=sip:<IP>:5065
+      # from this, FreeSWITCH ACL denies it (so SBC traffic is treated as
+      # non-local and ext-rtp-ip is used in SDP), and kamailio_rpc.ex uses
+      # http://<IP>/rpc for control-plane calls.
+      SBC_IP: ${SBC_IP:-172.20.0.10}
       CLUSTER_STRATEGY: gossip
       POSTGRES_SSL_ENABLED: 'false'
     depends_on:
@@ -215,8 +218,10 @@ services:
         condition: service_healthy
       cert-dumper:
         condition: service_started
+    # Pinned IP — server's SBC_IP env and FreeSWITCH ACL reference this.
     networks:
-      - comcent-network
+      comcent-network:
+        ipv4_address: 172.20.0.10
 
   # ---------------------------------------------------------------------------
   # Cert dumper — watches Traefik's acme.json and writes per-domain PEM files
@@ -274,8 +279,11 @@ services:
         condition: service_healthy
       sbc:
         condition: service_started
+    # Pinned IP — referenced by FreeSWITCH ACL allow rules (FS_LOCAL_NETWORK)
+    # and the SBC dispatcher's auto-discovery.
     networks:
-      - comcent-network
+      comcent-network:
+        ipv4_address: 172.20.0.11
 
   # ---------------------------------------------------------------------------
   # Voice bot (AI) — OPTIONAL. Uncomment to enable real-time AI voice agent.
@@ -299,6 +307,9 @@ networks:
   comcent-network:
     name: comcent-network
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 
 volumes:
   postgres_data:

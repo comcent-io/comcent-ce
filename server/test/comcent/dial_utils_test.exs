@@ -5,21 +5,21 @@ defmodule Comcent.DialUtilsTest do
   describe "create_dial_string_for_user/2" do
     test "creates a proper dial string for a user" do
       # Save original environment
-      original_kamailio_ip = System.get_env("KAMAILIO_SIP_URI")
+      original_sbc_ip = System.get_env("SBC_IP")
 
       # Set test environment
-      System.put_env("KAMAILIO_SIP_URI", "192.168.1.100")
+      System.put_env("SBC_IP", "192.168.1.100")
 
       expected =
-        "sofia/internal/test_user@test_subdomain.example.com;fs_path=192.168.1.100,[media_webrtc=true]sofia/internal/test_user@test_subdomain.example.com;fs_path=192.168.1.100"
+        "sofia/internal/test_user@test_subdomain.example.com;fs_path=sip:192.168.1.100:5065,[media_webrtc=true]sofia/internal/test_user@test_subdomain.example.com;fs_path=sip:192.168.1.100:5065"
 
       assert DialUtils.create_dial_string_for_user("test_user", "test_subdomain") == expected
 
       # Restore original environment
-      if original_kamailio_ip do
-        System.put_env("KAMAILIO_SIP_URI", original_kamailio_ip)
+      if original_sbc_ip do
+        System.put_env("SBC_IP", original_sbc_ip)
       else
-        System.delete_env("KAMAILIO_SIP_URI")
+        System.delete_env("SBC_IP")
       end
     end
   end
@@ -27,14 +27,14 @@ defmodule Comcent.DialUtilsTest do
   describe "create_dial_string_for_sip_trunk/4" do
     test "creates a proper dial string for a SIP trunk" do
       # Save original environment
-      original_kamailio_ip = System.get_env("KAMAILIO_SIP_URI")
+      original_sbc_ip = System.get_env("SBC_IP")
 
       # Set test environment
-      System.put_env("KAMAILIO_SIP_URI", "192.168.1.100")
+      System.put_env("SBC_IP", "192.168.1.100")
 
       # Test without spoofed number
       expected_no_spoof =
-        "[sip_h_X-Trunk-Number=11234567890,origination_caller_id_number=11234567890]sofia/internal/9876543210@example.com;fs_path=192.168.1.100"
+        "[sip_h_X-Trunk-Number=11234567890,origination_caller_id_number=11234567890]sofia/internal/9876543210@example.com;fs_path=sip:192.168.1.100:5065"
 
       assert DialUtils.create_dial_string_for_sip_trunk(
                "11234567890",
@@ -45,7 +45,7 @@ defmodule Comcent.DialUtilsTest do
 
       # Test with spoofed number
       expected_with_spoof =
-        "[sip_h_X-Trunk-Number=11234567890,origination_caller_id_number=5555555555]sofia/internal/9876543210@example.com;fs_path=192.168.1.100"
+        "[sip_h_X-Trunk-Number=11234567890,origination_caller_id_number=5555555555]sofia/internal/9876543210@example.com;fs_path=sip:192.168.1.100:5065"
 
       assert DialUtils.create_dial_string_for_sip_trunk(
                "11234567890",
@@ -55,10 +55,10 @@ defmodule Comcent.DialUtilsTest do
              ) == expected_with_spoof
 
       # Restore original environment
-      if original_kamailio_ip do
-        System.put_env("KAMAILIO_SIP_URI", original_kamailio_ip)
+      if original_sbc_ip do
+        System.put_env("SBC_IP", original_sbc_ip)
       else
-        System.delete_env("KAMAILIO_SIP_URI")
+        System.delete_env("SBC_IP")
       end
     end
   end
