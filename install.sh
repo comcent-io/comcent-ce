@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 #
-# Comcent CE installer — one-shot bootstrap for a fresh Linux host.
+# Comcent CE installer — non-interactive bootstrap for a fresh Linux host.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/comcent-io/comcent-ce/main/install.sh | bash
 #
-# What it does:
-#   1. Auto-installs Docker (via get.docker.com) if missing.
-#   2. Verifies docker compose plugin + curl + openssl.
-#   3. Detects the host's public IP.
-#   4. Prompts for things we cannot guess (domain, email, SMTP, S3 creds, etc.).
-#   5. Generates strong random secrets for DB / RabbitMQ / API / signing.
-#   6. Downloads docker-compose.deploy.yaml as docker-compose.yaml.
-#   7. Writes .env (mode 600) and starts the stack.
+# Steps (each prints status):
+#   1. Verify curl + openssl, install Docker (via get.docker.com) if missing.
+#   2. Verify the docker compose plugin.
+#   3. Detect the host's public IP.
+#   4. Generate strong random secrets for postgres / rabbit / API / signing.
+#   5. Download docker-compose.deploy.yaml.
+#   6. Write .env (mode 600) — known values filled in, unknowns marked replaceMe.
+#   7. Print clear next-steps the operator must do (edit .env, then docker compose up).
+#
+# This script does NOT pull images or start the stack. The operator runs
+# `docker compose up -d` themselves once .env has been edited.
 #
 # Re-running on a host that already has .env is refused — move it aside first.
 
@@ -24,249 +27,226 @@ INSTALL_DIR="${INSTALL_DIR:-$HOME/comcent-ce}"
 
 # ---------- output helpers --------------------------------------------------
 if [ -t 1 ]; then
-  R=$'\033[1;31m'; G=$'\033[1;32m'; Y=$'\033[1;33m'; B=$'\033[1;34m'; N=$'\033[0m'
+  R=$'\033[1;31m'; G=$'\033[1;32m'; Y=$'\033[1;33m'; B=$'\033[1;34m'; D=$'\033[2m'; N=$'\033[0m'
 else
-  R=""; G=""; Y=""; B=""; N=""
-fi
-info()  { printf "%s[*]%s %s\n" "$B" "$N" "$*"; }
-ok()    { printf "%s[✓]%s %s\n" "$G" "$N" "$*"; }
-warn()  { printf "%s[!]%s %s\n" "$Y" "$N" "$*"; }
-die()   { printf "%s[x]%s %s\n" "$R" "$N" "$*" >&2; exit 1; }
-
-# ---------- prereqs ---------------------------------------------------------
-# Order: hard prereqs first (curl + openssl), then auto-install docker if
-# missing, then verify the compose plugin. We do this BEFORE attaching to
-# /dev/tty so error messages always reach the operator regardless of how
-# the script was invoked.
-command -v curl    >/dev/null 2>&1 || die "Missing prerequisite: curl"
-command -v openssl >/dev/null 2>&1 || die "Missing prerequisite: openssl"
-
-if ! command -v docker >/dev/null 2>&1; then
-  info "Docker not found — installing via the official convenience script (https://get.docker.com)…"
-  curl -fsSL https://get.docker.com | sh \
-    || die "Docker install failed. Install manually and re-run."
-  ok "Docker installed."
+  R=""; G=""; Y=""; B=""; D=""; N=""
 fi
 
-docker compose version >/dev/null 2>&1 \
-  || die "docker compose plugin required (Docker 24+). On Debian/Ubuntu: 'apt install docker-compose-plugin'."
-
-# ---------- TTY for prompts when piped from curl ----------------------------
-# When run as `curl … | bash`, stdin is the script bytes. Reattach to /dev/tty
-# so `read` can prompt the operator. /dev/tty as a path always exists, but
-# opening it fails when there's no controlling terminal — test by attempting
-# the redirect in a subshell.
-if [ ! -t 0 ]; then
-  if (exec </dev/tty) 2>/dev/null; then
-    exec </dev/tty
-  else
-    die "No controlling terminal — install.sh needs an interactive shell. Re-run from a logged-in SSH session, not a non-interactive command."
-  fi
-fi
-
-# ---------- detect host's public IP -----------------------------------------
-detect_ip() {
-  curl -fsS --max-time 5 https://api.ipify.org   2>/dev/null \
-    || curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null \
-    || curl -fsS --max-time 5 https://icanhazip.com 2>/dev/null \
-    || true
-}
-PUBLIC_IP_DETECTED="$(detect_ip)"
+TOTAL_STEPS=6
+__step=0
+step()  { __step=$((__step + 1)); printf "\n%s[%d/%d]%s %s\n" "$B" "$__step" "$TOTAL_STEPS" "$N" "$*"; }
+ok()    { printf "  %s✓%s %s\n" "$G" "$N" "$*"; }
+note()  { printf "  %s%s%s\n"   "$D" "$*" "$N"; }
+warn()  { printf "  %s!%s %s\n" "$Y" "$N" "$*"; }
+die()   { printf "\n%s✗%s %s\n" "$R" "$N" "$*" >&2; exit 1; }
 
 # ---------- random secret helpers -------------------------------------------
 rand_url() { openssl rand -base64 48 | tr -d '\n+/=' | head -c 32; }
 rand_b64() { openssl rand -base64 64 | tr -d '\n'; }
 rand_hex() { openssl rand -hex 32; }
 
-# ---------- prompt helpers --------------------------------------------------
-prompt() {
-  # prompt VAR LABEL [DEFAULT]
-  local __var="$1" __label="$2" __default="${3:-}" __reply
-  if [ -n "$__default" ]; then
-    printf "  %s [%s]: " "$__label" "$__default"
-  else
-    printf "  %s: " "$__label"
-  fi
-  IFS= read -r __reply || __reply=""
-  [ -z "$__reply" ] && __reply="$__default"
-  printf -v "$__var" "%s" "$__reply"
-}
-
-prompt_required() {
-  # prompt_required VAR LABEL
-  local __var="$1" __label="$2" __reply=""
-  while [ -z "$__reply" ]; do
-    printf "  %s: " "$__label"
-    IFS= read -r __reply || __reply=""
-    [ -z "$__reply" ] && warn "value required, please enter something"
-  done
-  printf -v "$__var" "%s" "$__reply"
-}
-
 # ---------- banner ----------------------------------------------------------
 cat <<BANNER
 
-${B}=============================================================${N}
-  Comcent CE — open-source contact center installer
-${B}=============================================================${N}
-Install dir: ${INSTALL_DIR}
+${B}Comcent CE — installer${N}
+${D}Target dir: ${INSTALL_DIR}${N}
 BANNER
 
-mkdir -p "$INSTALL_DIR"
-cd "$INSTALL_DIR"
-[ -f .env ] && die ".env already exists in $INSTALL_DIR — refusing to overwrite. Move it aside or set INSTALL_DIR=…"
+# ---------- step 1: prereqs + docker ---------------------------------------
+step "Verifying prerequisites"
 
-echo
-info "We need a few things to set this up. Press enter to accept defaults shown in [brackets]."
-echo
+command -v curl    >/dev/null 2>&1 || die "curl not found — install it first (apt-get install curl)"
+ok "curl present"
+command -v openssl >/dev/null 2>&1 || die "openssl not found — install it first (apt-get install openssl)"
+ok "openssl present"
 
-# ---------- required identity -----------------------------------------------
-prompt_required COMCENT_DOMAIN   "Public domain (DNS A record must already point here)"
-prompt PUBLIC_IP                 "Public IP (used by FreeSWITCH for SDP)"          "$PUBLIC_IP_DETECTED"
-[ -z "$PUBLIC_IP" ] && die "PUBLIC_IP could not be detected and you didn't supply one."
+if command -v docker >/dev/null 2>&1; then
+  ok "docker present ($(docker --version 2>/dev/null | awk '{print $3}' | tr -d ','))"
+else
+  note "docker not found — installing via the official convenience script (https://get.docker.com)…"
+  curl -fsSL https://get.docker.com -o /tmp/get-docker.sh \
+    || die "Failed to download get.docker.com script"
+  sh /tmp/get-docker.sh >/tmp/get-docker.log 2>&1 \
+    || { tail -20 /tmp/get-docker.log; die "Docker install failed — see /tmp/get-docker.log"; }
+  rm -f /tmp/get-docker.sh
+  ok "docker installed ($(docker --version 2>/dev/null | awk '{print $3}' | tr -d ','))"
+fi
 
-prompt LETSENCRYPT_EMAIL         "Let's Encrypt contact email"                     "admin@${COMCENT_DOMAIN}"
-prompt SOURCE_EMAIL              "Outbound sender (invites, password resets)"      "Comcent <noreply@${COMCENT_DOMAIN}>"
-prompt SIP_WSS_PORT              "SIP-over-WSS host port"                          "5063"
+# ---------- step 2: compose plugin -----------------------------------------
+step "Verifying docker compose plugin"
 
-# ---------- SMTP ------------------------------------------------------------
-echo
-info "SMTP for transactional email. Leave empty to skip (invites/password resets won't be sent)."
-prompt SMTP_URL "SMTP URL (smtp://user:pass@host:587)" ""
+if docker compose version >/dev/null 2>&1; then
+  ok "docker compose plugin present ($(docker compose version --short 2>/dev/null))"
+else
+  die "docker compose plugin missing. On Debian/Ubuntu: apt install docker-compose-plugin"
+fi
 
-# ---------- object storage --------------------------------------------------
-echo
-info "Object storage for call recordings & uploads (S3 or any S3-compatible)."
-prompt_required STORAGE_BUCKET_NAME    "Bucket name"
-prompt          BUCKET_REGION          "Region"                                   "us-east-1"
-prompt_required AWS_ACCESS_KEY_ID      "Access key id"
-prompt_required AWS_SECRET_ACCESS_KEY  "Secret access key"
-prompt          S3_ENDPOINT_URL        "S3 endpoint URL (blank = AWS S3)"          ""
+# ---------- step 3: detect public IP ---------------------------------------
+step "Detecting public IP"
 
-# ---------- AI keys ---------------------------------------------------------
-echo
-info "Optional AI features (transcription, summaries, voice bot). Leave empty to skip."
-prompt DEEPGRAM_API_KEY "Deepgram API key" ""
-prompt OPENAI_API_KEY   "OpenAI API key"   ""
+detect_ip() {
+  curl -fsS --max-time 5 https://api.ipify.org   2>/dev/null \
+    || curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null \
+    || curl -fsS --max-time 5 https://icanhazip.com 2>/dev/null \
+    || true
+}
+PUBLIC_IP="$(detect_ip)"
+if [ -n "$PUBLIC_IP" ]; then
+  ok "public IP: ${PUBLIC_IP}"
+else
+  PUBLIC_IP="replaceMe"
+  warn "could not auto-detect — set PUBLIC_IP in .env manually"
+fi
 
-# ---------- generated secrets -----------------------------------------------
+# ---------- step 4: generate secrets ---------------------------------------
+step "Generating random secrets"
+
 POSTGRES_PASSWORD="$(rand_url)"
 RABBITMQ_PASSWORD="$(rand_url)"
 INTERNAL_API_PASSWORD="$(rand_url)"
 RPC_API_TOKEN="$(rand_url)"
 SECRET_KEY_BASE="$(rand_b64)"
 SIGNING_KEY="$(rand_hex)"
+ok "POSTGRES_PASSWORD, RABBITMQ_PASSWORD, INTERNAL_API_PASSWORD, RPC_API_TOKEN, SECRET_KEY_BASE, SIGNING_KEY"
 
-echo
-info "Generated random secrets for postgres, rabbitmq, internal API, RPC token, and signing keys."
+# ---------- step 5: prepare working dir + download compose -----------------
+step "Preparing working directory and downloading compose file"
 
-# ---------- download compose ------------------------------------------------
-info "Downloading docker-compose.deploy.yaml from ${REPO_RAW}…"
+mkdir -p "$INSTALL_DIR"
+cd "$INSTALL_DIR"
+[ -f .env ] && die ".env already exists in $INSTALL_DIR — move it aside or set INSTALL_DIR=…"
+ok "working directory: ${INSTALL_DIR}"
+
 curl -fsSL "${REPO_RAW}/docker-compose.deploy.yaml" -o docker-compose.yaml \
-  || die "Failed to download docker-compose.deploy.yaml"
-ok "docker-compose.yaml saved."
+  || die "Failed to download docker-compose.deploy.yaml from ${REPO_RAW}"
+ok "docker-compose.yaml downloaded"
 
-# ---------- write .env ------------------------------------------------------
-info "Writing .env (mode 600)…"
+# ---------- step 6: write .env ---------------------------------------------
+step "Writing .env"
+
 umask 077
 cat > .env <<EOF
 # Comcent CE — generated by install.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)
-# Edit at will, but keep this file out of source control.
+#
+# Search for "replaceMe" — every occurrence MUST be replaced before you
+# start the stack. Generated values (passwords / signing keys / IPs) are
+# already filled in. Keep this file out of source control.
 
-# --- identity / networking ---
-COMCENT_DOMAIN=${COMCENT_DOMAIN}
+# =============================================================================
+# REQUIRED — replace every "replaceMe" below
+# =============================================================================
+
+# Public domain — DNS A record for this name MUST point at PUBLIC_IP.
+COMCENT_DOMAIN=replaceMe
+
+# Email used by Let's Encrypt for cert renewal notifications.
+LETSENCRYPT_EMAIL=replaceMe
+
+# "From" address on outbound transactional email (invites, password resets).
+SOURCE_EMAIL=Comcent <noreply@replaceMe>
+
+# SMTP for outbound email. Format: smtp://user:pass@host:port
+# Anything works (SES, SendGrid, Postmark, Mailgun, your own postfix).
+SMTP_URL=replaceMe
+
+# S3 (or any S3-compatible) bucket for call recordings + uploads.
+STORAGE_BUCKET_NAME=replaceMe
+AWS_ACCESS_KEY_ID=replaceMe
+AWS_SECRET_ACCESS_KEY=replaceMe
+
+# =============================================================================
+# OPTIONAL — leave blank to disable, fill in to enable
+# =============================================================================
+
+# AI features (real-time transcription, summarization, voice bot)
+DEEPGRAM_API_KEY=
+OPENAI_API_KEY=
+
+# Sentry observability
+SERVER_SENTRY_DSN=
+PUBLIC_SENTRY_DSN=
+
+# OIDC SSO; default ({}) keeps password login only.
+# Example: {"google":{"client_id":"…","client_secret":"…","issuer":"https://accounts.google.com"}}
+AUTH_OIDC_PROVIDERS_JSON={}
+
+# =============================================================================
+# AUTO-DETECTED / GENERATED — usually no need to touch
+# =============================================================================
+
 PUBLIC_IP=${PUBLIC_IP}
-LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
-SOURCE_EMAIL=${SOURCE_EMAIL}
-SIP_WSS_PORT=${SIP_WSS_PORT}
+SIP_WSS_PORT=5063
+BUCKET_REGION=us-east-1
+S3_ENDPOINT_URL=
+S3_PROXY_DOWNLOADS=false
+AUTH_PASSWORD_ENABLED=true
 
-# --- image tags ---
+# Image tags. Change to a pinned version (e.g. v0.1.0) for prod stability.
 COMCENT_VERSION=latest
 FREESWITCH_VERSION=latest
 
-# --- service-to-service ---
-# SBC pinned IP from docker-compose. dial_utils derives sip:<IP>:5065 from this;
-# the same value drives the FS ACL deny rule and the SBC RPC URL.
+# In-tree Go SBC pinned IP (matches docker-compose.yaml). Used by:
+#   - dial_utils → fs_path=sip:<IP>:5065
+#   - FreeSWITCH ACL deny rule (so SBC traffic uses ext-rtp-ip in SDP)
+#   - SBC RPC URL (http://<IP>/rpc)
 SBC_IP=172.20.0.10
-# Docker subnet — added as ALLOW in FS's "private" ACL so internal peers stay local.
+# Docker subnet — added as ALLOW in FS's "private" ACL so internal peers
+# stay local (rtp-ip used in SDP rather than ext-rtp-ip).
 FS_LOCAL_NETWORK=172.20.0.0/16
 
 INTERNAL_API_USERNAME=internal_api
 INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD}
 RPC_API_TOKEN=${RPC_API_TOKEN}
 
-# --- data services ---
 POSTGRES_USER=comcent
 POSTGRES_DB=comcent
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 RABBITMQ_USER=comcent
 RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
 
-# --- secrets ---
 SECRET_KEY_BASE=${SECRET_KEY_BASE}
 SIGNING_KEY=${SIGNING_KEY}
 
-# --- storage ---
-STORAGE_BUCKET_NAME=${STORAGE_BUCKET_NAME}
-BUCKET_REGION=${BUCKET_REGION}
-AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
-S3_PROXY_DOWNLOADS=false
-
-# --- auth ---
-AUTH_PASSWORD_ENABLED=true
-AUTH_OIDC_PROVIDERS_JSON={}
-
-# --- email ---
-SMTP_URL=${SMTP_URL}
-
-# --- AI (optional) ---
-DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY}
-OPENAI_API_KEY=${OPENAI_API_KEY}
-
-# --- observability (optional) ---
-SERVER_SENTRY_DSN=
-PUBLIC_SENTRY_DSN=
-
-# --- runtime ---
 ENV=prod
 CLUSTER_STRATEGY=gossip
 EOF
 chmod 600 .env
-ok ".env written."
+ok ".env written (mode 600)"
 
-# ---------- bring stack up --------------------------------------------------
-echo
-info "Pulling images (one-time download, several hundred MB)…"
-docker compose pull
-echo
-info "Starting stack…"
-docker compose up -d
-
-# ---------- summary ---------------------------------------------------------
+# ---------- final instructions ---------------------------------------------
 cat <<EOF
 
-${G}Comcent CE is starting.${N}
+${G}Setup complete.${N}  Two manual steps remain — read carefully:
 
-Working directory : ${INSTALL_DIR}
-Domain            : https://${COMCENT_DOMAIN}
-Public IP         : ${PUBLIC_IP}
+${B}1) Edit .env${N}
+     ${INSTALL_DIR}/.env
 
-Watch boot logs:
-  cd ${INSTALL_DIR} && docker compose logs -f server
+   Search for the string ${Y}replaceMe${N} and fill every one in:
+     • COMCENT_DOMAIN          (e.g. cpaas.example.com — DNS A → ${PUBLIC_IP})
+     • LETSENCRYPT_EMAIL       (your address for cert-renewal alerts)
+     • SOURCE_EMAIL            (sender for invites; the host part will likely match COMCENT_DOMAIN)
+     • SMTP_URL                (smtp://user:pass@host:587 — any provider)
+     • STORAGE_BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 
-Open the app once Let's Encrypt finishes (1–2 min on first launch):
-  https://${COMCENT_DOMAIN}
+${B}2) Start the stack${N}
+     cd ${INSTALL_DIR}
+     docker compose up -d
 
-Required inbound firewall rules:
-  TCP 80, 443                 — HTTP/HTTPS (cert issuance + app)
-  UDP+TCP 5060                — SIP signaling
-  TCP 5061                    — SIP/TLS
-  TCP ${SIP_WSS_PORT}                    — SIP-over-WSS (browser dialer)
-  UDP 19000-19100             — RTP media
+   First run pulls ~800MB of images and takes 5–10 minutes — that is
+   normal, not stuck. Then watch the boot:
+     docker compose logs -f server
 
-Upgrade later:
-  cd ${INSTALL_DIR} && docker compose pull && docker compose up -d
+   Once Let's Encrypt issues (≈1 min after first start), open:
+     https://<COMCENT_DOMAIN>
+
+${B}Required inbound firewall rules${N}
+   TCP    80, 443         HTTP/HTTPS (cert issuance + app)
+   UDP+TCP 5060           SIP signaling
+   TCP    5061            SIP/TLS
+   TCP    5063            SIP-over-WSS (browser dialer)
+   UDP    19000-19100     RTP media
+
+${B}Upgrade later${N}
+   cd ${INSTALL_DIR} && docker compose pull && docker compose up -d
 
 EOF
