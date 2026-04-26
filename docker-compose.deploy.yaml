@@ -100,7 +100,7 @@ services:
   # Comcent Elixir API server
   # ---------------------------------------------------------------------------
   server:
-    image: ghcr.io/comcent-io/comcent-ce:${COMCENT_VERSION:-latest}
+    image: ghcr.io/comcent-io/comcent-ce-server:${COMCENT_VERSION:-latest}
     # Fallback to local build if image not yet published to GHCR:
     build:
       context: .
