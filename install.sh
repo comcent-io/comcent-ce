@@ -6,12 +6,13 @@
 #   curl -fsSL https://raw.githubusercontent.com/comcent-io/comcent-ce/main/install.sh | bash
 #
 # What it does:
-#   1. Verifies Docker + curl + openssl.
-#   2. Detects the host's public IP.
-#   3. Prompts for things we cannot guess (domain, email, SMTP, S3 creds, etc.).
-#   4. Generates strong random secrets for DB / RabbitMQ / API / signing.
-#   5. Downloads docker-compose.deploy.yaml as docker-compose.yaml.
-#   6. Writes .env (mode 600) and starts the stack.
+#   1. Auto-installs Docker (via get.docker.com) if missing.
+#   2. Verifies docker compose plugin + curl + openssl.
+#   3. Detects the host's public IP.
+#   4. Prompts for things we cannot guess (domain, email, SMTP, S3 creds, etc.).
+#   5. Generates strong random secrets for DB / RabbitMQ / API / signing.
+#   6. Downloads docker-compose.deploy.yaml as docker-compose.yaml.
+#   7. Writes .env (mode 600) and starts the stack.
 #
 # Re-running on a host that already has .env is refused — move it aside first.
 
@@ -32,24 +33,36 @@ ok()    { printf "%s[✓]%s %s\n" "$G" "$N" "$*"; }
 warn()  { printf "%s[!]%s %s\n" "$Y" "$N" "$*"; }
 die()   { printf "%s[x]%s %s\n" "$R" "$N" "$*" >&2; exit 1; }
 
-# ---------- TTY for prompts when piped from curl ----------------------------
-# When run as `curl … | bash`, stdin is the script bytes. Reattach to /dev/tty
-# so `read` can prompt the operator.
-if [ ! -t 0 ]; then
-  if [ -e /dev/tty ]; then
-    exec </dev/tty
-  else
-    die "Interactive prompts require a TTY. Run on a real shell, not a non-interactive runner."
-  fi
+# ---------- prereqs ---------------------------------------------------------
+# Order: hard prereqs first (curl + openssl), then auto-install docker if
+# missing, then verify the compose plugin. We do this BEFORE attaching to
+# /dev/tty so error messages always reach the operator regardless of how
+# the script was invoked.
+command -v curl    >/dev/null 2>&1 || die "Missing prerequisite: curl"
+command -v openssl >/dev/null 2>&1 || die "Missing prerequisite: openssl"
+
+if ! command -v docker >/dev/null 2>&1; then
+  info "Docker not found — installing via the official convenience script (https://get.docker.com)…"
+  curl -fsSL https://get.docker.com | sh \
+    || die "Docker install failed. Install manually and re-run."
+  ok "Docker installed."
 fi
 
-# ---------- prereqs ---------------------------------------------------------
-need() { command -v "$1" >/dev/null 2>&1 || die "Missing prerequisite: $1"; }
-need docker
-need curl
-need openssl
 docker compose version >/dev/null 2>&1 \
-  || die "docker compose plugin required (Docker 24+). On Ubuntu: 'apt install docker-compose-plugin'."
+  || die "docker compose plugin required (Docker 24+). On Debian/Ubuntu: 'apt install docker-compose-plugin'."
+
+# ---------- TTY for prompts when piped from curl ----------------------------
+# When run as `curl … | bash`, stdin is the script bytes. Reattach to /dev/tty
+# so `read` can prompt the operator. /dev/tty as a path always exists, but
+# opening it fails when there's no controlling terminal — test by attempting
+# the redirect in a subshell.
+if [ ! -t 0 ]; then
+  if (exec </dev/tty) 2>/dev/null; then
+    exec </dev/tty
+  else
+    die "No controlling terminal — install.sh needs an interactive shell. Re-run from a logged-in SSH session, not a non-interactive command."
+  fi
+fi
 
 # ---------- detect host's public IP -----------------------------------------
 detect_ip() {
