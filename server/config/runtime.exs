@@ -7,21 +7,21 @@ import Config
 # any compile-time configuration in here, as it won't be applied.
 # The block below contains prod specific runtime configuration.
 
-# Sentry Configuration
-if sentry_dsn = System.get_env("SERVER_SENTRY_DSN") do
-  config :sentry,
-    dsn: sentry_dsn
+# Sentry Configuration. Empty strings are truthy in Elixir, so the bare
+# `if System.get_env(...)` check would try to configure Sentry with dsn: ""
+# (which the library rejects, crashing boot). Treat both nil and "" as
+# "not configured".
+case System.get_env("SERVER_SENTRY_DSN") do
+  dsn when is_binary(dsn) and dsn != "" -> config :sentry, dsn: dsn
+  _ -> :ok
 end
 
-# Deepgram API configuration
-deepgram_api_key =
-  System.get_env("DEEPGRAM_API_KEY") ||
-    raise """
-    environment variable DEEPGRAM_API_KEY is missing.
-    You can get one from https://console.deepgram.com/
-    """
-
-config :comcent, :deepgram, api_key: deepgram_api_key
+# Deepgram API key — optional. Real-time transcription / voice-bot features
+# need it, but CE must boot fine without it.
+case System.get_env("DEEPGRAM_API_KEY") do
+  key when is_binary(key) and key != "" -> config :comcent, :deepgram, api_key: key
+  _ -> :ok
+end
 
 # AWS Configuration
 aws_access_key_id =
@@ -71,15 +71,12 @@ storage_bucket_name =
 
 config :comcent, :storage, bucket_name: storage_bucket_name
 
-# OpenAI API configuration
-openai_api_key =
-  System.get_env("OPENAI_API_KEY") ||
-    raise """
-    environment variable OPENAI_API_KEY is missing.
-    You can get one from https://platform.openai.com/account/api-keys
-    """
-
-config :comcent, :openai, api_key: openai_api_key
+# OpenAI API key — optional. Summarization / function-calling / voice-bot
+# features need it, but CE must boot fine without it.
+case System.get_env("OPENAI_API_KEY") do
+  key when is_binary(key) and key != "" -> config :comcent, :openai, api_key: key
+  _ -> :ok
+end
 
 # ## Using releases
 #
