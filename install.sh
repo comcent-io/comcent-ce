@@ -242,7 +242,6 @@ ${B}2) Start the stack${N}
 ${B}Required inbound firewall rules${N}
    TCP    80, 443         HTTP/HTTPS (cert issuance + app)
    UDP+TCP 5060           SIP signaling
-   TCP    5061            SIP/TLS
    TCP    5063            SIP-over-WSS (browser dialer)
    UDP    19000-19100     RTP media
 
