@@ -17,7 +17,7 @@
 # Requirements on the host:
 #   - Public DNS A record: ${COMCENT_DOMAIN} -> your droplet IP
 #   - Inbound ports open: 80, 443 (HTTP/HTTPS), 5060 UDP/TCP (SIP),
-#     5061 TCP (SIP/TLS), 19000-19100 UDP (RTP media)
+#     19000-19100 UDP (RTP media)
 #   - Docker 24+ and docker compose plugin
 #
 # All persistent data lives in named volumes (postgres_data, etc.).
@@ -28,13 +28,17 @@ services:
   # Reverse proxy — terminates TLS, routes to server/web-app, ACME for certs
   # ---------------------------------------------------------------------------
   traefik:
-    image: traefik:v3.3
+    image: traefik:v3.5
     restart: unless-stopped
+    # Why no docker provider: Docker Engine ≥25 enforces a minimum API
+    # version of 1.40, but Traefik's docker provider hard-codes the legacy
+    # 1.24 client and ignores DOCKER_API_VERSION. The daemon refuses every
+    # call → no routers, no Let's Encrypt cert. Routes are static here, so
+    # we use the file provider instead and avoid the docker socket entirely.
     command:
       - --api.dashboard=false
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --providers.docker.network=comcent-network
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.watch=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       # Force HTTPS
@@ -52,8 +56,13 @@ services:
       - '80:80'
       - '443:443'
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik_letsencrypt:/letsencrypt
+    configs:
+      # Inline dynamic config — ${COMCENT_DOMAIN} is interpolated by docker
+      # compose itself when the config is written, so the Host(`…`) match
+      # ends up correct for the operator's domain without templating.
+      - source: traefik-dynamic
+        target: /etc/traefik/dynamic.yml
     networks:
       - comcent-network
 
@@ -133,13 +142,8 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_started
-    labels:
-      - 'traefik.enable=true'
-      - 'traefik.http.routers.comcent-api.rule=Host(`${COMCENT_DOMAIN}`) && (PathPrefix(`/api/`) || PathPrefix(`/ws`) || PathPrefix(`/health`) || PathPrefix(`/internal-api`))'
-      - 'traefik.http.routers.comcent-api.entrypoints=websecure'
-      - 'traefik.http.routers.comcent-api.tls.certresolver=letsencrypt'
-      - 'traefik.http.routers.comcent-api.priority=100'
-      - 'traefik.http.services.comcent-api.loadbalancer.server.port=4000'
+    # Routing rules live in traefik-dynamic.yml (file provider) — see the
+    # traefik service. Docker-provider labels are not used.
     healthcheck:
       test: ['CMD', 'curl', '--fail', '--silent', 'http://127.0.0.1:4000/health']
       interval: 30s
@@ -175,19 +179,13 @@ services:
     depends_on:
       server:
         condition: service_healthy
-    labels:
-      - 'traefik.enable=true'
-      - 'traefik.http.routers.comcent-webapp.rule=Host(`${COMCENT_DOMAIN}`)'
-      - 'traefik.http.routers.comcent-webapp.entrypoints=websecure'
-      - 'traefik.http.routers.comcent-webapp.tls.certresolver=letsencrypt'
-      - 'traefik.http.routers.comcent-webapp.priority=1'
-      - 'traefik.http.services.comcent-webapp.loadbalancer.server.port=3000'
+    # Routing rules live in traefik-dynamic.yml (file provider).
     networks:
       - comcent-network
 
   # ---------------------------------------------------------------------------
   # Go SBC — SIP proxy / registrar / dispatcher (replaces Kamailio in CE)
-  # Listens on 5060 UDP+TCP for SIP signaling, 5061 TCP for SIP/TLS, and
+  # Listens on 5060 UDP+TCP for SIP signaling and
   # serves SIP-over-WSS directly on host port ${SIP_WSS_PORT:-5063}.
   # SBC terminates TLS itself using the Let's Encrypt cert Traefik already
   # issued for ${COMCENT_DOMAIN} (extracted into a shared volume by the
@@ -212,7 +210,6 @@ services:
     ports:
       - '5060:5060/udp'
       - '5060:5060/tcp'
-      - '5061:5061/tcp'
       - '${SIP_WSS_PORT:-5063}:5063/tcp'
     volumes:
       - sbc_certs:/certs:ro
@@ -320,3 +317,37 @@ volumes:
   rabbitmq_data:
   traefik_letsencrypt:
   sbc_certs:
+
+configs:
+  # Traefik dynamic config — file provider. Replaces the docker provider,
+  # which can't talk to modern Docker (its API client is hard-coded to v1.24
+  # and Docker Engine ≥25 enforces ≥1.40). ${COMCENT_DOMAIN} is interpolated
+  # by docker compose at config-write time, so the Host(...) rules match
+  # the operator's domain without templating or sed.
+  traefik-dynamic:
+    content: |
+      http:
+        routers:
+          comcent-api:
+            rule: "Host(`${COMCENT_DOMAIN}`) && (PathPrefix(`/api/`) || PathPrefix(`/ws`) || PathPrefix(`/health`) || PathPrefix(`/internal-api`))"
+            entryPoints: [websecure]
+            service: comcent-api
+            priority: 100
+            tls:
+              certResolver: letsencrypt
+          comcent-webapp:
+            rule: "Host(`${COMCENT_DOMAIN}`)"
+            entryPoints: [websecure]
+            service: comcent-webapp
+            priority: 1
+            tls:
+              certResolver: letsencrypt
+        services:
+          comcent-api:
+            loadBalancer:
+              servers:
+                - url: "http://server:4000"
+          comcent-webapp:
+            loadBalancer:
+              servers:
+                - url: "http://web-app:3000"
