@@ -230,7 +230,7 @@ services:
   # change (cert renewal); SBC re-reads the files every 5 minutes.
   # ---------------------------------------------------------------------------
   cert-dumper:
-    image: ldez/traefik-certs-dumper:v2.8.4
+    image: ldez/traefik-certs-dumper:v2.11.2
     restart: unless-stopped
     entrypoint: sh
     command:
