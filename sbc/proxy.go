@@ -450,12 +450,23 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 		cancelReq.AppendHeader(sip.HeaderClone(b.fwdReq.From()))
 		cancelReq.AppendHeader(sip.HeaderClone(b.fwdReq.To()))
 		cancelReq.AppendHeader(sip.HeaderClone(b.fwdReq.CallID()))
+		// RFC 3261 §9.1: CANCEL CSeq mirrors INVITE's SeqNo with Method=CANCEL.
+		// Max-Forwards is also mandatory.
+		if cseq := b.fwdReq.CSeq(); cseq != nil {
+			cancelReq.AppendHeader(&sip.CSeqHeader{SeqNo: cseq.SeqNo, MethodName: sip.CANCEL})
+		}
+		mf := sip.MaxForwardsHeader(70)
+		cancelReq.AppendHeader(&mf)
 		sip.CopyHeaders("Route", b.fwdReq, cancelReq)
 		cancelReq.SetSource(b.fwdReq.Source())
 		cancelReq.SetDestination(b.fwdReq.Destination())
 		cancelReq.SetTransport(b.fwdReq.Transport())
-		if err := p.publicClient.WriteRequest(cancelReq); err != nil {
-			slog.Debug("CANCEL on fork sibling failed", "address", b.contact.Address, "error", err)
+		// Pass noopClientOption so sipgo skips clientRequestBuildReq, which
+		// would stamp req.Laddr with the public client's bind addr
+		// (0.0.0.0:5060) and break pooled-connection lookup — fatal for WS to
+		// the registered WebRTC agent (would try to bind 0.0.0.0:5060 again).
+		if err := p.publicClient.WriteRequest(cancelReq, noopClientOption); err != nil {
+			slog.Error("CANCEL on fork sibling failed", "address", b.contact.Address, "error", err)
 		}
 	}
 
@@ -944,14 +955,26 @@ func (p *Proxy) cancelOutgoing(callID string) {
 	cancelReq.AppendHeader(sip.HeaderClone(entry.req.From()))
 	cancelReq.AppendHeader(sip.HeaderClone(entry.req.To()))
 	cancelReq.AppendHeader(sip.HeaderClone(entry.req.CallID()))
+	if cseq := entry.req.CSeq(); cseq != nil {
+		cancelReq.AppendHeader(&sip.CSeqHeader{SeqNo: cseq.SeqNo, MethodName: sip.CANCEL})
+	}
+	mf := sip.MaxForwardsHeader(70)
+	cancelReq.AppendHeader(&mf)
 	sip.CopyHeaders("Route", entry.req, cancelReq)
 	cancelReq.SetSource(entry.req.Source())
 	cancelReq.SetDestination(entry.req.Destination())
 
-	if err := entry.client.WriteRequest(cancelReq); err != nil {
+	if err := entry.client.WriteRequest(cancelReq, noopClientOption); err != nil {
 		slog.Error("Failed to send CANCEL", "callid", callID, "error", err)
 	}
 }
+
+// noopClientOption is a do-nothing sipgo.ClientRequestOption. Passing any
+// option to WriteRequest causes sipgo to skip clientRequestBuildReq, which
+// otherwise stamps req.Laddr with the client's bind addr and breaks pooled
+// connection lookup for already-open inbound transports (notably WS to a
+// registered WebRTC agent).
+func noopClientOption(_ *sipgo.Client, _ *sip.Request) error { return nil }
 
 // ---------------------------------------------------------------------------
 // OPTIONS (respond locally)

@@ -228,11 +228,11 @@ else
   IO.puts("No Redis URL found")
 end
 
-# Kamailio RPC Configuration
-kamailio_ip =
-  System.get_env("KAMAILIO_IP") ||
+# SBC RPC Configuration (Kamailio in EE-style topologies; CE uses the in-tree Go SBC)
+sbc_ip =
+  System.get_env("SBC_IP") ||
     raise """
-    environment variable KAMAILIO_IP is missing.
+    environment variable SBC_IP is missing.
     For example: 192.168.1.100
     """
 
@@ -242,8 +242,8 @@ rpc_api_token =
     environment variable RPC_API_TOKEN is missing.
     """
 
-config :comcent, :kamailio,
-  ip: kamailio_ip,
+config :comcent, :sbc,
+  ip: sbc_ip,
   rpc_api_token: rpc_api_token
 
 # RabbitMQ Configuration

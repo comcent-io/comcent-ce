@@ -242,8 +242,6 @@ services:
       - ./fsdata:/usr/local/freeswitch/sounds
     ports:
       - '18000-18100:18000-18100/udp'
-    networks:
-      - comcent-network
     environment:
       - SOUND_RATES=8000:32000
       - SOUND_TYPES=music:en-us-callie
@@ -272,6 +270,12 @@ services:
         condition: service_started
       minio-init:
         condition: service_started
+    # Pin FS to a static IP so the FreeSWITCH ACL ("private" list) and
+    # SBC dispatcher can reference a known address rather than whatever
+    # docker happens to hand out on each restart.
+    networks:
+      comcent-network:
+        ipv4_address: 172.31.0.11
 
 networks:
   comcent-network:

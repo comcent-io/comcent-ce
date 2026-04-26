@@ -139,7 +139,7 @@ defmodule Comcent.KamailioRPC do
 
   # Private function to get RPC configuration
   defp get_rpc_config do
-    config = Application.get_env(:comcent, :kamailio)
+    config = Application.get_env(:comcent, :sbc)
     url = "http://#{config[:ip]}/rpc"
     api_token = config[:rpc_api_token]
     {url, api_token}
