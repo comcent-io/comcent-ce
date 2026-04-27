@@ -261,19 +261,21 @@ defmodule ComcentWeb.Internal.HttpapiController do
   end
 
   defp hangup_response do
-    # NORMAL_CLEARING (Q.850 cause 16) → BYE on an established leg, the
-    # standard "call ended" signal. The previous USER_BUSY (cause 17 →
-    # SIP 486 Busy Here) misclassified post-bridge teardown as an
-    # early-dialog decline; sofia then skipped emitting BYE on the
-    # answered trunk leg, leaving the PSTN side ringing until the caller
-    # gave up on their own.
+    # Use the dialplan `hangup` application via <execute>, NOT the bare
+    # <hangup> action. mod_httapi's <hangup> moves the channel straight
+    # from CS_EXECUTE to CS_DESTROY, skipping the CS_HANGUP state where
+    # sofia normally emits the SIP BYE. The PSTN side then sat with the
+    # call open until the caller gave up on their own (verified on a
+    # fresh DO droplet — twilio sent its own BYE 60+s after the agent
+    # hung up). Routing through the dialplan engine takes the standard
+    # state path so sofia sends BYE immediately.
     """
     <document type="xml/freeswitch-httapi">
       <params>
         <currentNodeId>hangup</currentNodeId>
       </params>
       <work>
-        <hangup cause='NORMAL_CLEARING' />
+        <execute application="hangup" data="NORMAL_CLEARING" />
       </work>
     </document>
     """
