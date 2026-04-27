@@ -566,20 +566,21 @@ func (p *Proxy) handleInviteFromFSToTrunk(req *sip.Request, tx sip.ServerTransac
 		return
 	}
 
+	// Build R-URI from the trunk's configured contact (typically an FQDN
+	// like "<trunk>.pstn.twilio.com"). Carriers like Twilio use the R-URI
+	// host to identify which customer trunk the call belongs to and reject
+	// with 403 if it sees a bare edge IP they don't recognize. Resolve to
+	// IP only for the network destination so the packet actually routes.
+	contactHost, contactPort := splitHostPort(trunk.OutboundContact, 5060)
 	dest := resolveHost(trunk.OutboundContact)
 	callID := req.CallID().Value()
-	slog.Info("Proxy: FS→trunk", "number", trunkHeader.Value(), "dest", dest)
+	slog.Info("Proxy: FS→trunk", "number", trunkHeader.Value(),
+		"r-uri-host", contactHost, "dest", dest)
 
 	// 100 Trying
 	tx.Respond(sip.NewResponseFromRequest(req, 100, "Trying", nil))
 
-	// Build forwarded INVITE
-	parts := strings.SplitN(dest, ":", 2)
-	port := 5060
-	if len(parts) == 2 {
-		port, _ = strconv.Atoi(parts[1])
-	}
-	trunkURI := sip.Uri{User: toUser, Host: parts[0], Port: port}
+	trunkURI := sip.Uri{User: toUser, Host: contactHost, Port: contactPort}
 
 	fwdReq, ok := p.buildForwardRequestWithURI(req, trunkURI)
 	if !ok {
@@ -1520,6 +1521,21 @@ func resolveHost(hostPort string) string {
 		return hostPort
 	}
 	return addrs[0] + ":" + port
+}
+
+// splitHostPort takes "host" or "host:port" and returns (host, port). Unlike
+// net.SplitHostPort it tolerates a bare host (no colon) and returns the
+// supplied default port in that case.
+func splitHostPort(hostPort string, defaultPort int) (string, int) {
+	parts := strings.SplitN(hostPort, ":", 2)
+	if len(parts) == 1 {
+		return parts[0], defaultPort
+	}
+	port, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return parts[0], defaultPort
+	}
+	return parts[0], port
 }
 
 func parsePort(addr string) int {
