@@ -261,13 +261,19 @@ defmodule ComcentWeb.Internal.HttpapiController do
   end
 
   defp hangup_response do
+    # NORMAL_CLEARING (Q.850 cause 16) → BYE on an established leg, the
+    # standard "call ended" signal. The previous USER_BUSY (cause 17 →
+    # SIP 486 Busy Here) misclassified post-bridge teardown as an
+    # early-dialog decline; sofia then skipped emitting BYE on the
+    # answered trunk leg, leaving the PSTN side ringing until the caller
+    # gave up on their own.
     """
     <document type="xml/freeswitch-httapi">
       <params>
         <currentNodeId>hangup</currentNodeId>
       </params>
       <work>
-        <hangup cause='USER_BUSY' />
+        <hangup cause='NORMAL_CLEARING' />
       </work>
     </document>
     """
