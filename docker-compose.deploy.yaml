@@ -207,6 +207,14 @@ services:
       WSS_CERT_PATH: /certs/certs/${COMCENT_DOMAIN}.crt
       WSS_KEY_PATH: /certs/private/${COMCENT_DOMAIN}.key
       WSS_PORT: '5063'
+      # SBC's docker-network IP (matches the pinned ipv4_address below).
+      # Used in the Record-Route header SBC stamps on every forwarded
+      # request — must be reachable from FS, not 127.0.0.1 (the default).
+      PRIVATE_IP: ${SBC_IP:-172.20.0.10}
+      # Public IP that the SBC advertises in Record-Route / Via on its
+      # public listener. Without this, default 127.0.0.1 leaks into
+      # outbound headers toward the PSTN trunk.
+      PUBLIC_IP: ${PUBLIC_IP}
     ports:
       - '5060:5060/udp'
       - '5060:5060/tcp'
