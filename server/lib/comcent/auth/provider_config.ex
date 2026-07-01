@@ -18,6 +18,30 @@ defmodule Comcent.Auth.ProviderConfig do
     |> Enum.sort_by(& &1.id)
   end
 
+  def allowed_signup_domains do
+    auth_config()
+    |> Keyword.get(:allowed_signup_domains, [])
+  end
+
+  def signup_open_to_domain?(email) when is_binary(email) do
+    case allowed_signup_domains() do
+      [] ->
+        false
+
+      domains ->
+        domain =
+          email
+          |> String.downcase()
+          |> String.trim()
+          |> String.split("@", parts: 2)
+          |> List.last()
+
+        is_binary(domain) and domain != "" and domain in domains
+    end
+  end
+
+  def signup_open_to_domain?(_), do: false
+
   def fetch_provider(provider_id) when is_binary(provider_id) do
     case auth_config()[:oidc_providers][provider_id] do
       nil -> {:error, :provider_not_found}
@@ -26,7 +50,11 @@ defmodule Comcent.Auth.ProviderConfig do
   end
 
   defp auth_config do
-    Application.get_env(:comcent, :auth, password_enabled: true, oidc_providers: %{})
+    Application.get_env(:comcent, :auth,
+      password_enabled: true,
+      oidc_providers: %{},
+      allowed_signup_domains: []
+    )
   end
 
   defp normalize_provider(provider_id, config) do

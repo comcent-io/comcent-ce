@@ -49,6 +49,11 @@ defmodule Comcent.Application do
     end)
 
     Task.start(fn ->
+      Process.sleep(3000)
+      Comcent.InstanceSetup.ensure_token!()
+    end)
+
+    Task.start(fn ->
       # Give the database connection time to fully establish
       Process.sleep(3000)
       Comcent.Queue.AgentSession.start_all_active_sessions()

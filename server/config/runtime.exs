@@ -263,9 +263,19 @@ oidc_providers =
   System.get_env("AUTH_OIDC_PROVIDERS_JSON", "{}")
   |> Jason.decode!()
 
+# Comma-separated list of email domains that may self-register (e.g.
+# "acme.com,acme.co.uk"). Empty by default → invite-only.
+allowed_signup_domains =
+  System.get_env("ALLOWED_SIGNUP_DOMAIN", "")
+  |> String.split(",")
+  |> Enum.map(&String.trim/1)
+  |> Enum.map(&String.downcase/1)
+  |> Enum.reject(&(&1 == ""))
+
 config :comcent, :auth,
   password_enabled: password_enabled,
-  oidc_providers: oidc_providers
+  oidc_providers: oidc_providers,
+  allowed_signup_domains: allowed_signup_domains
 
 # Email Configuration
 smtp_url =

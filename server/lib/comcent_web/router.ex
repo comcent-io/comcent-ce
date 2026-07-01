@@ -170,6 +170,7 @@ defmodule ComcentWeb.Router do
     get("/auth/config", AuthController, :config)
     post("/auth/login", AuthController, :login)
     post("/auth/register", AuthController, :register)
+    post("/auth/claim-setup", AuthController, :claim_setup)
     post("/auth/verify-email", AuthController, :verify_email)
     post("/auth/resend-verification", AuthController, :resend_verification)
     get("/auth/oauth/:provider/start", AuthController, :oauth_start)

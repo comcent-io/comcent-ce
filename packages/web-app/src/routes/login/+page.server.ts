@@ -5,6 +5,7 @@ import { getInternalJson, postInternalJson } from '$lib/server/api';
 
 type AuthConfig = {
   passwordEnabled: boolean;
+  bootstrapMode: boolean;
   oauthProviders: Array<{ id: string; label: string; type: string }>;
 };
 
@@ -31,10 +32,14 @@ export const load: ServerLoad = async ({ cookies, fetch }) => {
 
   const authConfigResult = await getInternalJson<AuthConfig>('/api/v2/auth/config', fetch);
 
+  if (authConfigResult.ok && authConfigResult.data.bootstrapMode) {
+    throw redirect(303, '/setup');
+  }
+
   return {
     authConfig: authConfigResult.ok
       ? authConfigResult.data
-      : { passwordEnabled: true, oauthProviders: [] },
+      : { passwordEnabled: true, bootstrapMode: false, oauthProviders: [] },
   };
 };
 
