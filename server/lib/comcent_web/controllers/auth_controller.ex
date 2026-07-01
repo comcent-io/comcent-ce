@@ -7,8 +7,9 @@ defmodule ComcentWeb.AuthController do
   alias Comcent.Auth.Password
   alias Comcent.Auth.ProviderConfig
   alias Comcent.Emails
+  alias Comcent.InstanceSetup
   alias Comcent.Repo
-  alias Comcent.Schemas.{User, UserIdentity}
+  alias Comcent.Schemas.{OrgInvite, User, UserIdentity}
 
   @verification_resend_cooldown_seconds 60
   @verification_resend_limit_per_day 3
@@ -17,21 +18,69 @@ defmodule ComcentWeb.AuthController do
   def config(conn, _params) do
     json(conn, %{
       password_enabled: ProviderConfig.password_enabled?(),
-      oauth_providers: ProviderConfig.public_provider_configs()
+      oauth_providers: ProviderConfig.public_provider_configs(),
+      bootstrap_mode: InstanceSetup.bootstrap_mode?()
     })
   end
 
   def register(conn, params) do
-    if ProviderConfig.password_enabled?() do
-      with :ok <- validate_registration(params),
-           {:ok, _user} <- create_password_user(params) do
-        json(conn, %{message: "Check your email to verify your account before signing in."})
-      else
-        {:error, message} ->
-          conn |> put_status(:bad_request) |> json(%{error: message})
-      end
-    else
-      conn |> put_status(:not_found) |> json(%{error: "Password authentication is disabled"})
+    cond do
+      not ProviderConfig.password_enabled?() ->
+        conn |> put_status(:not_found) |> json(%{error: "Password authentication is disabled"})
+
+      InstanceSetup.bootstrap_mode?() ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{
+          error:
+            "This instance has not been claimed yet. Visit /setup with the server's setup token."
+        })
+
+      true ->
+        with :ok <- validate_registration(params),
+             :ok <- validate_signup_allowed(params["email"]),
+             {:ok, _user} <- create_password_user(params) do
+          json(conn, %{message: "Check your email to verify your account before signing in."})
+        else
+          {:error, :not_allowed} ->
+            conn
+            |> put_status(:forbidden)
+            |> json(%{
+              error: signup_not_allowed_message()
+            })
+
+          {:error, message} ->
+            conn |> put_status(:bad_request) |> json(%{error: message})
+        end
+    end
+  end
+
+  def claim_setup(conn, params) do
+    cond do
+      not ProviderConfig.password_enabled?() ->
+        conn |> put_status(:not_found) |> json(%{error: "Password authentication is disabled"})
+
+      not InstanceSetup.bootstrap_mode?() ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "This instance has already been claimed."})
+
+      true ->
+        attrs = %{
+          org_name: params["org_name"],
+          subdomain: params["subdomain"],
+          sip_username: params["sip_username"],
+          token: params["token"]
+        }
+
+        case InstanceSetup.claim(params["name"], params["email"], params["password"], attrs) do
+          {:ok, user} ->
+            session_token = Auth.sign_session_token(user, "password")
+            json(conn, %{token: session_token, user: session_user(user, "password")})
+
+          {:error, message} ->
+            conn |> put_status(:bad_request) |> json(%{error: message})
+        end
     end
   end
 
@@ -181,6 +230,34 @@ defmodule ComcentWeb.AuthController do
 
   def resend_verification(conn, _params) do
     conn |> put_status(:bad_request) |> json(%{error: "Email is required"})
+  end
+
+  defp validate_signup_allowed(email) do
+    normalized = normalize_email(email)
+
+    cond do
+      ProviderConfig.signup_open_to_domain?(normalized) ->
+        :ok
+
+      Repo.exists?(
+        from(i in OrgInvite, where: i.email == ^normalized and i.status == "PENDING")
+      ) ->
+        :ok
+
+      true ->
+        {:error, :not_allowed}
+    end
+  end
+
+  defp signup_not_allowed_message do
+    case ProviderConfig.allowed_signup_domains() do
+      [] ->
+        "Signup is invite-only on this instance. Ask your admin to send you an invite."
+
+      domains ->
+        "Signup is invite-only on this instance. " <>
+          "Self-signup is only allowed for emails at: #{Enum.join(domains, ", ")}."
+    end
   end
 
   defp validate_registration(params) do
@@ -372,11 +449,24 @@ defmodule ComcentWeb.AuthController do
             updated_user
 
           nil ->
+            existing = Repo.get_by(User, email: normalize_email(oauth_user.email))
+
             user =
-              Repo.get_by(User, email: normalize_email(oauth_user.email))
-              |> case do
-                nil -> insert_oauth_user(oauth_user)
-                %User{} = existing_user -> update_user_from_oauth(existing_user, oauth_user)
+              case existing do
+                %User{} = existing_user ->
+                  update_user_from_oauth(existing_user, oauth_user)
+
+                nil ->
+                  cond do
+                    InstanceSetup.bootstrap_mode?() ->
+                      Repo.rollback(:bootstrap_mode)
+
+                    validate_signup_allowed(oauth_user.email) != :ok ->
+                      Repo.rollback(:signup_not_allowed)
+
+                    true ->
+                      insert_oauth_user(oauth_user)
+                  end
               end
 
             insert_identity(user, oauth_user)
@@ -385,6 +475,8 @@ defmodule ComcentWeb.AuthController do
       end)
       |> case do
         {:ok, user} -> {:ok, user}
+        {:error, :bootstrap_mode} -> {:error, "This instance has not been claimed yet. Visit /setup first."}
+        {:error, :signup_not_allowed} -> {:error, signup_not_allowed_message()}
         {:error, reason} -> {:error, reason}
       end
     end

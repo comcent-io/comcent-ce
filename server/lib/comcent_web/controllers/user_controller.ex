@@ -124,12 +124,18 @@ defmodule ComcentWeb.UserController do
   def create_org(conn, params) do
     current_user = conn.assigns[:current_user]
 
-    with :ok <- validate_create_org_params(params),
-         {:ok, org} <- insert_org(current_user, params) do
-      json(conn, %{success: true, org: %{id: org.id, subdomain: org.subdomain}})
+    if current_user.is_super_admin do
+      with :ok <- validate_create_org_params(params),
+           {:ok, org} <- insert_org(current_user, params) do
+        json(conn, %{success: true, org: %{id: org.id, subdomain: org.subdomain}})
+      else
+        {:error, message} ->
+          conn |> put_status(:bad_request) |> json(%{error: message})
+      end
     else
-      {:error, message} ->
-        conn |> put_status(:bad_request) |> json(%{error: message})
+      conn
+      |> put_status(:forbidden)
+      |> json(%{error: "Only the instance super-admin can create orgs on this install."})
     end
   end
 
