@@ -47,12 +47,17 @@ jobs:
         run: |
           mkdir -p stack-logs
           for s in server freeswitch sbc rabbitmq postgres; do
-            docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e logs --no-color --tail=400 $s > stack-logs/$s.log 2>&1 || true
+            docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e logs --no-color $s 2>&1 | gzip > stack-logs/$s.log.gz || true
           done
           docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e ps > stack-logs/ps.txt 2>&1 || true
+          docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e exec -T rabbitmq \
+            sh -c "rabbitmqctl list_queues name messages consumers; rabbitmqctl list_exchanges name type; rabbitmqctl list_bindings" \
+            > stack-logs/rabbitmq-state.txt 2>&1 || true
           docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e exec -T postgres \
             psql -U postgres -c "SELECT direction, count(*) FROM call_stories GROUP BY 1" \
-            > stack-logs/call-stories.txt 2>&1 || true
+                             -c "SELECT count(*) AS call_story_events FROM call_story_events" \
+                             -c "SELECT count(*) AS call_spans FROM call_spans" \
+            > stack-logs/db-counts.txt 2>&1 || true
 
       - name: Upload stack diagnostics
         uses: actions/upload-artifact@v7
