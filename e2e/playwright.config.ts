@@ -21,10 +21,7 @@ export default defineConfig({
   testMatch: '**/*.{spec,setup}.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  // Keep CI parallelism low: GitHub runners share a few cores with the whole
-  // telephony stack (FreeSWITCH media, SBC, sipp, recordings), and story
-  // processing falls behind test timeouts when saturated.
-  workers: process.env.CI ? 3 : 6,
+  workers: process.env.CI ? 8 : 6,
   reporter: process.env.PLAYWRIGHT_REPORTER || 'line',
   use: {
     baseURL: process.env.PUBLIC_ROOT_URL || 'http://localhost:4173',
