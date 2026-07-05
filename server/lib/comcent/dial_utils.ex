@@ -18,7 +18,10 @@ defmodule Comcent.DialUtils do
   def create_dial_targets_for_user(username, subdomain, channel_vars \\ nil) do
     sbc_sip_uri = sbc_sip_uri()
     sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
-    base_dial = "sofia/internal/#{username}@#{subdomain}.#{sip_user_root_domain};fs_path=#{sbc_sip_uri}"
+
+    base_dial =
+      "sofia/internal/#{username}@#{subdomain}.#{sip_user_root_domain};fs_path=#{sbc_sip_uri}"
+
     build_user_dial_targets(base_dial, channel_vars)
   end
 

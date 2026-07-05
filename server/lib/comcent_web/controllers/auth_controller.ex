@@ -239,9 +239,7 @@ defmodule ComcentWeb.AuthController do
       ProviderConfig.signup_open_to_domain?(normalized) ->
         :ok
 
-      Repo.exists?(
-        from(i in OrgInvite, where: i.email == ^normalized and i.status == "PENDING")
-      ) ->
+      Repo.exists?(from(i in OrgInvite, where: i.email == ^normalized and i.status == "PENDING")) ->
         :ok
 
       true ->
@@ -474,10 +472,17 @@ defmodule ComcentWeb.AuthController do
         end
       end)
       |> case do
-        {:ok, user} -> {:ok, user}
-        {:error, :bootstrap_mode} -> {:error, "This instance has not been claimed yet. Visit /setup first."}
-        {:error, :signup_not_allowed} -> {:error, signup_not_allowed_message()}
-        {:error, reason} -> {:error, reason}
+        {:ok, user} ->
+          {:ok, user}
+
+        {:error, :bootstrap_mode} ->
+          {:error, "This instance has not been claimed yet. Visit /setup first."}
+
+        {:error, :signup_not_allowed} ->
+          {:error, signup_not_allowed_message()}
+
+        {:error, reason} ->
+          {:error, reason}
       end
     end
   end

@@ -111,8 +111,12 @@ defmodule ComcentWeb.Internal.ConfigurationController do
     #      reach FS over symmetric-RTP / NAT-detected paths the same as before.
     sbc_deny =
       case System.get_env("SBC_IP") do
-        nil -> ""
-        "" -> ""
+        nil ->
+          ""
+
+        "" ->
+          ""
+
         entry ->
           cidr = if String.contains?(entry, "/"), do: entry, else: "#{entry}/32"
           ~s(<node type="deny" cidr="#{cidr}"/>)
