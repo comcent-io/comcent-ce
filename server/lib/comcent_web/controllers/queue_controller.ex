@@ -57,7 +57,9 @@ defmodule ComcentWeb.QueueController do
 
         Comcent.QueueManager.start_queue_manager_worker(queue.id, subdomain)
 
-        queue_address = "#{queue.id}@#{subdomain}.#{Application.fetch_env!(:comcent, :sip_user_root_domain)}"
+        queue_address =
+          "#{queue.id}@#{subdomain}.#{Application.fetch_env!(:comcent, :sip_user_root_domain)}"
+
         Logger.info("Started queue manager process for queue #{queue.name} at #{queue_address}")
 
         conn
@@ -289,7 +291,8 @@ defmodule ComcentWeb.QueueController do
           end
 
           # Stop a worker process for this queue under DynamicSupervisor
-          queue_address = "#{queue.id}@#{subdomain}.#{Application.fetch_env!(:comcent, :sip_user_root_domain)}"
+          queue_address =
+            "#{queue.id}@#{subdomain}.#{Application.fetch_env!(:comcent, :sip_user_root_domain)}"
 
           case Comcent.QueueManager.stop_queue_manager_worker(queue.id, subdomain) do
             :ok ->

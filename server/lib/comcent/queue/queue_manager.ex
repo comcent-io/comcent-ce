@@ -31,7 +31,10 @@ defmodule Comcent.QueueManager do
     Repo.all(query)
     |> Enum.each(fn {queue_id, queue_name, subdomain} ->
       start_queue_manager_worker(queue_id, subdomain)
-      Logger.info("Started queue scheduler for #{queue_name}@#{subdomain}.#{sip_user_root_domain}")
+
+      Logger.info(
+        "Started queue scheduler for #{queue_name}@#{subdomain}.#{sip_user_root_domain}"
+      )
     end)
 
     Logger.info("\n=== Started queue scheduler processes ===\n")

@@ -127,10 +127,6 @@ defmodule ComcentWeb.Router do
     get("/compliance/downloads/:file_name", FileController, :get_compliance_download)
     get("/uploads/get-signed-url", FileController, :get_upload_signed_url)
     delete("/uploads", FileController, :delete_upload)
-
-
-
-
   end
 
   scope "/api/v2/:subdomain", ComcentWeb do
@@ -203,7 +199,6 @@ defmodule ComcentWeb.Router do
 
   scope "/api/v2", ComcentWeb do
     pipe_through([:api])
-
   end
 
   pipeline :internal do

@@ -126,11 +126,11 @@ if config_env() == :prod do
 
   host =
     System.get_env("PHX_HOST") ||
-      (case System.get_env("PUBLIC_BASE_URL") do
-         nil -> nil
-         "" -> nil
-         url -> URI.parse(url).host
-       end) ||
+      case System.get_env("PUBLIC_BASE_URL") do
+        nil -> nil
+        "" -> nil
+        url -> URI.parse(url).host
+      end ||
       "example.com"
 
   port = String.to_integer(System.get_env("PORT") || "4000")

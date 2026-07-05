@@ -53,7 +53,8 @@ defmodule Comcent.InstanceSetup do
         token: token
       }) do
     with :ok <- validate_inputs(name, email, password, org_name, subdomain, sip_username, token),
-         {:ok, %{user: user}} <- run_claim_transaction(name, email, password, org_name, subdomain, sip_username, token) do
+         {:ok, %{user: user}} <-
+           run_claim_transaction(name, email, password, org_name, subdomain, sip_username, token) do
       {:ok, user}
     else
       {:error, _step, %Ecto.Changeset{} = changeset, _changes} ->
@@ -147,15 +148,29 @@ defmodule Comcent.InstanceSetup do
 
   defp validate_inputs(name, email, password, org_name, subdomain, sip_username, token) do
     cond do
-      blank?(name) -> {:error, "Name is required"}
-      blank?(email) -> {:error, "Email is required"}
+      blank?(name) ->
+        {:error, "Name is required"}
+
+      blank?(email) ->
+        {:error, "Email is required"}
+
       blank?(password) or String.length(password) < 8 ->
         {:error, "Password must be at least 8 characters"}
-      blank?(org_name) -> {:error, "Organization name is required"}
-      blank?(subdomain) -> {:error, "Subdomain is required"}
-      blank?(sip_username) -> {:error, "SIP username is required"}
-      blank?(token) -> {:error, "Setup token is required"}
-      true -> :ok
+
+      blank?(org_name) ->
+        {:error, "Organization name is required"}
+
+      blank?(subdomain) ->
+        {:error, "Subdomain is required"}
+
+      blank?(sip_username) ->
+        {:error, "SIP username is required"}
+
+      blank?(token) ->
+        {:error, "Setup token is required"}
+
+      true ->
+        :ok
     end
   end
 
@@ -168,10 +183,17 @@ defmodule Comcent.InstanceSetup do
     Multi.new()
     |> Multi.run(:setup_row, fn repo, _ ->
       case repo.get(InstanceSetup, @singleton_id) do
-        nil -> {:error, "Setup token is not configured. Restart the server."}
-        %InstanceSetup{consumed_at: %DateTime{}} -> {:error, "This instance has already been claimed."}
-        %InstanceSetup{token: stored} = row when stored == token -> {:ok, row}
-        _ -> {:error, "Invalid setup token."}
+        nil ->
+          {:error, "Setup token is not configured. Restart the server."}
+
+        %InstanceSetup{consumed_at: %DateTime{}} ->
+          {:error, "This instance has already been claimed."}
+
+        %InstanceSetup{token: stored} = row when stored == token ->
+          {:ok, row}
+
+        _ ->
+          {:error, "Invalid setup token."}
       end
     end)
     |> Multi.run(:no_super_admin, fn repo, _ ->
@@ -188,7 +210,8 @@ defmodule Comcent.InstanceSetup do
         {:ok, :ok}
       end
     end)
-    |> Multi.insert(:user,
+    |> Multi.insert(
+      :user,
       User.changeset(%User{id: user_id}, %{
         name: String.trim(name),
         email: normalized_email,
@@ -197,7 +220,8 @@ defmodule Comcent.InstanceSetup do
         is_super_admin: true
       })
     )
-    |> Multi.insert(:org,
+    |> Multi.insert(
+      :org,
       Org.changeset(%Org{id: org_id}, %{
         name: String.trim(org_name),
         subdomain: String.trim(subdomain),
@@ -206,7 +230,8 @@ defmodule Comcent.InstanceSetup do
         max_members: @trial_max_members
       })
     )
-    |> Multi.insert(:member,
+    |> Multi.insert(
+      :member,
       OrgMember.changeset(%OrgMember{}, %{
         user_id: user_id,
         org_id: org_id,
