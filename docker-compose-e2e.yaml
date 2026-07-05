@@ -7,6 +7,11 @@ services:
       - POSTGRES_PASSWORD=password
     ports:
       - '${E2E_POSTGRES_PORT:-55432}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 2s
+      timeout: 3s
+      retries: 30
     networks:
       - comcent-network
 
@@ -84,11 +89,16 @@ services:
       - SMTP_URL=smtp://mailhog:1025
     command: sh -c "/app/bin/migrate && /app/bin/server start"
     depends_on:
-      - postgres
-      - rabbitmq
-      - redis
-      - minio-init
-      - mailhog
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio-init:
+        condition: service_started
+      mailhog:
+        condition: service_started
     healthcheck:
       test:
         ['CMD', 'curl', '--fail', '--silent', 'http://127.0.0.1:4000/health']
@@ -151,7 +161,7 @@ services:
       - INTERNAL_API_USERNAME=${INTERNAL_API_USERNAME:-}
       - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD:-}
       - RPC_API_TOKEN=${RPC_API_TOKEN:-}
-      - SIP_USER_ROOT_DOMAIN=localhost
+      - SIP_USER_ROOT_DOMAIN=${SIP_USER_ROOT_DOMAIN:-localhost}
     ports:
       - '${E2E_SBC_WS_PORT:-4180}:80'
     depends_on:

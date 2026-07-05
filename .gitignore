@@ -6,6 +6,7 @@ node_modules
 .env.*
 !.env.example
 !.env.e2e.example
+!.env.e2e.ci
 .turbo
 .venv
 .DS_Store
