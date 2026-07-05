@@ -24,8 +24,10 @@ jobs:
       - name: Install dependencies
         run: npm install && npm install --prefix e2e
 
+      # Install browsers for e2e/'s own @playwright/test version — the root
+      # install doesn't match it and tests fail with missing chromium.
       - name: Install Playwright
-        run: npx playwright install --with-deps
+        run: npx --prefix e2e playwright install --with-deps
 
       - name: Run Playwright tests
         id: playwright
