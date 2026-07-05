@@ -99,7 +99,8 @@ defmodule ComcentWeb.Internal.DialplanController do
               if member do
                 {:ok,
                  dial_member_dialplan(member, subdomain, "default", %{
-                   address: "#{from_user}@#{caller_subdomain}.#{Application.fetch_env!(:comcent, :sip_user_root_domain)}",
+                   address:
+                     "#{from_user}@#{caller_subdomain}.#{Application.fetch_env!(:comcent, :sip_user_root_domain)}",
                    name: caller_member[:user][:name] || ""
                  })}
               else
@@ -117,7 +118,8 @@ defmodule ComcentWeb.Internal.DialplanController do
 
               {:ok,
                dial_member_dialplan(member, caller_subdomain, "default", %{
-                 address: "#{from_user}@#{caller_subdomain}.#{Application.fetch_env!(:comcent, :sip_user_root_domain)}",
+                 address:
+                   "#{from_user}@#{caller_subdomain}.#{Application.fetch_env!(:comcent, :sip_user_root_domain)}",
                  name: caller_member[:user][:name] || ""
                })}
             else
@@ -217,7 +219,9 @@ defmodule ComcentWeb.Internal.DialplanController do
                 else
                   # external redirect
                   Logger.info("External redirect found.")
-                  {:ok, dial_trunk_dialplan(number, destination_number, number.org.subdomain, context)}
+
+                  {:ok,
+                   dial_trunk_dialplan(number, destination_number, number.org.subdomain, context)}
                 end
               end
             end
@@ -500,7 +504,7 @@ defmodule ComcentWeb.Internal.DialplanController do
     """
   end
 
-  defp dial_trunk_dialplan(number, to_user, subdomain, context \\ "default") do
+  defp dial_trunk_dialplan(number, to_user, subdomain, context) do
     # Get dial string from DialUtils
     dial_string =
       DialUtils.create_dial_string_for_sip_trunk(
