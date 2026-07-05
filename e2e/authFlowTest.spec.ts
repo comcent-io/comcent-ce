@@ -31,12 +31,8 @@ test('Password signup, email verification, and login flow works', async ({
     waitUntil: 'networkidle',
   });
 
-  await expect(page).toHaveURL('/terms-conditions');
-  await expect(
-    page.getByText('Terms of Service and Privacy Policy'),
-  ).toBeVisible();
-
-  await page.getByRole('button', { name: 'I accept' }).click();
+  // CE has no terms-and-conditions gate after signup — email verification
+  // lands straight on the org picker.
   await page.waitForURL('/org');
 
   await clearSession(page);

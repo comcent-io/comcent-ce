@@ -9,20 +9,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
+      # .env.e2e.ci is committed and contains only dummy values scoped to the
+      # throwaway CI stack — no repo secrets/vars needed, so fork PRs work too.
       - name: Add e2e env file
-        run: |
-          cat > .env.e2e <<HEREDOCS
-          ${{ vars.TEST_DOT_ENV }}
-          ${{ vars.TEST_PLAYWRIGHT_ENV }}
-          HEREDOCS
+        run: cp .env.e2e.ci .env.e2e
 
       - name: Start isolated e2e stack
         run: npm run test:e2e:stack:up
 
+      # e2e/ is not a root workspace, so its deps (incl. @playwright/test)
+      # need their own install.
       - name: Install dependencies
-        run: npm install
+        run: npm install && npm install --prefix e2e
 
       - name: Install Playwright
         run: npx playwright install --with-deps
@@ -33,7 +33,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report

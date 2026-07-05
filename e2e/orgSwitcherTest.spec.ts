@@ -15,19 +15,14 @@ test('Home page, switch organization successfully', async ({ page }) => {
   await page.getByPlaceholder('your.name').fill('aiet');
   await page.getByPlaceholder('ACME Corp').fill('Alvas');
   await page.getByPlaceholder('acme', { exact: true }).fill('aiet');
-  await page.getByPlaceholder('Billing Name').fill('aiet');
-  await page.getByLabel('Country').selectOption('IN');
-  await page.getByLabel('State').selectOption('Karnataka');
-  await page.getByPlaceholder('City').click();
-  await page.getByPlaceholder('City').fill('Moodbidri');
-  await page.getByLabel('Zip Code').click();
-  await page.getByLabel('Zip Code').fill('574227');
+  // CE org creation has no billing address fields; success returns to the
+  // org picker rather than the billing page.
   await page.getByRole('button', { name: 'Create Organization' }).click();
+  await page.waitForURL('/org');
+  await page.goto('/app/acme');
   await page.getByRole('button', { name: 'Switch Organization' }).click();
   await page.locator('#switchOrganization').selectOption('aiet');
-  await expect(page).toHaveURL(
-    '/app/aiet/settings/billing/balance?redirected=true',
-  );
+  await expect(page).toHaveURL('/app/aiet');
   await page.getByRole('button', { name: 'Switch Organization' }).click();
   await page.locator('#switchOrganization').selectOption('acme');
   await expect(page).toHaveURL('/app/acme');
