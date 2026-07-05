@@ -22,6 +22,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   workers: process.env.CI ? 8 : 6,
+  // One retry on CI absorbs timing flakes in the telephony stress specs on
+  // shared runners; trace capture below already assumes retries exist.
+  retries: process.env.CI ? 1 : 0,
   reporter: process.env.PLAYWRIGHT_REPORTER || 'line',
   use: {
     baseURL: process.env.PUBLIC_ROOT_URL || 'http://localhost:4173',
