@@ -21,9 +21,11 @@ export default defineConfig({
   testMatch: '**/*.{spec,setup}.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  workers: process.env.CI ? 8 : 6,
-  // One retry on CI absorbs timing flakes in the telephony stress specs on
-  // shared runners; trace capture below already assumes retries exist.
+  // 4 workers on CI: at 8, a different sipp telephony spec fails each run
+  // from timing variance on the shared runner (queueStress, queueFailover, …).
+  workers: process.env.CI ? 4 : 6,
+  // One retry on CI absorbs residual timing flakes; trace capture below
+  // already assumes retries exist.
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.PLAYWRIGHT_REPORTER || 'line',
   use: {
