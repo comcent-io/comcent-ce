@@ -294,22 +294,22 @@ services:
         ipv4_address: 172.20.0.11
 
   # ---------------------------------------------------------------------------
-  # Voice bot (AI) — OPTIONAL. Uncomment to enable real-time AI voice agent.
+  # Voice bot (AI) — real-time AI voice agent.
   # Needs DEEPGRAM_API_KEY and OPENAI_API_KEY in .env.
   # ---------------------------------------------------------------------------
-  # voice-bot:
-  #   image: ghcr.io/comcent-io/go-voice-bot-ce:${VOICE_BOT_VERSION:-latest}
-  #   restart: unless-stopped
-  #   env_file: .env
-  #   environment:
-  #     COMCENT_API_URL: http://server:4000
-  #     SIP_USER_ROOT_DOMAIN: ${COMCENT_DOMAIN}
-  #     SIP_REGISTER_URL: sip:sbc:5060
-  #   depends_on:
-  #     server:
-  #       condition: service_healthy
-  #   networks:
-  #     - comcent-network
+  voice-bot:
+    image: ghcr.io/comcent-io/go-voice-bot-ce:${VOICE_BOT_VERSION:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      COMCENT_API_URL: http://server:4000
+      SIP_USER_ROOT_DOMAIN: ${COMCENT_DOMAIN}
+      SIP_REGISTER_URL: sip:sbc:5060
+    depends_on:
+      server:
+        condition: service_healthy
+    networks:
+      - comcent-network
 
 networks:
   comcent-network:
