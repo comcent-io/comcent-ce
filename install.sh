@@ -222,7 +222,7 @@ ${B}1) Edit .env${N}
      ${INSTALL_DIR}/.env
 
    Search for the string ${Y}replaceMe${N} and fill every one in:
-     • COMCENT_DOMAIN          (e.g. cpaas.example.com — DNS A → ${PUBLIC_IP})
+     • COMCENT_DOMAIN          (e.g. voice.example.com — DNS A → ${PUBLIC_IP})
      • LETSENCRYPT_EMAIL       (your address for cert-renewal alerts)
      • SOURCE_EMAIL            (sender for invites; the host part will likely match COMCENT_DOMAIN)
      • SMTP_URL                (smtp://user:pass@host:587 — any provider)
