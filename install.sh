@@ -216,7 +216,7 @@ ok ".env written (mode 600)"
 # ---------- final instructions ---------------------------------------------
 cat <<EOF
 
-${G}Setup complete.${N}  Two manual steps remain — read carefully:
+${G}Setup complete.${N}  Three manual steps remain — read carefully:
 
 ${B}1) Edit .env${N}
      ${INSTALL_DIR}/.env
@@ -238,6 +238,15 @@ ${B}2) Start the stack${N}
 
    Once Let's Encrypt issues (≈1 min after first start), open:
      https://<COMCENT_DOMAIN>
+
+${B}3) Claim your instance${N}
+   Once up, the server prints a one-time setup token. Grab it from
+   the logs:
+     docker compose logs server | grep -A 10 "FIRST-RUN SETUP"
+
+   Then open https://<COMCENT_DOMAIN>/setup and create the first
+   admin account. (Lost it? The token is re-printed on every server
+   start until claimed.)
 
 ${B}Required inbound firewall rules${N}
    TCP    80, 443         HTTP/HTTPS (cert issuance + app)
