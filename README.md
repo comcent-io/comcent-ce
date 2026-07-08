@@ -11,7 +11,7 @@ Run your own voice infrastructure on a single Linux box. Bring your own SIP trun
 
 🎬 **Watch the installation walkthrough — from blank server to first call:**
 
-[![Comcent CE installation walkthrough](https://img.youtube.com/vi/Cm4JDB95vpI/maxresdefault.jpg)](https://youtu.be/Cm4JDB95vpI)
+[![Watch the Comcent CE installation walkthrough on YouTube](.github/assets/install-walkthrough-thumb.jpg)](https://youtu.be/Cm4JDB95vpI "Play on YouTube")
 
 ## Minimum requirements
 
