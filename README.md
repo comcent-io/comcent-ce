@@ -1,6 +1,6 @@
 # Comcent Community Edition
 
-Run your own call center on a single Linux box. Bring your own SIP trunk
+Run your own voice infrastructure on a single Linux box. Bring your own SIP trunk
 (Twilio, Telnyx, …), run one install script, and you get:
 
 - Voice calls with browser-based dialers for agents
@@ -9,7 +9,9 @@ Run your own call center on a single Linux box. Bring your own SIP trunk
 - A real-time AI voice bot
 - Multi-tenant orgs, API keys, webhooks
 
-> 🎬 **[Placeholder: under-a-minute video — from blank server to first call]**
+🎬 **Watch the installation walkthrough — from blank server to first call:**
+
+[![Comcent CE installation walkthrough](https://img.youtube.com/vi/Cm4JDB95vpI/maxresdefault.jpg)](https://youtu.be/Cm4JDB95vpI)
 
 ## Minimum requirements
 
@@ -32,8 +34,8 @@ Run your own call center on a single Linux box. Bring your own SIP trunk
 
 ### 2. Point a domain at the host
 
-Create a DNS **A record** (e.g. `cpaas.yourdomain.com`) pointing at the
-host's public IPv4. Verify with `dig +short cpaas.yourdomain.com` before
+Create a DNS **A record** (e.g. `voice.yourdomain.com`) pointing at the
+host's public IPv4. Verify with `dig +short voice.yourdomain.com` before
 continuing — the HTTPS certificate can't be issued until DNS resolves.
 
 ### 3. Run the installer
@@ -84,7 +86,7 @@ first admin account. Grab it from the logs:
 docker compose logs server | grep -A 10 "FIRST-RUN SETUP"
 ```
 
-Then open `https://cpaas.yourdomain.com/setup`, enter the token along with
+Then open `https://voice.yourdomain.com/setup`, enter the token along with
 your name, email, password, and organization details. Done — you're the
 super-admin.
 
@@ -169,7 +171,7 @@ trunk's IP allow list. Add `<your-IP>/32`.
 serving a valid Let's Encrypt cert:
 
 ```bash
-echo | openssl s_client -connect cpaas.yourdomain.com:5063 -servername cpaas.yourdomain.com 2>/dev/null \
+echo | openssl s_client -connect voice.yourdomain.com:5063 -servername voice.yourdomain.com 2>/dev/null \
   | openssl x509 -noout -subject -issuer -dates
 ```
 
