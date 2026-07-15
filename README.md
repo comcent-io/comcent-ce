@@ -180,6 +180,17 @@ echo | openssl s_client -connect voice.yourdomain.com:5063 -servername voice.you
 Billing & metered usage, GDPR workflows, audit logs, SLA tracking,
 outbound campaigns, executive summaries → <https://comcent.io/enterprise>
 
+## Sponsor
+
+Comcent CE is free and AGPL-licensed. If it's saving you the cost of a
+call-center SaaS, consider sponsoring development — it funds the time
+spent maintaining and improving the community edition.
+
+👉 [GitHub Sponsors](https://github.com/sponsors/pavanputhra)
+
+See [SPONSORS.md](SPONSORS.md) for the people and companies already
+backing this project.
+
 ## License
 
 AGPL-3.0. See `LICENSE`. Commercial licenses available — contact the
