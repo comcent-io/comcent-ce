@@ -6,13 +6,16 @@ defmodule Comcent.Deepgram do
   use HTTPoison.Base
   require Logger
 
-  @base_url "https://api.deepgram.com/v1"
   @default_timeout 30_000
   # Receive timeout needs to be longer as Deepgram downloads and transcribes audio
   @default_recv_timeout 120_000
 
   def process_url(url) do
-    @base_url <> url
+    base_url() <> url
+  end
+
+  defp base_url do
+    Application.get_env(:comcent, :deepgram)[:base_url] || "https://api.deepgram.com/v1"
   end
 
   def process_request_headers(headers) do
