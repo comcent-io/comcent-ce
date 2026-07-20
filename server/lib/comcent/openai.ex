@@ -3,8 +3,9 @@ defmodule Comcent.OpenAI do
   alias HTTPoison
 
   def embed_text(text) do
-    openai_api_key = Application.get_env(:comcent, :openai)[:api_key]
-    url = "https://api.openai.com/v1/embeddings"
+    config = Application.get_env(:comcent, :openai)
+    openai_api_key = config[:api_key]
+    url = "#{config[:base_url] || "https://api.openai.com"}/v1/embeddings"
 
     headers = [
       {"Content-Type", "application/json"},
@@ -42,8 +43,9 @@ defmodule Comcent.OpenAI do
   Sends a chat completion request to OpenAI API
   """
   def chat_completion(messages, temperature \\ 0, model \\ "gpt-4o-mini") do
-    openai_api_key = Application.get_env(:comcent, :openai)[:api_key]
-    url = "https://api.openai.com/v1/chat/completions"
+    config = Application.get_env(:comcent, :openai)
+    openai_api_key = config[:api_key]
+    url = "#{config[:base_url] || "https://api.openai.com"}/v1/chat/completions"
 
     headers = [
       {"Content-Type", "application/json"},

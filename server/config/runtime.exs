@@ -23,6 +23,12 @@ case System.get_env("DEEPGRAM_API_KEY") do
   _ -> :ok
 end
 
+# Base URL is separate from the key check above — self-hosters can point
+# this at any Deepgram-API-compatible endpoint (e.g. a local proxy) even
+# without changing the key.
+config :comcent, :deepgram,
+  base_url: System.get_env("DEEPGRAM_BASE_URL", "https://api.deepgram.com/v1")
+
 # AWS Configuration
 aws_access_key_id =
   System.get_env("AWS_ACCESS_KEY_ID", "")
@@ -77,6 +83,12 @@ case System.get_env("OPENAI_API_KEY") do
   key when is_binary(key) and key != "" -> config :comcent, :openai, api_key: key
   _ -> :ok
 end
+
+# Base URL is separate from the key check above — self-hosters can point
+# this at any OpenAI-API-compatible endpoint (e.g. a self-hosted LiteLLM
+# proxy) instead of OpenAI directly, even without changing the key.
+config :comcent, :openai,
+  base_url: System.get_env("OPENAI_BASE_URL", "https://api.openai.com")
 
 # ## Using releases
 #
