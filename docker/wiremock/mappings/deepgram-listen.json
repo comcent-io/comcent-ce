@@ -1,0 +1,69 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/listen"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "metadata": {
+        "request_id": "e2e-mock",
+        "duration": 1.0
+      },
+      "results": {
+        "channels": [
+          {
+            "alternatives": [
+              {
+                "transcript": "This is a mock transcript for e2e testing.",
+                "confidence": 0.99,
+                "words": [
+                  {
+                    "word": "this",
+                    "start": 0.0,
+                    "end": 0.2,
+                    "confidence": 0.99
+                  },
+                  {
+                    "word": "is",
+                    "start": 0.2,
+                    "end": 0.3,
+                    "confidence": 0.99
+                  },
+                  {
+                    "word": "a",
+                    "start": 0.3,
+                    "end": 0.35,
+                    "confidence": 0.99
+                  },
+                  {
+                    "word": "mock",
+                    "start": 0.35,
+                    "end": 0.6,
+                    "confidence": 0.99
+                  },
+                  {
+                    "word": "transcript",
+                    "start": 0.6,
+                    "end": 1.0,
+                    "confidence": 0.99
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "sentiments": {
+          "segments": [],
+          "average": {
+            "sentiment": "neutral",
+            "sentiment_score": 0.0
+          }
+        }
+      }
+    }
+  }
+}

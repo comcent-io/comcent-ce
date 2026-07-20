@@ -38,6 +38,18 @@ services:
     networks:
       - comcent-network
 
+  # Stands in for OpenAI and Deepgram — canned responses only, no real API
+  # calls, no cost, no external network dependency. See docker/wiremock/mappings.
+  wiremock:
+    image: wiremock/wiremock:3.9.1
+    command: --port 8080 --global-response-templating
+    volumes:
+      - ./docker/wiremock/mappings:/home/wiremock/mappings:ro
+    ports:
+      - '${E2E_WIREMOCK_PORT:-58089}:8080'
+    networks:
+      - comcent-network
+
   minio:
     image: minio/minio:RELEASE.2025-02-28T09-55-16Z
     command: server /data --console-address ":9001"
@@ -82,6 +94,8 @@ services:
       - S3_ENDPOINT_URL=http://minio:9000
       - S3_PROXY_DOWNLOADS=true
       - SMTP_URL=smtp://mailhog:1025
+      - OPENAI_BASE_URL=http://wiremock:8080
+      - DEEPGRAM_BASE_URL=http://wiremock:8080
     command: sh -c "/app/bin/migrate && /app/bin/server start"
     depends_on:
       - postgres
@@ -89,6 +103,7 @@ services:
       - redis
       - minio-init
       - mailhog
+      - wiremock
     healthcheck:
       test:
         ['CMD', 'curl', '--fail', '--silent', 'http://127.0.0.1:4000/health']

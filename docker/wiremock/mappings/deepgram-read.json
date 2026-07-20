@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/read"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "metadata": {
+        "request_id": "e2e-mock"
+      },
+      "results": {
+        "summary": {
+          "text": "This is a mock summary for e2e testing."
+        }
+      }
+    }
+  }
+}
