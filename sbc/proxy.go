@@ -489,6 +489,12 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 		case r := <-results:
 			if r.err != nil {
 				pending--
+				// A branch that failed to connect (e.g. a closed WebSocket
+				// left behind by a stale browser tab) isn't coming back —
+				// drop it so future calls don't keep forking to a dead peer.
+				slog.Info("Fork branch failed; unregistering dead contact",
+					"aor", aor, "address", preps[r.idx].c.Address, "error", r.err)
+				p.reg.UnregisterContact(aor, preps[r.idx].c.Address)
 				continue
 			}
 			resp := r.resp
