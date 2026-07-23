@@ -11,18 +11,19 @@ defmodule Comcent.DialUtils do
   or derived from PUBLIC_BASE_URL).
   """
   def create_dial_string_for_user(username, subdomain, channel_vars \\ nil) do
-    create_dial_targets_for_user(username, subdomain, channel_vars)
-    |> Enum.join(",")
-  end
-
-  def create_dial_targets_for_user(username, subdomain, channel_vars \\ nil) do
-    sbc_sip_uri = sbc_sip_uri()
     sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
 
     base_dial =
-      "sofia/internal/#{username}@#{subdomain}.#{sip_user_root_domain};fs_path=#{sbc_sip_uri}"
+      "sofia/internal/#{username}@#{subdomain}.#{sip_user_root_domain};fs_path=#{sbc_sip_uri()}"
 
-    build_user_dial_targets(base_dial, channel_vars)
+    vars = channel_vars || []
+    webrtc_vars = vars ++ ["media_webrtc=true"]
+
+    [
+      if(vars == [], do: base_dial, else: "[#{Enum.join(vars, ",")}]#{base_dial}"),
+      "[#{Enum.join(webrtc_vars, ",")}]#{base_dial}"
+    ]
+    |> Enum.join(",")
   end
 
   # Target the SBC's PRIVATE listener (5065). 5060 is the public/PSTN-facing
@@ -37,23 +38,6 @@ defmodule Comcent.DialUtils do
 
   def user_dial_branch_count do
     2
-  end
-
-  defp build_user_dial_targets(base_dial, channel_vars) do
-    vars = channel_vars || []
-
-    [
-      maybe_prefix_channel_vars(base_dial, vars),
-      maybe_prefix_channel_vars(base_dial, vars ++ ["media_webrtc=true"])
-    ]
-  end
-
-  defp maybe_prefix_channel_vars(dial_string, channel_vars) do
-    if Enum.empty?(channel_vars) do
-      dial_string
-    else
-      "[#{Enum.join(channel_vars, ",")}]#{dial_string}"
-    end
   end
 
   @doc """
