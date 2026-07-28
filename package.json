@@ -54,7 +54,7 @@
     "npm": "^10.2.4"
   },
   "devDependencies": {
-    "@dotenvx/dotenvx": "^0.15.0",
+    "@dotenvx/dotenvx": "^2.19.0",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.16.0",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
@@ -65,7 +65,7 @@
     "husky": "^8.0.3",
     "lint-staged": "^15.2.0",
     "natural-compare-lite": "^1.4.0",
-    "turbo": "^1.12.4",
+    "turbo": "^2.9.14",
     "typescript": "^5.3.3"
   },
   "dependencies": {
