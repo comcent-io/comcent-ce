@@ -17,7 +17,6 @@
   import { SessionManager } from 'sip.js/lib/platform/web';
   import type { SessionManagerDelegate } from 'sip.js/lib/platform/web';
   import CurrentCall from '$lib/components/DialerWidget/CurrentCall.svelte';
-  import type { DialerWidgetDelegate } from './types/DialerWidgetDelegate';
   import { isValidPhoneNumber } from 'libphonenumber-js';
   import type { MemberSearchResult } from '$lib/server/types/MemberSearchResult';
   import Spinner from '../Icons/Spinner.svelte';
@@ -35,8 +34,6 @@
   export let sipDomain: string | null = null;
 
   export let authToken: string | undefined;
-
-  export let delegate: DialerWidgetDelegate = {};
 
   export let numbers: {
     id: string;
@@ -164,21 +161,6 @@
       newCallNotification(invitation as Invitation);
       invitations.push(invitation as Invitation);
       invitations = invitations;
-      const invite = invitation as Invitation;
-      delegate?.onCallReceived?.({
-        from: {
-          name: invite.request.from.displayName,
-          address: invite.request.from.uri.user ?? '',
-        },
-        to: {
-          name: displayName,
-          address: `sip:${username}@${domainName}`,
-        },
-        paths: invite.request.headers['X-Inbound-Info']?.[0]?.raw?.split('|').map((p) => {
-          const [type, address, name] = p.split(':');
-          return { type, address, name: name ?? '' };
-        }),
-      });
     },
     onServerConnect() {
       uaStatus = 'Connected';
@@ -450,15 +432,6 @@
     expanded = !expanded;
   }
 
-  function onOutboundInfoChanged(e: Event) {
-    const target = e.target as HTMLSelectElement;
-    const [address, , name] = target.value.split('/');
-    delegate?.onOutboundNumberChanged?.({
-      address,
-      name,
-    });
-  }
-
   async function onStatusChange(e: Event) {
     const target = e.target as HTMLSelectElement;
     const status = target.value;
@@ -469,11 +442,14 @@
       headers['Authorization'] = `Bearer ${authToken}`;
     }
     try {
-      const presenceResponse = await fetch(`${resolvedAppBaseUrl}/api/v2/${subdomain}/members/presence`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ presence: status }),
-      });
+      const presenceResponse = await fetch(
+        `${resolvedAppBaseUrl}/api/v2/${subdomain}/members/presence`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ presence: status }),
+        },
+      );
       if (!presenceResponse.ok)
         throw new Error((await presenceResponse.json()).error ?? presenceResponse.statusText);
     } catch (error: any) {

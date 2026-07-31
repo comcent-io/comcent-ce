@@ -15,20 +15,3 @@ export function redirectResponse(location: string, status = 302) {
     },
   });
 }
-
-export function corsResponse(
-  body: string | Record<string, unknown>,
-  status = 200,
-  headers: Record<string, string> = {},
-) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
-      ...headers,
-    },
-  });
-}

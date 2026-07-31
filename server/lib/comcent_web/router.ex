@@ -22,11 +22,6 @@ defmodule ComcentWeb.Router do
     plug(ComcentWeb.Plugs.ApiAnyAuth)
   end
 
-  pipeline :org_api_key_auth do
-    plug(:accepts, ["json"])
-    plug(ComcentWeb.Plugs.OrgApiKeyAuth)
-  end
-
   pipeline :ensure_org_admin_member do
     plug(:accepts, ["json"])
     plug(ComcentWeb.Plugs.ApiV2Auth)
@@ -148,18 +143,6 @@ defmodule ComcentWeb.Router do
     put("/promises/:promise_id/assign", PromiseController, :update_assigned_to)
   end
 
-  scope "/api/v2/:subdomain/widget", ComcentWeb do
-    pipe_through([:api])
-
-    options("/init-config", MemberController, :options_widget)
-  end
-
-  scope "/api/v2/:subdomain/widget", ComcentWeb do
-    pipe_through([:api, :api_any_auth, :ensure_is_org_member])
-
-    get("/init-config", MemberController, :get_widget_init_config)
-  end
-
   scope "/api/v2", ComcentWeb do
     pipe_through([:api])
 
@@ -183,18 +166,6 @@ defmodule ComcentWeb.Router do
     get("/user/invitations/:id", UserController, :get_invitation)
     post("/user/invitations/:id/accept", UserController, :accept_invitation)
     post("/user/accept-terms", UserController, :accept_terms)
-  end
-
-  scope "/api/v2/public/:subdomain", ComcentWeb do
-    pipe_through([:api])
-
-    options("/user-token", UserController, :options_public_api)
-  end
-
-  scope "/api/v2/public/:subdomain", ComcentWeb do
-    pipe_through([:api, :org_api_key_auth])
-
-    get("/user-token", UserController, :generate_user_token)
   end
 
   scope "/api/v2", ComcentWeb do

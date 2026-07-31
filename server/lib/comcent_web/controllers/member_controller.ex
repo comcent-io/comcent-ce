@@ -18,9 +18,6 @@ defmodule ComcentWeb.MemberController do
       Logger.error("Wrong presence value #{presence}")
 
       conn
-      |> put_resp_header("Access-Control-Allow-Origin", "*")
-      |> put_resp_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-      |> put_resp_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
       |> put_status(400)
       |> json(%{error: "Wrong presence value #{presence}"})
       |> halt()
@@ -30,9 +27,6 @@ defmodule ComcentWeb.MemberController do
       Logger.info("Updated presence for member #{member.user_id} to #{presence}")
 
       conn
-      |> put_resp_header("Access-Control-Allow-Origin", "*")
-      |> put_resp_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-      |> put_resp_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
       |> json(%{
         id: member.user.id,
         name: member.user.name,
@@ -48,9 +42,6 @@ defmodule ComcentWeb.MemberController do
     member = OrgMemberRepo.is_user_with_email_an_org_member(email, subdomain)
 
     conn
-    |> put_resp_header("Access-Control-Allow-Origin", "*")
-    |> put_resp_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-    |> put_resp_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
     |> json(%{
       id: member.user.id,
       name: member.user.name,
@@ -79,7 +70,6 @@ defmodule ComcentWeb.MemberController do
 
     if search != "" do
       conn
-      |> put_widget_cors_headers()
       |> json(%{members: search_members_for_subdomain(subdomain, search)})
     else
       formatted_members =
@@ -123,9 +113,6 @@ defmodule ComcentWeb.MemberController do
         end)
 
       conn
-      |> put_resp_header("Access-Control-Allow-Origin", "*")
-      |> put_resp_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-      |> put_resp_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
       |> json(%{members: formatted_members})
     end
   end
@@ -156,20 +143,8 @@ defmodule ComcentWeb.MemberController do
     end
   end
 
-  def search_members(conn, %{"subdomain" => subdomain} = params) do
-    search = String.trim(params["search"] || "")
-    conn = put_widget_cors_headers(conn)
-
-    if search == "" do
-      json(conn, %{members: []})
-    else
-      json(conn, %{members: search_members_for_subdomain(subdomain, search)})
-    end
-  end
-
   def update_default_number(conn, %{"subdomain" => subdomain, "number" => number}) do
     current_user = conn.assigns[:current_user]
-    conn = put_widget_cors_headers(conn)
 
     case get_member_identity(current_user.email, subdomain) do
       nil ->
@@ -205,55 +180,6 @@ defmodule ComcentWeb.MemberController do
 
             json(conn, %{status: "success"})
         end
-    end
-  end
-
-  def get_widget_init_config(conn, %{"subdomain" => subdomain} = _params) do
-    current_user = conn.assigns[:current_user]
-    conn = put_widget_cors_headers(conn)
-
-    member_profile =
-      from(om in OrgMember,
-        join: o in Org,
-        on: om.org_id == o.id,
-        join: u in User,
-        on: om.user_id == u.id,
-        where: o.subdomain == ^subdomain and u.email == ^current_user.email,
-        select: %{
-          name: u.name,
-          username: om.username,
-          sip_password: om.sip_password
-        }
-      )
-      |> Repo.one()
-
-    if member_profile do
-      outbound_numbers =
-        NumberRepo.get_numbers_by_org(subdomain)
-        |> Enum.map(fn number ->
-          %{
-            id: number.id,
-            name: number.name,
-            number: number.number,
-            sip_trunk: %{
-              id: number.sip_trunk.id,
-              name: number.sip_trunk.name
-            }
-          }
-        end)
-
-      sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
-
-      json(conn, %{
-        name: member_profile.name,
-        username: member_profile.username,
-        subdomain: subdomain,
-        sip_password: member_profile.sip_password,
-        serverDomain: "ws.#{subdomain}.#{sip_user_root_domain}",
-        outboundNumbers: outbound_numbers
-      })
-    else
-      conn |> put_status(:unauthorized) |> json(%{error: "Invalid email."})
     end
   end
 
@@ -435,16 +361,4 @@ defmodule ComcentWeb.MemberController do
     |> Repo.one()
   end
 
-  def options_widget(conn, _params) do
-    conn
-    |> put_widget_cors_headers()
-    |> send_resp(204, "")
-  end
-
-  defp put_widget_cors_headers(conn) do
-    conn
-    |> put_resp_header("access-control-allow-origin", "*")
-    |> put_resp_header("access-control-allow-methods", "GET, POST, OPTIONS")
-    |> put_resp_header("access-control-allow-headers", "Content-Type, Authorization")
-  end
 end
