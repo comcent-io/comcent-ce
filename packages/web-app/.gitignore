@@ -5,7 +5,6 @@ node_modules
 /package
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-static/widget
 
 # Sentry Config File
 .sentryclirc

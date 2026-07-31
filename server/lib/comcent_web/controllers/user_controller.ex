@@ -23,36 +23,6 @@ defmodule ComcentWeb.UserController do
     })
   end
 
-  def generate_user_token(conn, %{"subdomain" => subdomain} = params) do
-    conn = put_public_api_cors_headers(conn)
-    email = String.trim(params["email"] || "")
-
-    if email == "" do
-      conn |> put_status(:bad_request) |> json(%{error: "Email missing."})
-    else
-      case Comcent.Repo.OrgMember.get_member_by_email_and_subdomain(email, subdomain) do
-        nil ->
-          conn |> put_status(:unauthorized) |> json(%{error: "Invalid email."})
-
-        member ->
-          sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
-
-          claims = %{
-            "sub" => member.user.id,
-            "name" => member.user.name,
-            "email" => member.user.email,
-            "picture" => member.user.picture,
-            "sipAddress" => "#{member.username}@#{subdomain}.#{sip_user_root_domain}",
-            "sipUsername" => member.username,
-            "subdomain" => subdomain
-          }
-
-          token = sign_widget_token(claims)
-          json(conn, %{token: token})
-      end
-    end
-  end
-
   def get_orgs(conn, _params) do
     current_user = conn.assigns[:current_user]
 
@@ -206,12 +176,6 @@ defmodule ComcentWeb.UserController do
     json(conn, %{success: true})
   end
 
-  def options_public_api(conn, _params) do
-    conn
-    |> put_public_api_cors_headers()
-    |> send_resp(204, "")
-  end
-
   defp validate_create_org_params(params) do
     # Billing-address fields (country/state/city/zip/user_name) are EE-only and
     # optional. When present they're validated by OrgBillingAddress.changeset;
@@ -320,13 +284,6 @@ defmodule ComcentWeb.UserController do
     end
   end
 
-  defp put_public_api_cors_headers(conn) do
-    conn
-    |> put_resp_header("access-control-allow-origin", "*")
-    |> put_resp_header("access-control-allow-methods", "GET, OPTIONS")
-    |> put_resp_header("access-control-allow-headers", "Content-Type, Authorization, X-API-KEY")
-  end
-
   defp find_invitation(id, email) do
     from(i in OrgInvite,
       join: o in Org,
@@ -343,21 +300,6 @@ defmodule ComcentWeb.UserController do
       }
     )
     |> Repo.one()
-  end
-
-  defp sign_widget_token(claims) do
-    signing_key = System.get_env("SIGNING_KEY")
-    jwk = JOSE.JWK.from_oct(signing_key)
-
-    {_, token} =
-      jwk
-      |> JOSE.JWT.sign(
-        %{"alg" => "HS256"},
-        Map.put(claims, "exp", System.os_time(:second) + 86_400)
-      )
-      |> JOSE.JWS.compact()
-
-    token
   end
 
   defp suggested_username(email) do
