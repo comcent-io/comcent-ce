@@ -432,6 +432,133 @@
     expanded = !expanded;
   }
 
+  // Drag/dock positioning. At rest the widget is pinned by whichever corner
+  // it's docked against (bottom-right by default) using `bottom`/`right` (or
+  // `top`/`left`) CSS rather than always `top`/`left` — that way content
+  // that renders *above* the header (RingNotification, CurrentCall) grows
+  // the box away from a fixed bottom edge, exactly like the browser handles
+  // native `bottom`-anchored content, instead of pushing the header down
+  // and then having it clamped back up once the content shrinks again.
+  let widgetEl: HTMLDivElement;
+  let anchorX: 'left' | 'right' = 'right';
+  let anchorY: 'top' | 'bottom' = 'bottom';
+  let offsetX: number | null = null; // px from the anchorX edge
+  let offsetY: number | null = null; // px from the anchorY edge
+  let dragging = false;
+  let dragLeft = 0; // live top-left px while actively dragging
+  let dragTop = 0;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  const EDGE_MARGIN = 8;
+  const DOCK_THRESHOLD = 32;
+
+  function initialPosition() {
+    anchorX = 'right';
+    anchorY = 'bottom';
+    offsetX = EDGE_MARGIN;
+    offsetY = EDGE_MARGIN;
+  }
+
+  // Keeps the widget fully on-screen whenever its size changes (expanding,
+  // opening the dial pad, showing search/number dropdowns, an incoming call
+  // notification) instead of only ever growing in a fixed direction and
+  // risking clipping off the viewport. A no-op for the common case of a
+  // widget docked flush against an edge — offset is already at EDGE_MARGIN,
+  // so the browser grows the box away from that edge on its own.
+  function clampPosition() {
+    if (!widgetEl || offsetX === null || offsetY === null || dragging) return;
+    const rect = widgetEl.getBoundingClientRect();
+    const maxX = Math.max(EDGE_MARGIN, window.innerWidth - rect.width - EDGE_MARGIN);
+    const maxY = Math.max(EDGE_MARGIN, window.innerHeight - rect.height - EDGE_MARGIN);
+    offsetX = Math.min(Math.max(offsetX, EDGE_MARGIN), maxX);
+    offsetY = Math.min(Math.max(offsetY, EDGE_MARGIN), maxY);
+  }
+
+  function onDragHandlePointerDown(e: PointerEvent) {
+    const target = e.target as HTMLElement;
+    if (target.closest('select, button')) return;
+    if (!widgetEl) return;
+    const rect = widgetEl.getBoundingClientRect();
+    dragging = true;
+    dragLeft = rect.left;
+    dragTop = rect.top;
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+    window.addEventListener('pointermove', onDragPointerMove);
+    window.addEventListener('pointerup', onDragPointerUp);
+  }
+
+  function onDragPointerMove(e: PointerEvent) {
+    if (!dragging) return;
+    dragLeft = e.clientX - dragOffsetX;
+    dragTop = e.clientY - dragOffsetY;
+  }
+
+  function onDragPointerUp() {
+    if (!dragging) return;
+    dragging = false;
+    window.removeEventListener('pointermove', onDragPointerMove);
+    window.removeEventListener('pointerup', onDragPointerUp);
+    dockFromDragPosition();
+  }
+
+  // Converts the free-floating drag-end position into a resting corner
+  // anchor: docks flush against whichever edge(s) it was dropped near,
+  // otherwise keeps it anchored to the nearer edge at its dropped offset.
+  function dockFromDragPosition() {
+    if (!widgetEl) return;
+    const rect = widgetEl.getBoundingClientRect();
+    const maxLeft = Math.max(EDGE_MARGIN, window.innerWidth - rect.width - EDGE_MARGIN);
+    const maxTop = Math.max(EDGE_MARGIN, window.innerHeight - rect.height - EDGE_MARGIN);
+    const left = Math.min(Math.max(dragLeft, EDGE_MARGIN), maxLeft);
+    const top = Math.min(Math.max(dragTop, EDGE_MARGIN), maxTop);
+
+    if (left - EDGE_MARGIN <= DOCK_THRESHOLD) {
+      anchorX = 'left';
+      offsetX = EDGE_MARGIN;
+    } else if (maxLeft - left <= DOCK_THRESHOLD) {
+      anchorX = 'right';
+      offsetX = EDGE_MARGIN;
+    } else if (left + rect.width / 2 < window.innerWidth / 2) {
+      anchorX = 'left';
+      offsetX = left;
+    } else {
+      anchorX = 'right';
+      offsetX = window.innerWidth - (left + rect.width);
+    }
+
+    if (top - EDGE_MARGIN <= DOCK_THRESHOLD) {
+      anchorY = 'top';
+      offsetY = EDGE_MARGIN;
+    } else if (maxTop - top <= DOCK_THRESHOLD) {
+      anchorY = 'bottom';
+      offsetY = EDGE_MARGIN;
+    } else if (top + rect.height / 2 < window.innerHeight / 2) {
+      anchorY = 'top';
+      offsetY = top;
+    } else {
+      anchorY = 'bottom';
+      offsetY = window.innerHeight - (top + rect.height);
+    }
+  }
+
+  let resizeObserver: ResizeObserver | undefined;
+  function bindWidgetEl(node: HTMLDivElement) {
+    widgetEl = node;
+    initialPosition();
+    resizeObserver = new ResizeObserver(() => clampPosition());
+    resizeObserver.observe(node);
+    window.addEventListener('resize', clampPosition);
+    return {
+      destroy() {
+        resizeObserver?.disconnect();
+        window.removeEventListener('resize', clampPosition);
+        window.removeEventListener('pointermove', onDragPointerMove);
+        window.removeEventListener('pointerup', onDragPointerUp);
+      },
+    };
+  }
+
   async function onStatusChange(e: Event) {
     const target = e.target as HTMLSelectElement;
     const status = target.value;
@@ -510,7 +637,18 @@
   }
 </script>
 
-<div class="w-1/4 fixed bottom-1 right-1 block max-w-md">
+<div
+  use:bindWidgetEl
+  class="w-1/4 fixed block max-w-md z-[60] dialer-widget"
+  class:dialer-widget--dragging={dragging}
+  class:bottom-1={offsetX === null}
+  class:right-1={offsetX === null}
+  style={dragging
+    ? `left: ${dragLeft}px; top: ${dragTop}px;`
+    : offsetX !== null && offsetY !== null
+      ? `${anchorX}: ${offsetX}px; ${anchorY}: ${offsetY}px;`
+      : ''}
+>
   {#each invitations as invitation}
     <RingNotification bind:invitation on:answer={onAnswer} on:decline={onDecline} />
   {/each}
@@ -535,7 +673,10 @@
   <div
     class="bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
   >
-    <div class="flex justify-between bg-gray-950 py-3 px-5">
+    <div
+      class="flex justify-between bg-gray-950 py-3 px-5 cursor-move touch-none select-none"
+      on:pointerdown={onDragHandlePointerDown}
+    >
       <div class="text-gray-500 dark:text-gray-400">
         {#if uaStatus !== 'Registered'}
           {uaStatus}
@@ -569,7 +710,7 @@
       {/if}
     </div>
     {#if showExpanded}
-      <div class="p-3 relative">
+      <div class="p-3 relative" transition:slide={{ duration: 200 }}>
         {#if errorMessage}
           <p class="text-red-500 text-sm mb-2">{errorMessage}</p>
         {/if}
@@ -749,3 +890,17 @@
     <audio id="ringSound" bind:this={ringSound} loop src={ringSoundUrl} />
   </div>
 </div>
+
+<style>
+  .dialer-widget {
+    transition:
+      left 0.2s ease-out,
+      right 0.2s ease-out,
+      top 0.2s ease-out,
+      bottom 0.2s ease-out;
+  }
+
+  .dialer-widget--dragging {
+    transition: none;
+  }
+</style>
