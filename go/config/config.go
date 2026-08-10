@@ -107,7 +107,7 @@ func GetConfig() *Config {
 					StaticIP    string `yaml:"staticIP"`
 					LocalhostIP string `yaml:"localhostIP"`
 					Port        int    `yaml:"port"`
-				}{StaticIP: "172.31.17.9", LocalhostIP: "127.0.0.1", Port: 5060},
+				}{StaticIP: "172.32.17.9", LocalhostIP: "127.0.0.1", Port: 5060},
 				LogLevel: "info",
 				Env:      "dev",
 				Calls: struct {

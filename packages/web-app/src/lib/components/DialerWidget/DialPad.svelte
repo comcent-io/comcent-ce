@@ -6,11 +6,11 @@
   const dialPadNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 </script>
 
-<div class="grid grid-cols-3 gap-3">
+<div class="grid grid-cols-3 gap-2">
   {#each dialPadNumbers as number}
     <button
       type="button"
-      class="px-6 py-3.5 text-base font-medium text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+      class="rounded-lg bg-gray-100 py-3 text-base font-semibold text-gray-800 transition-colors hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 dark:focus:ring-blue-800"
       on:click={() => dispatch('dialKeyPress', { number })}
     >
       {number}
