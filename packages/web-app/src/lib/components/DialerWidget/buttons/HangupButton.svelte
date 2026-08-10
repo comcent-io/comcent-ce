@@ -1,12 +1,7 @@
-<script>
-  import PhoneDisconnectIcon from '$lib/components/Icons/PhoneDisconnectIcon.svelte';
-</script>
-
 <button
   type="button"
   on:click
-  class="rounded-full mr-1 text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 inline-flex justify-center items-center dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-blue-800"
+  class="flex-1 rounded-lg border border-transparent bg-red-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300 dark:focus:ring-red-800"
 >
-  <PhoneDisconnectIcon />
-  <span class="sr-only">Hangup</span>
+  End
 </button>

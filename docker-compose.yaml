@@ -188,10 +188,10 @@ services:
       - '6080:80/tcp'
     networks:
       comcent-network:
-        ipv4_address: 172.31.17.9
+        ipv4_address: 172.32.17.9
     environment:
       - SIP_USER_ROOT_DOMAIN=localhost
-      - PRIVATE_IP=172.31.17.9
+      - PRIVATE_IP=172.32.17.9
       - PUBLIC_IP=${DEV_IP}
       - PUBLIC_SIP_PORT=6060
       - INTERNAL_API_BASE_URL=http://server:4000/internal-api
@@ -217,9 +217,9 @@ services:
       - '6080:80/tcp'
     networks:
       comcent-network:
-        ipv4_address: 172.31.17.9
+        ipv4_address: 172.32.17.9
     environment:
-      - PRIVATE_IP=172.31.17.9
+      - PRIVATE_IP=172.32.17.9
       - PUBLIC_IP=${DEV_IP}
       - SIP_USER_ROOT_DOMAIN=localhost
       - INTERNAL_API_BASE_URL=http://server:4000/internal-api
@@ -275,14 +275,14 @@ services:
     # docker happens to hand out on each restart.
     networks:
       comcent-network:
-        ipv4_address: 172.31.0.11
+        ipv4_address: 172.32.0.11
 
 networks:
   comcent-network:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.31.0.0/16
+        - subnet: 172.32.0.0/16
 
 volumes:
   postgres_data:

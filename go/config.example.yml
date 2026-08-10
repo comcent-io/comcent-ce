@@ -13,8 +13,8 @@ network:
   publicIP: 192.168.31.23
 
 kamailio:
-  staticIP: 172.31.17.9
-  dockerIP: 172.31.17.9
+  staticIP: 172.32.17.9
+  dockerIP: 172.32.17.9
   localhostIP: 127.0.0.1
   port: 5060
 

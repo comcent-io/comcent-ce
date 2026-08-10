@@ -1,31 +1,22 @@
 <script>
-  import PauseIcon from '$lib/components/Icons/PauseIcon.svelte';
-
   export let hold = false;
 </script>
 
 <button
   type="button"
   on:click={() => (hold = !hold)}
-  class="rounded-full mr-1 text-white focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 inline-flex justify-center items-center dark:focus:ring-blue-800"
+  class="flex-1 rounded-lg border py-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
   class:active={hold}
   class:inactive={!hold}
 >
-  <PauseIcon />
-  <span class="sr-only">
-    {#if hold}
-      Un hold
-    {:else}
-      Hold
-    {/if}
-  </span>
+  {hold ? 'Unhold' : 'Hold'}
 </button>
 
 <style lang="postcss">
   .active {
-    @apply bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-700;
+    @apply border-amber-500 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-950 dark:text-amber-300;
   }
   .inactive {
-    @apply bg-gray-400 hover:bg-gray-500 dark:bg-gray-400 dark:hover:bg-gray-500;
+    @apply border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-transparent dark:text-gray-300 dark:hover:bg-gray-800;
   }
 </style>
