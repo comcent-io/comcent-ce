@@ -31,13 +31,16 @@
     "docker:db:migrate": "docker compose exec -w /app server mix ecto.migrate",
     "docker:populate-country-state": "docker compose exec -w /code/packages/tools/ comcent-all-in-one node populate_country_state.js",
     "docker:web-app:build": "docker run --workdir /code -v \"$(pwd)\":/code node:20.11.1 sh -c \"npm i && npm run build\"\n",
-    "check:elixir": "cd server && mix format && mix compile --warnings-as-errors && cd ..",
+    "check:elixir": "cd server && mix compile --warnings-as-errors && cd ..",
     "install:rollup-platform": "./tools/install-rollup-platform.sh"
   },
   "lint-staged": {
     "*.{js,ts,html,css,vue,svelte}": [
       "npm run eslint-fix",
       "npm run stage-format"
+    ],
+    "server/**/*.{ex,exs}": [
+      "./tools/format-elixir-staged.sh"
     ]
   },
   "repository": {
