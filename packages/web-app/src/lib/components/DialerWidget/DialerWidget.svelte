@@ -506,6 +506,20 @@
   let availableStatus = ['Logged Out', 'Available', 'On Break', 'On Call', 'Wrap Up', 'Busy'];
   let status = 'Available';
   let statusMenuOpen = false;
+  let statusMenuDropUp = false;
+  let statusButtonEl: HTMLButtonElement;
+
+  function toggleStatusMenu() {
+    if (!statusMenuOpen && statusButtonEl) {
+      // Flip the dropdown upward when the widget is docked near the bottom
+      // of the viewport and there isn't room for it to open downward.
+      const rect = statusButtonEl.getBoundingClientRect();
+      const estimatedMenuHeight = availableStatus.length * 36 + 8;
+      statusMenuDropUp = rect.bottom + estimatedMenuHeight > window.innerHeight;
+    }
+    statusMenuOpen = !statusMenuOpen;
+  }
+
   const statusDotColors: Record<string, string> = {
     'Logged Out': 'bg-gray-400 dark:bg-gray-500',
     Available: 'bg-green-500',
@@ -762,7 +776,8 @@
         {:else}
           <button
             type="button"
-            on:click={() => (statusMenuOpen = !statusMenuOpen)}
+            bind:this={statusButtonEl}
+            on:click={toggleStatusMenu}
             class="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-sm font-medium text-gray-100 hover:bg-gray-700"
           >
             <span class="h-2 w-2 rounded-full {statusDotColors[status] ?? 'bg-gray-400'}" />
@@ -781,7 +796,9 @@
           </button>
           {#if statusMenuOpen}
             <div
-              class="absolute left-0 top-full z-10 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+              class="absolute left-0 z-10 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800 {statusMenuDropUp
+                ? 'bottom-full mb-1'
+                : 'top-full mt-1'}"
             >
               {#each availableStatus as s}
                 <button
