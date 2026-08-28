@@ -295,14 +295,21 @@ defmodule Comcent.VCon do
                 transferee = List.first(prev_dialog.parties -- [transferor])
                 transfer_target = List.first(next_dialog.parties -- prev_dialog.parties)
 
+                # prev_dialog is always the last element already in acc, and
+                # next_dialog will land right after the transfer object we're
+                # about to append, so these are the two dialogs' real indices
+                # in the final merged array, not their positions in temp_dialog.
+                original_index = length(acc) - 1
+                target_dialog_index = length(acc) + 1
+
                 transfer_dialog = %{
                   type: :transfer,
                   start: next_dialog.start,
                   transferor: transferor,
                   transferee: transferee,
                   transfer_target: transfer_target,
-                  original: i - 1,
-                  target_dialog: i
+                  original: original_index,
+                  target_dialog: target_dialog_index
                 }
 
                 acc ++ [transfer_dialog, next_dialog]
