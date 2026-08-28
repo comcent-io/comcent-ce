@@ -44,7 +44,7 @@ defmodule Comcent.Types.VCon do
 
   @type dialog_type :: :recording | :text | :transfer | :incomplete
 
-  @type mime_type ::
+  @type mediatype ::
           :"text/plain"
           | :"audio/x-wav"
           | :"audio/x-mp3"
@@ -64,51 +64,50 @@ defmodule Comcent.Types.VCon do
 
   @type dialog :: %{
           required(:type) => dialog_type(),
-          optional(:start) => date(),
+          required(:start) => date(),
           optional(:duration) => duration(),
           optional(:parties) => party_index() | [party_index()],
           optional(:originator) => party_index(),
-          optional(:mimetype) => mime_type(),
+          optional(:mediatype) => mediatype(),
           optional(:filename) => String.t(),
           optional(:body) => String.t(),
           optional(:encoding) => String.t(),
           optional(:url) => String.t(),
-          optional(:alg) => String.t(),
-          optional(:signature) => String.t(),
+          optional(:content_hash) => String.t(),
           optional(:disposition) => dialog_disposition(),
           optional(:transferee) => party_index(),
           optional(:transferor) => party_index(),
-          optional(:transferTarget) => party_index(),
+          optional(:transfer_target) => party_index(),
           optional(:original) => dialog_index(),
           optional(:consultation) => dialog_index(),
-          optional(:targetDialog) => dialog_index()
+          optional(:target_dialog) => dialog_index()
         }
 
   @type attachment :: %{
           required(:party) => party_index(),
-          optional(:type) => String.t(),
-          optional(:mimetype) => String.t(),
+          required(:dialog) => dialog_index(),
+          required(:start) => date(),
+          optional(:purpose) => String.t(),
+          optional(:mediatype) => String.t(),
           optional(:filename) => String.t(),
           optional(:body) => String.t(),
           optional(:encoding) => String.t(),
           optional(:url) => String.t(),
-          optional(:alg) => String.t(),
-          optional(:signature) => String.t()
+          optional(:content_hash) => String.t()
         }
 
   @type analysis :: %{
           required(:type) => String.t(),
           required(:vendor) => String.t(),
           optional(:dialog) => dialog_index() | [dialog_index()],
-          optional(:mimeType) => String.t(),
+          optional(:mediatype) => String.t(),
           optional(:filename) => String.t(),
           optional(:product) => String.t(),
           optional(:schema) => String.t(),
           optional(:body) => String.t(),
           optional(:encoding) => String.t(),
           optional(:url) => String.t(),
-          optional(:alg) => String.t(),
-          optional(:signature) => String.t()
+          optional(:content_hash) => String.t()
         }
 
   @type t :: %{
