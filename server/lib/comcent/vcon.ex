@@ -15,7 +15,7 @@ defmodule Comcent.VCon do
     analysis = get_analysis(call_story)
 
     %{
-      vcon: "0.0.1",
+      vcon: "0.4.0",
       uuid: call_story.id,
       created_at: call_story.start_at,
       parties: parties,
@@ -23,6 +23,16 @@ defmodule Comcent.VCon do
       attachments: attachments,
       analysis: analysis
     }
+  end
+
+  @spec build_content_hash(String.t() | nil) :: String.t() | nil
+  defp build_content_hash(nil), do: nil
+
+  defp build_content_hash(hex_digest) do
+    case Base.decode16(hex_digest, case: :mixed) do
+      {:ok, binary} -> "sha512-" <> Base.url_encode64(binary, padding: false)
+      :error -> nil
+    end
   end
 
   @spec get_parties(CallStoryAssociation.t()) :: [VCon.party()]
@@ -211,11 +221,10 @@ defmodule Comcent.VCon do
                   start: caller_span.start_at,
                   duration: DateTime.diff(call_story.end_at, caller_span.start_at),
                   parties: [caller_index, callee_index],
-                  mimetype: :"audio/x-wav",
+                  mediatype: :"audio/x-wav",
                   filename: metadata["file_name"],
                   url: url,
-                  alg: "SHA-512",
-                  signature: metadata["sha512"]
+                  content_hash: build_content_hash(metadata["sha512"])
                 }
               ]
             rescue
@@ -261,11 +270,10 @@ defmodule Comcent.VCon do
                     duration: DateTime.diff(call_story.end_at, span.start_at),
                     parties: [customer_index, agent_index],
                     originator: originator_index,
-                    mimetype: :"audio/x-wav",
+                    mediatype: :"audio/x-wav",
                     filename: metadata["file_name"],
                     url: url,
-                    alg: "SHA-512",
-                    signature: metadata["sha512"]
+                    content_hash: build_content_hash(metadata["sha512"])
                   }
                 rescue
                   e ->
@@ -289,11 +297,12 @@ defmodule Comcent.VCon do
 
                 transfer_dialog = %{
                   type: :transfer,
+                  start: next_dialog.start,
                   transferor: transferor,
                   transferee: transferee,
-                  transferTarget: transfer_target,
+                  transfer_target: transfer_target,
                   original: i - 1,
-                  targetDialog: i
+                  target_dialog: i
                 }
 
                 acc ++ [transfer_dialog, next_dialog]
@@ -344,12 +353,12 @@ defmodule Comcent.VCon do
     [
       %{
         party: 0,
-        type: "comcent.call_story",
-        body:
-          case Jason.encode(call_story_export) do
-            {:ok, encoded} -> encoded
-            {:error, _} -> "{}"
-          end,
+        # this attachment describes the whole call rather than a single dialog
+        # segment, so it references the first dialog object as required by the schema
+        dialog: 0,
+        start: call_story.start_at,
+        purpose: "comcent.call_story",
+        body: call_story_export,
         encoding: "json"
       }
     ]
@@ -386,14 +395,10 @@ defmodule Comcent.VCon do
           transcript_chat = Transcript.create_transcript_chat(call_story_copy)
 
           transcription = %{
-            type: "transcription",
+            type: "transcript",
             vendor: "comcent",
             schema: "comcent.deepgram.nova2.v1",
-            body:
-              case Jason.encode(transcript_chat) do
-                {:ok, encoded} -> encoded
-                {:error, _} -> "{}"
-              end,
+            body: transcript_chat,
             encoding: "json"
           }
 
@@ -420,11 +425,7 @@ defmodule Comcent.VCon do
               type: "sentiment",
               vendor: "comcent",
               schema: "comcent.deepgram.nova2.v1",
-              body:
-                case Jason.encode(sentiments) do
-                  {:ok, encoded} -> encoded
-                  {:error, _} -> "{}"
-                end,
+              body: sentiments,
               encoding: "json"
             }
 
@@ -460,7 +461,7 @@ defmodule Comcent.VCon do
               vendor: "comcent",
               schema: "comcent.deepgram.nova2.v1",
               body: summary_text,
-              encoding: "text"
+              encoding: "none"
             }
 
             [summary_analysis | analysis]
