@@ -87,8 +87,7 @@ end
 # Base URL is separate from the key check above — self-hosters can point
 # this at any OpenAI-API-compatible endpoint (e.g. a self-hosted LiteLLM
 # proxy) instead of OpenAI directly, even without changing the key.
-config :comcent, :openai,
-  base_url: System.get_env("OPENAI_BASE_URL", "https://api.openai.com")
+config :comcent, :openai, base_url: System.get_env("OPENAI_BASE_URL", "https://api.openai.com")
 
 # ## Using releases
 #
