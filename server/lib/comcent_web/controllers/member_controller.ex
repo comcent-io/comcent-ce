@@ -360,5 +360,4 @@ defmodule ComcentWeb.MemberController do
     )
     |> Repo.one()
   end
-
 end
