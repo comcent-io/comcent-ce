@@ -78,7 +78,7 @@ services:
       - comcent-network
 
   server:
-    image: hexpm/elixir:1.18.3-erlang-27.3-debian-bullseye-20250317-slim
+    image: hexpm/elixir:1.18.3-erlang-27.3-debian-bookworm-20250317-slim
     ports:
       - '5400:4000'
     env_file:
