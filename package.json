@@ -3,11 +3,8 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "dev": "dotenv -- turbo run dev",
-    "build": "turbo run build",
-    "dev:web-app": "dotenv -- turbo run dev --filter=@comcent/web-app...",
-    "dev:sip-test-tools-ui": "dotenv -- turbo run dev --filter=@comcent/sip-test-tools-ui -- --host 0.0.0.0 --port 5175",
-    "build:web-app": "./tools/build_web_app.sh",
+    "dev:sip-test-tools-ui": "dotenv -- npm run dev --prefix packages/sip-test-tools-ui -- --host 0.0.0.0 --port 5175",
+    "build:web-app": "npm run build --prefix packages/web-app",
     "start:web-app": "dotenv -- node packages/web-app/build/index.js",
     "prepare": "if [ \"$NODE_ENV\" != \"production\" ]; then husky install; fi",
     "lint": "eslint . --ext .vue,.svelte,.html,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
@@ -27,10 +24,8 @@
     "test:e2e:telephony:stack:down": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e down --remove-orphans -v",
     "test:e2e:telephony:stack:logs": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e logs --tail=200",
     "test:vscode": "code e2e",
-    "test": "turbo run test",
+    "test": "npm run test --prefix packages/web-app && npm run test --prefix packages/sip-test-tools-ui",
     "docker:db:migrate": "docker compose exec -w /app server mix ecto.migrate",
-    "docker:populate-country-state": "docker compose exec -w /code/packages/tools/ comcent-all-in-one node populate_country_state.js",
-    "docker:web-app:build": "docker run --workdir /code -v \"$(pwd)\":/code node:20.11.1 sh -c \"npm i && npm run build\"\n",
     "check:elixir": "cd server && mix compile --warnings-as-errors && cd ..",
     "install:rollup-platform": "./tools/install-rollup-platform.sh"
   },
@@ -68,7 +63,6 @@
     "husky": "^8.0.3",
     "lint-staged": "^15.2.0",
     "natural-compare-lite": "^1.4.0",
-    "turbo": "^1.12.4",
     "typescript": "^5.3.3"
   },
   "dependencies": {
