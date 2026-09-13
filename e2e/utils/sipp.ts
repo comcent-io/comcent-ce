@@ -36,7 +36,7 @@ const composeArgs = [
   'comcent-e2e',
 ];
 
-const SBC_ADMIN_SERVICE = process.env.E2E_SBC_ADMIN_SERVICE || 'sbc';
+const SBC_SERVICE = 'sbc';
 
 type SippRunOptions = {
   scenario: string;
@@ -539,74 +539,39 @@ export async function waitForServerHealthy() {
   throw new Error('Server did not become healthy within 60s');
 }
 
-export async function waitForKamailioDispatcher() {
+export async function waitForSbcDispatcher() {
   const rpcToken = process.env.RPC_API_TOKEN || '';
-
   const fsIP = process.env.E2E_FREESWITCH_IP || '172.29.17.8';
-  if (SBC_ADMIN_SERVICE === 'sbc-kamailio') {
-    await runCompose(
-      [
-        ...composeArgs,
-        'exec',
-        '-T',
-        SBC_ADMIN_SERVICE,
-        'kamcmd',
-        'dispatcher.add',
-        '2',
-        `sip:${fsIP}:5070`,
-      ],
-      10_000,
-      true,
-    );
-  } else {
-    await runCompose(
-      [
-        ...composeArgs,
-        'exec',
-        '-T',
-        SBC_ADMIN_SERVICE,
-        'sh',
-        '-c',
-        `curl -sf -H "X-Api-Token: ${rpcToken}" -d '{"jsonrpc":"2.0","method":"dispatcher.add","params":[2,"sip:${fsIP}:5070"],"id":1}' http://127.0.0.1:80/rpc 2>/dev/null || true`,
-      ],
-      10_000,
-      true,
-    );
-  }
+
+  const rpc = (body: string) => [
+    ...composeArgs,
+    'exec',
+    '-T',
+    SBC_SERVICE,
+    'sh',
+    '-c',
+    `curl -sf -H "X-Api-Token: ${rpcToken}" -d '${body}' http://127.0.0.1:80/rpc 2>/dev/null`,
+  ];
+
+  await runCompose(
+    rpc(
+      `{"jsonrpc":"2.0","method":"dispatcher.add","params":[2,"sip:${fsIP}:5070"],"id":1}`,
+    ),
+    10_000,
+    true,
+  );
 
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    const result =
-      SBC_ADMIN_SERVICE === 'sbc-kamailio'
-        ? await runCompose(
-            [
-              ...composeArgs,
-              'exec',
-              '-T',
-              SBC_ADMIN_SERVICE,
-              'kamcmd',
-              'dispatcher.list',
-            ],
-            10_000,
-            true,
-          )
-        : await runCompose(
-            [
-              ...composeArgs,
-              'exec',
-              '-T',
-              SBC_ADMIN_SERVICE,
-              'sh',
-              '-c',
-              `curl -sf -H "X-Api-Token: ${rpcToken}" -d '{"jsonrpc":"2.0","method":"dispatcher.list","id":1}' http://127.0.0.1:80/rpc 2>/dev/null`,
-            ],
-            10_000,
-            true,
-          );
+    const result = await runCompose(
+      rpc('{"jsonrpc":"2.0","method":"dispatcher.list","id":1}'),
+      10_000,
+      true,
+    );
     if (result.stdout.includes('sip:')) return;
     await new Promise((r) => setTimeout(r, 2_000));
   }
-  throw new Error('Kamailio dispatcher has no destinations after 30s');
+  throw new Error('SBC dispatcher has no destinations after 30s');
 }
 
 /**
