@@ -115,7 +115,6 @@
       </div>
       <!-- Low-balance alert is EE-only (no wallet/billing in CE). -->
 
-
       <!-- Main content and other items remain unchanged -->
 
       <div class="flex items-center lg:order-2">
@@ -248,7 +247,10 @@
     </div>
   </aside>
 
-  <main class="p-4 md:ml-64 h-auto pt-20">
+  <!-- pb-24 leaves room to scroll the last row of any page clear of the dialer
+       widget docked in the bottom-right corner; without it the widget covers
+       that row's action buttons and they cannot be clicked. -->
+  <main class="p-4 md:ml-64 h-auto pt-20 pb-24">
     <slot />
   </main>
 
