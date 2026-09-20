@@ -174,6 +174,19 @@ defmodule Comcent.Repo.Queue do
       updated_at: now
     })
     |> Repo.insert()
+    |> case do
+      {:error, %Ecto.Changeset{errors: errors} = changeset} ->
+        # Two requests adding the same member (a double click, a retry) race
+        # past any pre-check, so the primary key is the only reliable guard.
+        if Enum.any?(errors, fn {_field, {_msg, opts}} -> opts[:constraint] == :unique end) do
+          {:error, :already_member}
+        else
+          {:error, changeset}
+        end
+
+      result ->
+        result
+    end
   end
 
   def remove_member_from_queue(queue_id, member_id, org_id) do
