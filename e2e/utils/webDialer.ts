@@ -1,4 +1,9 @@
-import { expect, type APIRequestContext, type Browser, type Page } from '@playwright/test';
+import {
+  expect,
+  type APIRequestContext,
+  type Browser,
+  type Page,
+} from '@playwright/test';
 
 const baseUrl = process.env.PUBLIC_ROOT_URL || 'http://localhost:4173';
 
@@ -32,7 +37,9 @@ function attachDialerDebugListeners(page: Page, debug: DialerDebugState) {
   page.on('websocket', (webSocket) => {
     debug.webSockets.push(webSocket.url());
     webSocket.on('socketerror', (error) => {
-      debug.consoleMessages.push(`[websocket-error] ${webSocket.url()} :: ${error}`);
+      debug.consoleMessages.push(
+        `[websocket-error] ${webSocket.url()} :: ${error}`,
+      );
     });
     webSocket.on('close', () => {
       debug.consoleMessages.push(`[websocket-close] ${webSocket.url()}`);
@@ -70,11 +77,16 @@ export async function ensureRegisteredUser(
   }
 
   const body = await response.text();
-  if (response.status() === 400 && body.toLowerCase().includes('email already exists')) {
+  if (
+    response.status() === 400 &&
+    body.toLowerCase().includes('email already exists')
+  ) {
     return;
   }
 
-  throw new Error(`Failed to register ${params.email}: ${response.status()} ${body}`);
+  throw new Error(
+    `Failed to register ${params.email}: ${response.status()} ${body}`,
+  );
 }
 
 export async function loginAsMember(params: {
@@ -90,16 +102,21 @@ export async function loginAsMember(params: {
   const page = await context.newPage();
   const debug = createDialerDebugState();
   attachDialerDebugListeners(page, debug);
-  const loginResponse = await params.request.post(`${baseUrl}/api/v2/auth/login`, {
-    data: {
-      email: params.email,
-      password: params.password,
+  const loginResponse = await params.request.post(
+    `${baseUrl}/api/v2/auth/login`,
+    {
+      data: {
+        email: params.email,
+        password: params.password,
+      },
+      failOnStatusCode: false,
     },
-    failOnStatusCode: false,
-  });
+  );
 
   if (!loginResponse.ok()) {
-    throw new Error(`Unable to login ${params.email}: ${loginResponse.status()} ${await loginResponse.text()}`);
+    throw new Error(
+      `Unable to login ${params.email}: ${loginResponse.status()} ${await loginResponse.text()}`,
+    );
   }
 
   const loginBody = await loginResponse.json();
@@ -126,13 +143,17 @@ export async function loginAsMember(params: {
 export async function waitForDialerReady(page: Page, debug?: DialerDebugState) {
   await expect
     .poll(async () =>
-      page.evaluate(() => Boolean((window as Window & { dialerWidget?: unknown }).dialerWidget)),
+      page.evaluate(() =>
+        Boolean((window as Window & { dialerWidget?: unknown }).dialerWidget),
+      ),
     )
     .toBe(true);
 
   try {
     await expect
-      .poll(async () => (await readDialerStatus(page)) === 'Registered', { timeout: 30_000 })
+      .poll(async () => (await readDialerStatus(page)) === 'Registered', {
+        timeout: 30_000,
+      })
       .toBe(true);
   } catch (error) {
     const dialerStatus = await readDialerStatus(page);
@@ -144,14 +165,33 @@ export async function waitForDialerReady(page: Page, debug?: DialerDebugState) {
           `Console: ${debug.consoleMessages.join(' | ') || '(none)'}`,
         ].join('\n')
       : `Dialer status: ${dialerStatus ?? 'unknown'}`;
-    throw new Error(`${debugSummary}\n\n${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `${debugSummary}\n\n${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
-export async function setDialerPresenceStatus(page: Page, status: 'Logged Out' | 'Available' | 'On Break') {
-  const statusSelect = page.locator('.fixed.bottom-1.right-1 select').first();
-  await expect(statusSelect).toBeVisible({ timeout: 30_000 });
-  await statusSelect.selectOption(status);
+const DIALER_PRESENCE_STATUSES =
+  /^(Logged Out|Available|On Break|On Call|Wrap Up|Busy)$/;
+
+export async function setDialerPresenceStatus(
+  page: Page,
+  status: 'Logged Out' | 'Available' | 'On Break',
+) {
+  const widget = page.locator('.dialer-widget');
+  // The status pill is a button labelled with the current status; it opens a
+  // menu of buttons, one per status. With the menu closed it is the only match.
+  const statusPill = widget.getByRole('button', {
+    name: DIALER_PRESENCE_STATUSES,
+  });
+  await expect(statusPill).toBeVisible({ timeout: 30_000 });
+  await statusPill.click();
+  // The menu follows the pill in the DOM, so when the target equals the
+  // current status the menu item is the last match.
+  await widget
+    .getByRole('button', { name: status, exact: true })
+    .last()
+    .click();
 }
 
 export async function installDialerObservers(page: Page) {
@@ -178,7 +218,10 @@ export async function installDialerObservers(page: Page) {
   });
 }
 
-export async function dialFromWidget(page: Page, params: { fromNumber: string; to: string }) {
+export async function dialFromWidget(
+  page: Page,
+  params: { fromNumber: string; to: string },
+) {
   await page.evaluate(
     async ({ fromNumber, to }) => {
       const win = window as Window & {
@@ -203,9 +246,11 @@ export async function waitForDialerConnected(page: Page, timeoutMs = 30_000) {
       async () =>
         page.evaluate(
           () =>
-            (window as Window & {
-              __dialerTelemetry?: { connectedCount: number };
-            }).__dialerTelemetry?.connectedCount ?? 0,
+            (
+              window as Window & {
+                __dialerTelemetry?: { connectedCount: number };
+              }
+            ).__dialerTelemetry?.connectedCount ?? 0,
         ),
       { timeout: timeoutMs },
     )
@@ -218,9 +263,11 @@ export async function waitForDialerHungUp(page: Page, timeoutMs = 30_000) {
       async () =>
         page.evaluate(
           () =>
-            (window as Window & {
-              __dialerTelemetry?: { hangupCount: number };
-            }).__dialerTelemetry?.hangupCount ?? 0,
+            (
+              window as Window & {
+                __dialerTelemetry?: { hangupCount: number };
+              }
+            ).__dialerTelemetry?.hangupCount ?? 0,
         ),
       { timeout: timeoutMs },
     )
@@ -232,32 +279,73 @@ export async function answerIncomingCall(page: Page) {
 }
 
 export async function hangupCurrentCall(page: Page) {
-  await page.getByRole('button', { name: 'Hangup' }).first().click();
+  // Parked calls list their own End buttons above the current call's.
+  await page
+    .locator('.dialer-widget')
+    .getByRole('button', { name: 'End', exact: true })
+    .last()
+    .click();
 }
 
 export async function toggleHold(page: Page) {
   const holdButton = page
-    .getByRole('button', { name: /^(Hold|Un hold)$/ })
+    .locator('.dialer-widget')
+    .getByRole('button', { name: /^(Hold|Unhold)$/ })
     .first();
   await holdButton.click();
 }
 
-export async function blindTransferCurrentCall(page: Page, transferAddress: string) {
-  await page.getByRole('button', { name: 'Transfer' }).first().click();
-  await page.locator('input#toAddress').first().fill(transferAddress);
-  await page.getByRole('button', { name: 'Blind Transfer' }).click();
+async function openTransferMenu(
+  page: Page,
+  mode: 'Blind Transfer' | 'Attended Transfer',
+  transferAddress: string,
+) {
+  const widget = page.locator('.dialer-widget');
+  await widget.getByRole('button', { name: 'Transfer', exact: true }).click();
+  await widget.getByRole('button', { name: mode, exact: true }).click();
+  await widget.getByPlaceholder('Name or number').fill(transferAddress);
+
+  // Typing a member name opens an autocomplete list over the confirm
+  // button; pick the match the way an agent would. Phone numbers skip it.
+  if (!/^\+?\d+$/.test(transferAddress)) {
+    await widget
+      .getByRole('button', { name: new RegExp(`^${transferAddress} \\[`) })
+      .click();
+  }
 }
 
-export async function attendedTransferCurrentCall(page: Page, transferAddress: string) {
-  await page.getByRole('button', { name: 'Transfer' }).first().click();
-  await page.locator('input#toAddress').first().fill(transferAddress);
-  await page.getByRole('button', { name: 'Attended Transfer' }).click();
+export async function blindTransferCurrentCall(
+  page: Page,
+  transferAddress: string,
+) {
+  await openTransferMenu(page, 'Blind Transfer', transferAddress);
+  await page
+    .locator('.dialer-widget')
+    .getByRole('button', { name: 'Transfer Call', exact: true })
+    .click();
+}
+
+export async function attendedTransferCurrentCall(
+  page: Page,
+  transferAddress: string,
+) {
+  await openTransferMenu(page, 'Attended Transfer', transferAddress);
+  await page
+    .locator('.dialer-widget')
+    .getByRole('button', { name: 'Call Privately', exact: true })
+    .click();
 }
 
 export async function confirmAttendedTransfer(page: Page) {
-  await page.getByRole('button', { name: 'Transfer' }).last().click();
+  await page
+    .locator('.dialer-widget')
+    .getByRole('button', { name: 'Complete Transfer', exact: true })
+    .click();
 }
 
 export async function cancelAttendedTransfer(page: Page) {
-  await page.getByRole('button', { name: 'Cancel & Talk' }).click();
+  await page
+    .locator('.dialer-widget')
+    .getByRole('button', { name: 'Resume Call', exact: true })
+    .click();
 }

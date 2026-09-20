@@ -27,5 +27,9 @@ defmodule Comcent.Schemas.QueueMembership do
     |> foreign_key_constraint(:queue_id, name: :queue_memberships_queue_id_fkey)
     |> foreign_key_constraint(:org_id, name: :queue_memberships_org_id_fkey)
     |> foreign_key_constraint(:user_id, name: :queue_memberships_user_id_fkey)
+    |> unique_constraint(:user_id,
+      name: :queue_memberships_pkey,
+      message: "is already a member of this queue"
+    )
   end
 end

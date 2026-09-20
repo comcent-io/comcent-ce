@@ -18,12 +18,17 @@
     pipeline: 'DEEPGRAM_AND_OPENAI',
   };
   let lastFetchKey = '';
+  // The form is rendered only once the bot has loaded; see the note in
+  // sip-trunks/[id]/edit for why an empty form must not be shown first.
+  let isLoading = true;
 
   async function fetchVoiceBot() {
+    isLoading = true;
     const result = await getJson<any>(
       `/api/v2/${$page.params.subdomain}/voice-bots/${$page.params.id}`,
     );
     formData = result.ok ? result.data : {};
+    isLoading = false;
   }
 
   $: if (browser) {
@@ -38,5 +43,7 @@
 <h3 class="text-3xl font-bold dark:text-white">Voice Bots Edit</h3>
 
 <div class="max-w-sm">
-  <VoiceBotForm {formData} isUpdate={true} />
+  {#if !isLoading}
+    <VoiceBotForm {formData} isUpdate={true} />
+  {/if}
 </div>

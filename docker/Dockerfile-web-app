@@ -22,9 +22,17 @@ WORKDIR /usr/src/app/packages/web-app
 
 COPY packages/web-app/package*.json ./
 
-RUN npm install --no-fund --no-audit || \
-    (sleep 5 && npm install --no-fund --no-audit) || \
-    (sleep 15 && npm install --no-fund --no-audit)
+# npm ci, not npm install, so that a retry can actually recover. A network
+# timeout part-way through an install leaves truncated files in node_modules;
+# `npm install` on top of that sees the package as already present and keeps
+# the corrupt copy, so all three attempts failed identically (in CI: a
+# truncated mdn-data JSON, then @sveltejs/kit's postinstall choking on it each
+# time). `npm ci` empties node_modules first and checks every tarball against
+# the lockfile's integrity hash. It also installs exactly what the lockfile
+# says, which is what an image build should do anyway.
+RUN npm ci --no-fund --no-audit || \
+    (sleep 5 && npm ci --no-fund --no-audit) || \
+    (sleep 15 && npm ci --no-fund --no-audit)
 
 # Create a separate layer with only production dependencies
 FROM deps as prod-deps

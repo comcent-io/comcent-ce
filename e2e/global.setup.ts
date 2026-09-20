@@ -9,7 +9,8 @@ import {
 import {
   killAllSippProcesses,
   restartServer,
-  waitForKamailioDispatcher,
+  syncFreeSwitchClock,
+  waitForSbcDispatcher,
   waitForServerHealthy,
 } from './utils/sipp';
 
@@ -21,10 +22,11 @@ setup(
     await waitForAppReady(request);
     await truncateAllTables();
     await killAllSippProcesses();
+    await syncFreeSwitchClock();
 
     await restartServer();
     await waitForServerHealthy();
-    await waitForKamailioDispatcher();
+    await waitForSbcDispatcher();
 
     const { user } = await seedBaselineData();
 

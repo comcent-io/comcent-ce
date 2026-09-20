@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +37,7 @@ const composeArgs = [
   'comcent-e2e',
 ];
 
-const SBC_ADMIN_SERVICE = process.env.E2E_SBC_ADMIN_SERVICE || 'sbc';
+const SBC_SERVICE = 'sbc';
 
 type SippRunOptions = {
   scenario: string;
@@ -99,8 +100,6 @@ async function runCompose(
   }
 }
 
-let sippCallCounter = 0;
-
 export async function runSipp(options: SippRunOptions) {
   const targetHost = options.targetHost;
   const targetPort = options.targetPort ?? 5060;
@@ -111,8 +110,11 @@ export async function runSipp(options: SippRunOptions) {
   const timeoutMs = options.timeoutMs ?? 90_000;
   const resetProcesses = options.resetProcesses ?? false;
 
-  const csvId = `sipp_${Date.now()}_${++sippCallCounter}`;
-  const csvPath = `/tmp/${csvId}.csv`;
+  // The SIPp containers are shared by every Playwright worker, so this path
+  // must be unique across processes. A per-process counter is not: workers
+  // running the same spec in lock-step reach the same counter value in the
+  // same millisecond, and one test's SIPp then reads another test's row.
+  const csvPath = `/tmp/sipp_${randomUUID()}.csv`;
   const csvArg = csvRows.length > 0 ? `-inf ${csvPath}` : '';
   const csvContent = ['SEQUENTIAL', ...csvRows]
     .map((row) => row)
@@ -154,11 +156,27 @@ export async function runSipp(options: SippRunOptions) {
   );
 }
 
+/**
+ * Stops the SIPp instances bound to the given local ports, and only those.
+ * The SIPp containers are shared by every Playwright worker, so a blanket
+ * `pkill sipp` also kills the agents of whichever specs happen to be running
+ * in parallel, which then fail with an agent that never answered.
+ */
 export async function stopSippProcesses(
-  services: Array<'sipp' | 'sipp-uas' | 'sipp-agent-a' | 'sipp-agent-b'>,
+  targets: Array<{
+    service: 'sipp' | 'sipp-uas' | 'sipp-agent-a' | 'sipp-agent-b';
+    port: number;
+  }>,
 ) {
+  const portsByService = new Map<string, Set<number>>();
+  for (const { service, port } of targets) {
+    const ports = portsByService.get(service) ?? new Set<number>();
+    ports.add(port);
+    portsByService.set(service, ports);
+  }
+
   await Promise.allSettled(
-    [...new Set(services)].map((service) =>
+    [...portsByService].map(([service, ports]) =>
       runCompose(
         [
           ...composeArgs,
@@ -167,7 +185,7 @@ export async function stopSippProcesses(
           service,
           'sh',
           '-c',
-          'pkill -x sipp || true',
+          `pkill -f '^sipp .* -p (${[...ports].join('|')})( |$)' || true`,
         ],
         30_000,
         true,
@@ -513,6 +531,31 @@ export async function killAllSippProcesses() {
   );
 }
 
+/**
+ * FreeSWITCH reads the system clock once at startup and from then on advances
+ * its own clock from a monotonic timer. That timer stops while the Docker VM
+ * is suspended (laptop sleep), so on a long-lived local stack FreeSWITCH falls
+ * behind by however long the machine slept. A call story then starts in
+ * FreeSWITCH's past but ends at the server's "now", so a 10 second call is
+ * recorded as hours long and every assertion on durations or ordering is
+ * working with nonsense. `fsctl sync_clock` re-reads the system clock.
+ */
+export async function syncFreeSwitchClock() {
+  await runCompose(
+    [
+      ...composeArgs,
+      'exec',
+      '-T',
+      'freeswitch',
+      'fs_cli',
+      '-x',
+      'fsctl sync_clock',
+    ],
+    30_000,
+    true,
+  );
+}
+
 export async function restartServer() {
   await runCompose([...composeArgs, 'restart', 'server'], 60_000, true);
 }
@@ -539,74 +582,39 @@ export async function waitForServerHealthy() {
   throw new Error('Server did not become healthy within 60s');
 }
 
-export async function waitForKamailioDispatcher() {
+export async function waitForSbcDispatcher() {
   const rpcToken = process.env.RPC_API_TOKEN || '';
-
   const fsIP = process.env.E2E_FREESWITCH_IP || '172.29.17.8';
-  if (SBC_ADMIN_SERVICE === 'sbc-kamailio') {
-    await runCompose(
-      [
-        ...composeArgs,
-        'exec',
-        '-T',
-        SBC_ADMIN_SERVICE,
-        'kamcmd',
-        'dispatcher.add',
-        '2',
-        `sip:${fsIP}:5070`,
-      ],
-      10_000,
-      true,
-    );
-  } else {
-    await runCompose(
-      [
-        ...composeArgs,
-        'exec',
-        '-T',
-        SBC_ADMIN_SERVICE,
-        'sh',
-        '-c',
-        `curl -sf -H "X-Api-Token: ${rpcToken}" -d '{"jsonrpc":"2.0","method":"dispatcher.add","params":[2,"sip:${fsIP}:5070"],"id":1}' http://127.0.0.1:80/rpc 2>/dev/null || true`,
-      ],
-      10_000,
-      true,
-    );
-  }
+
+  const rpc = (body: string) => [
+    ...composeArgs,
+    'exec',
+    '-T',
+    SBC_SERVICE,
+    'sh',
+    '-c',
+    `curl -sf -H "X-Api-Token: ${rpcToken}" -d '${body}' http://127.0.0.1:80/rpc 2>/dev/null`,
+  ];
+
+  await runCompose(
+    rpc(
+      `{"jsonrpc":"2.0","method":"dispatcher.add","params":[2,"sip:${fsIP}:5070"],"id":1}`,
+    ),
+    10_000,
+    true,
+  );
 
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    const result =
-      SBC_ADMIN_SERVICE === 'sbc-kamailio'
-        ? await runCompose(
-            [
-              ...composeArgs,
-              'exec',
-              '-T',
-              SBC_ADMIN_SERVICE,
-              'kamcmd',
-              'dispatcher.list',
-            ],
-            10_000,
-            true,
-          )
-        : await runCompose(
-            [
-              ...composeArgs,
-              'exec',
-              '-T',
-              SBC_ADMIN_SERVICE,
-              'sh',
-              '-c',
-              `curl -sf -H "X-Api-Token: ${rpcToken}" -d '{"jsonrpc":"2.0","method":"dispatcher.list","id":1}' http://127.0.0.1:80/rpc 2>/dev/null`,
-            ],
-            10_000,
-            true,
-          );
+    const result = await runCompose(
+      rpc('{"jsonrpc":"2.0","method":"dispatcher.list","id":1}'),
+      10_000,
+      true,
+    );
     if (result.stdout.includes('sip:')) return;
     await new Promise((r) => setTimeout(r, 2_000));
   }
-  throw new Error('Kamailio dispatcher has no destinations after 30s');
+  throw new Error('SBC dispatcher has no destinations after 30s');
 }
 
 /**

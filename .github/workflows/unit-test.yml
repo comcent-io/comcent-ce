@@ -2,7 +2,13 @@ name: Unit test
 on:
   push:
     branches:
-      - '*'
+      # '*' does not match '/', so a branch named like "fix/something" ran no
+      # tests at all and its PR showed "no checks reported". '**' matches
+      # across slashes.
+      - '**'
+  pull_request:
+    branches:
+      - main
 
 jobs:
   test:
@@ -22,6 +28,14 @@ jobs:
 
       - name: Install Linux Rollup binary
         run: npm install @rollup/rollup-linux-x64-gnu
+
+      # packages/web-app has its own lockfile and is not a root workspace, so
+      # the root install above never creates its node_modules. That went
+      # unnoticed under Turbo because `turbo run test` only covered the two
+      # workspaces: the web-app's unit tests never ran in CI at all. Now that
+      # `npm run test` runs them explicitly, they need their dependencies.
+      - name: Install web-app Dependencies
+        run: npm ci --prefix packages/web-app
 
       - name: Run unit tests
         run: npm run test

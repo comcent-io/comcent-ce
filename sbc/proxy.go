@@ -276,23 +276,33 @@ func (p *Proxy) handleInviteToFS(req *sip.Request, tx sip.ServerTransaction, sou
 			relay := sip.NewResponseFromRequest(req, resp.StatusCode, resp.Reason, resp.Body())
 			copyResponseHeaders(resp, relay)
 			replaceContactHeader(relay, normalizedContactHeaderValue(resp.GetHeader("Contact"), fsAddr))
+
+			success := resp.StatusCode >= 200 && resp.StatusCode < 300
+			if success {
+				// Record the dialog BEFORE the 2xx goes upstream. The far side ACKs within
+				// a millisecond, on another goroutine, and handleAck drops an ACK for a
+				// call it cannot find. With the entry written after tx.Respond, that ACK
+				// regularly arrived first (7% of calls on a laptop, 17% on a loaded CI
+				// runner), and the callee then never saw an ACK at all.
+				userURI := requestContactURI(req, req.From().Address)
+				fsURI := responseContactURI(resp, sip.Uri{Host: strings.Split(fsAddr, ":")[0], Port: parsePort(fsAddr)})
+				p.callsMu.Lock()
+				p.calls[callID] = &callState{
+					fsAddr:   fsAddr,
+					fsURI:    fsURI,
+					userAddr: req.Source(),
+					userURI:  userURI,
+					userAORs: append([]string(nil), userAORs...),
+					isWebRTC: isWebRTCTransport(req.Transport()),
+				}
+				p.callsMu.Unlock()
+				established = true
+			}
+
 			tx.Respond(relay)
 
 			if resp.StatusCode >= 200 {
-				if resp.StatusCode < 300 {
-					userURI := requestContactURI(req, req.From().Address)
-					fsURI := responseContactURI(resp, sip.Uri{Host: strings.Split(fsAddr, ":")[0], Port: parsePort(fsAddr)})
-					p.callsMu.Lock()
-					p.calls[callID] = &callState{
-						fsAddr:   fsAddr,
-						fsURI:    fsURI,
-						userAddr: req.Source(),
-						userURI:  userURI,
-						userAORs: append([]string(nil), userAORs...),
-						isWebRTC: isWebRTCTransport(req.Transport()),
-					}
-					p.callsMu.Unlock()
-					established = true
+				if success {
 					slog.Info("Proxy: caller→FS established", "callID", callID)
 				}
 				return
@@ -519,7 +529,8 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 				winner := branches[r.idx]
 				relay := sip.NewResponseFromRequest(req, resp.StatusCode, resp.Reason, resp.Body())
 				copyResponseHeaders(resp, relay)
-				tx.Respond(relay)
+				// Recorded before the 2xx goes upstream; see the note in the
+				// caller→FS path for why the order matters.
 				p.callsMu.Lock()
 				p.calls[callID] = &callState{
 					fsAddr:   fsAddr,
@@ -531,6 +542,7 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 				}
 				p.callsMu.Unlock()
 				established = true
+				tx.Respond(relay)
 				slog.Info("Proxy: FS→user established", "aor", aor, "callID", callID,
 					"winner", winner.contact.Address, "webrtc", winner.contact.IsWebRTC,
 					"branches", len(branches))
@@ -655,9 +667,11 @@ func (p *Proxy) handleInviteFromFSToTrunk(req *sip.Request, tx sip.ServerTransac
 
 				relay := sip.NewResponseFromRequest(req, authResp.StatusCode, authResp.Reason, authResp.Body())
 				copyResponseHeaders(authResp, relay)
-				tx.Respond(relay)
 
-				if authResp.StatusCode >= 200 && authResp.StatusCode < 300 {
+				authSuccess := authResp.StatusCode >= 200 && authResp.StatusCode < 300
+				if authSuccess {
+					// Recorded before the 2xx goes upstream; see the note in the
+					// caller→FS path for why the order matters.
 					userURI := responseContactURI(authResp, trunkURI)
 					p.callsMu.Lock()
 					p.calls[callID] = &callState{
@@ -669,6 +683,10 @@ func (p *Proxy) handleInviteFromFSToTrunk(req *sip.Request, tx sip.ServerTransac
 					}
 					p.callsMu.Unlock()
 					established = true
+				}
+
+				tx.Respond(relay)
+				if authSuccess {
 					slog.Info("Proxy: FS→trunk established", "callID", callID)
 				}
 				return
@@ -676,21 +694,28 @@ func (p *Proxy) handleInviteFromFSToTrunk(req *sip.Request, tx sip.ServerTransac
 
 			relay := sip.NewResponseFromRequest(req, resp.StatusCode, resp.Reason, resp.Body())
 			copyResponseHeaders(resp, relay)
+
+			success := resp.StatusCode >= 200 && resp.StatusCode < 300
+			if success {
+				// Recorded before the 2xx goes upstream; see the note in the
+				// caller→FS path for why the order matters.
+				userURI := responseContactURI(resp, trunkURI)
+				p.callsMu.Lock()
+				p.calls[callID] = &callState{
+					fsAddr:      fsAddr,
+					fsURI:       requestContactURI(req, sip.Uri{Host: strings.Split(fsAddr, ":")[0], Port: parsePort(fsAddr)}),
+					userAddr:    dest,
+					userURI:     userURI,
+					spoofedUser: spoofedUser,
+				}
+				p.callsMu.Unlock()
+				established = true
+			}
+
 			tx.Respond(relay)
 
 			if resp.StatusCode >= 200 {
-				if resp.StatusCode < 300 {
-					userURI := responseContactURI(resp, trunkURI)
-					p.callsMu.Lock()
-					p.calls[callID] = &callState{
-						fsAddr:      fsAddr,
-						fsURI:       requestContactURI(req, sip.Uri{Host: strings.Split(fsAddr, ":")[0], Port: parsePort(fsAddr)}),
-						userAddr:    dest,
-						userURI:     userURI,
-						spoofedUser: spoofedUser,
-					}
-					p.callsMu.Unlock()
-					established = true
+				if success {
 					slog.Info("Proxy: FS→trunk established", "callID", callID)
 				}
 				return
@@ -895,7 +920,14 @@ func (p *Proxy) handleAck(req *sip.Request, tx sip.ServerTransaction) {
 	state, found := p.calls[callID]
 	p.callsMu.RUnlock()
 	if !found {
-		slog.Debug("ACK for unknown call", "callid", callID)
+		// Normally the hop-by-hop ACK to a non-2xx final response (an auth
+		// challenge, a rejected or cancelled INVITE), which has no dialog and
+		// needs no forwarding. The ACK to a 2xx must never land here: every
+		// INVITE path stores its call state before relaying the 200, because a
+		// dropped 2xx ACK strands the callee retransmitting its answer. Logged at
+		// Info, not Debug, so that if that ordering ever regresses the evidence
+		// is in the collected logs.
+		slog.Info("ACK for a call with no dialog, not forwarded", "callid", callID, "fromFS", isFS)
 		return
 	}
 

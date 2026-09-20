@@ -81,6 +81,16 @@ async function unregisterAgents(agents: AgentSpec[]) {
 }
 
 function runAgentScenario(agent: AgentSpec) {
+  // Answering agents wait for the caller's BYE (uas-answer.xml) instead of
+  // sending their own (uas-answer-remote-bye.xml), because the callers here
+  // run uac-basic.xml: it hangs up by itself after a hardcoded 15 s (it
+  // ignores hangupAfterMs) and counts a BYE from the far end as a failed call.
+  // This spec used to pair the two anyway and only passed because that agent
+  // BYE was malformed and FreeSWITCH dropped it -- the call always ended on the
+  // caller's hangup, and the agent's SIPp exited 0 only if the SBC's 10 s
+  // relay timeout beat the caller's BYE, a margin of about a second. The BYE is
+  // fixed now, so pairing them again would end every call at 4 s and fail
+  // every caller; an agent-ends-the-call variant needs uac-remote-bye.xml.
   const scenario =
     agent.behavior === 'reject'
       ? 'uas-reject.xml'
@@ -88,7 +98,7 @@ function runAgentScenario(agent: AgentSpec) {
         ? 'uas-ring-forever.xml'
         : visualQueueStress
           ? 'uas-answer-slow.xml'
-          : 'uas-answer-remote-bye.xml';
+          : 'uas-answer.xml';
 
   const timeoutMs =
     agent.behavior === 'answer'
@@ -355,10 +365,19 @@ test(
         expect(result.stderr).not.toContain('Failed'),
       );
       agentResults.forEach((result, index) => {
-        if (allAgents[index]?.behavior === 'reject') {
-          expect(result.exitCode).not.toBe(0);
-        } else {
-          expect(result.exitCode).toBe(0);
+        const agent = allAgents[index];
+        const detail = `${agent?.username} on ${agent?.service}:${agent?.port}\n${result.stderr}`;
+        // The reject agent's exit code says nothing about the product, so it
+        // is not asserted. This used to require it to be non-zero, which only
+        // held when the scheduler never offered that agent a call at all: its
+        // SIPp then sat idle until the harness killed it. When it WAS offered
+        // one and rejected it cleanly with 486 -- its whole purpose -- SIPp
+        // exited 0 and the test failed. Whether it is offered a call depends
+        // on which queue reserves the shared agents first. What matters is
+        // asserted below: every caller ends up on a call with an agent that
+        // accepts.
+        if (agent?.behavior !== 'reject') {
+          expect(result.exitCode, detail).toBe(0);
         }
       });
 
@@ -395,11 +414,13 @@ test(
         );
       }
     } finally {
-      await unregisterAgents(allAgents);
-      await stopSippProcesses(
-        Array.from(new Set(allAgents.map((agent) => agent.service))),
-      );
+      // Stop the agents before unregistering them. The un-REGISTER is sent
+      // from the agent's own port, so while the agent's SIPp still held it
+      // every unregister died with "Address already in use" -- silently, since
+      // non-zero exits are tolerated here -- and no agent was ever removed.
+      await stopSippProcesses(allAgents);
       await Promise.allSettled(agentRuns);
+      await unregisterAgents(allAgents);
     }
   },
 );
@@ -772,11 +793,13 @@ test(
         ).toEqual([]);
       }
     } finally {
-      await unregisterAgents(allAgents);
-      await stopSippProcesses(
-        Array.from(new Set(allAgents.map((agent) => agent.service))),
-      );
+      // Stop the agents before unregistering them. The un-REGISTER is sent
+      // from the agent's own port, so while the agent's SIPp still held it
+      // every unregister died with "Address already in use" -- silently, since
+      // non-zero exits are tolerated here -- and no agent was ever removed.
+      await stopSippProcesses(allAgents);
       await Promise.allSettled(agentRuns);
+      await unregisterAgents(allAgents);
     }
   },
 );
