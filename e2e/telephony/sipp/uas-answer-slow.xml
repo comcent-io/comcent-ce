@@ -6,7 +6,9 @@
   transition through Reserved/Ringing before they flip to On Call.
 -->
 <scenario name="Slow UAS Answer With Remote BYE">
-  <recv request="INVITE" />
+  <!-- rrs records the INVITE's Record-Route set and Contact, which the BYE
+       below needs as [routes] and [next_url]. -->
+  <recv request="INVITE" rrs="true" />
 
   <send>
     <![CDATA[
@@ -72,11 +74,12 @@
   <send retrans="500">
     <![CDATA[
 
-      BYE sip:[remote_ip]:[remote_port] SIP/2.0
+      BYE [next_url] SIP/2.0
       Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
+      [routes]
       Max-Forwards: 70
-      From: [last_To:]
-      To: [last_From:]
+      From: [last_To]
+      To: [last_From]
       Call-ID: [call_id]
       CSeq: 2 BYE
       Contact: <sip:[local_ip]:[local_port]>

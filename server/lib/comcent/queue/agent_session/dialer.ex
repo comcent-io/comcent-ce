@@ -14,12 +14,15 @@ defmodule Comcent.Queue.AgentSession.Dialer do
        leg.
     4. Report `{:dialer_answered, reservation_id, member_uuid}` or
        `{:dialer_failed, reservation_id, reason}` to the owning AgentSession.
+       Between 2 and 3 it also sends `{:dialer_member_answered, reservation_id}`
+       so the owner stops treating the attempt as unanswered.
     5. Exit.
 
   On `{:cancel, reason}` the dialer issues
-  `hupall NORMAL_CLEARING comcent_dialed_for_call_id <call_id>` to kill any
-  member legs still alive (forked branches, parked channel, etc.), then exits
-  without reporting further outcomes.
+  `hupall NORMAL_CLEARING comcent_dialed_for_attempt <attempt key>` to kill any
+  member legs of THIS attempt that are still alive (forked branches, parked
+  channel, etc.), then exits without reporting further outcomes. See
+  `attempt_key/2` for why the key is per attempt and not per call.
 
   Design notes
     * The owner is monitored, not linked. If the owner dies, the `{:DOWN, ...}`
@@ -28,13 +31,14 @@ defmodule Comcent.Queue.AgentSession.Dialer do
       FreeSWITCH gives up first; the AgentSession timer is the backstop.
     * No bare `receive`. All messages go through GenServer callbacks.
     * No channel-id tracking is done here; cleanup is a single `hupall` on the
-      attempt-scoped channel variable.
+      attempt-scoped channel variable `comcent_dialed_for_attempt`.
   """
 
   use GenServer, restart: :temporary
   require Logger
 
   alias Comcent.DialUtils
+  alias Comcent.Queue.AgentSession.AttemptKey
 
   @type attempt :: %{
           owner: pid(),
@@ -60,6 +64,9 @@ defmodule Comcent.Queue.AgentSession.Dialer do
   def start_link(%{owner: owner} = attempt) when is_pid(owner) do
     GenServer.start_link(__MODULE__, attempt, [])
   end
+
+  @doc "See `Comcent.Queue.AgentSession.AttemptKey.build/2`."
+  defdelegate attempt_key(call_id, reservation_id), to: AttemptKey, as: :build
 
   @doc "Cancel the attempt. The dialer hangs up any member legs and exits."
   def cancel(pid, reason) when is_pid(pid) do
@@ -95,6 +102,13 @@ defmodule Comcent.Queue.AgentSession.Dialer do
               Logger.info(
                 "Dialer originate answered call=#{attempt.call_id} member=#{attempt.member_username} uuid=#{uuid}"
               )
+
+              # Tell the owner now, before bridging. Its attempt timer measures
+              # how long the member took to pick up; uuid_bridge can take a
+              # second or two on a loaded host, and an answer that lands near
+              # the end of the ring window must not be timed out as a no-answer
+              # while that is still in progress.
+              send(attempt.owner, {:dialer_member_answered, attempt.reservation_id})
 
               bridge(%{state | conn: conn}, uuid)
 
@@ -187,7 +201,8 @@ defmodule Comcent.Queue.AgentSession.Dialer do
     _ =
       SwitchX.api(
         conn,
-        "hupall NORMAL_CLEARING comcent_dialed_for_call_id #{attempt.call_id}"
+        "hupall NORMAL_CLEARING comcent_dialed_for_attempt " <>
+          attempt_key(attempt.call_id, attempt.reservation_id)
       )
 
     :ok
@@ -210,6 +225,15 @@ defmodule Comcent.Queue.AgentSession.Dialer do
       "comcent_dialed_by=queue_member_dialer",
       "comcent_dialed_by_queue_id=#{attempt.queue_id}",
       "comcent_dialed_for_call_id=#{attempt.call_id}",
+      "comcent_dialed_for_attempt=#{attempt_key(attempt.call_id, attempt.reservation_id)}",
+      # `originate ... &park()` returns +OK as soon as the member answers, and
+      # `uuid_bridge` follows at once -- sometimes before the member's channel
+      # thread has entered park(). The bridge then interrupts nothing, and when
+      # the customer hangs up FreeSWITCH resumes the inline dialplan and runs
+      # park() for the first time: the agent is left on a silent, parked leg
+      # and never receives a BYE. Hanging up when the bridge ends makes both
+      # orderings behave the same.
+      "hangup_after_bridge=true",
       "effective_caller_id_number=#{attempt.from_user}",
       "effective_caller_id_name=#{attempt.from_name}",
       "sip_h_X-Inbound-Info=:#{attempt.to_user}:#{attempt.to_name}",
