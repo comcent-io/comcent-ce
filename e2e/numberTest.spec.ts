@@ -1029,6 +1029,12 @@ test('Numbers page, create number with dial timeout route successfully', async (
   await connectOutletByLabel(page, 'Timeout');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
 
+  // click() resolves once the click is dispatched, not once the POST it
+  // triggers has been persisted. Without this the SELECT below races the
+  // request and intermittently reads no row, which surfaces much later as
+  // `findGraphNodeByType(undefined, ...)` returning undefined.
+  await expect(page).toHaveURL(`/app/${org.subdomain}/numbers`);
+
   const client = createClient();
   await client.connect();
   let createdNumberId = '';
@@ -1074,6 +1080,12 @@ test('Numbers page, create number with dial group timeout route successfully', a
   await connectStartToNode(page, 'DialGroup');
   await connectOutletByLabel(page, 'Timeout');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
+
+  // click() resolves once the click is dispatched, not once the POST it
+  // triggers has been persisted. Without this the SELECT below races the
+  // request and intermittently reads no row, which surfaces much later as
+  // `findGraphNodeByType(undefined, ...)` returning undefined.
+  await expect(page).toHaveURL(`/app/${org.subdomain}/numbers`);
 
   const client = createClient();
   await client.connect();
@@ -1122,6 +1134,12 @@ test('Numbers page, create number with week time true and false routes successfu
   await connectOutletByLabel(page, 'true');
   await connectOutletByLabel(page, 'false');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
+
+  // click() resolves once the click is dispatched, not once the POST it
+  // triggers has been persisted. Without this the SELECT below races the
+  // request and intermittently reads no row, which surfaces much later as
+  // `findGraphNodeByType(undefined, ...)` returning undefined.
+  await expect(page).toHaveURL(`/app/${org.subdomain}/numbers`);
 
   const client = createClient();
   await client.connect();

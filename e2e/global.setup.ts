@@ -9,6 +9,7 @@ import {
 import {
   killAllSippProcesses,
   restartServer,
+  syncFreeSwitchClock,
   waitForSbcDispatcher,
   waitForServerHealthy,
 } from './utils/sipp';
@@ -21,6 +22,7 @@ setup(
     await waitForAppReady(request);
     await truncateAllTables();
     await killAllSippProcesses();
+    await syncFreeSwitchClock();
 
     await restartServer();
     await waitForServerHealthy();

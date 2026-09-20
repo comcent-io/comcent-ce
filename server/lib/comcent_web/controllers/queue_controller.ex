@@ -399,6 +399,11 @@ defmodule ComcentWeb.QueueController do
         |> put_status(:bad_request)
         |> json(%{error: "User is not a member of this org", code: "NOT_ORG_MEMBER"})
 
+      {:error, :already_member} ->
+        conn
+        |> put_status(:conflict)
+        |> json(%{error: "User is already a member of this queue", code: "ALREADY_QUEUE_MEMBER"})
+
       {:error, error} ->
         conn
         |> put_status(:unprocessable_entity)

@@ -42,9 +42,10 @@ TIME      AGENT 1 (agent1.wav)                   AGENT 2 (agent2.wav)
 
 ## Note on Mac Docker and play_pcap_audio
 
-On Mac, FreeSwitch advertises `127.0.0.1` in the SDP `c=` line (because
-`E2E_PUBLIC_IP=127.0.0.1` is required for browser WebRTC via port-forwarding).
-SIPp's built-in `play_pcap_audio` would blindly send to `127.0.0.1` which is
+On Mac, FreeSwitch advertises the host's address in the SDP `c=` line, because
+`E2E_PUBLIC_IP` must be set for browser WebRTC to reach the published RTP
+ports (see `.env.e2e.example`; use the machine's LAN IP). If it is set to
+`127.0.0.1` instead, SIPp's built-in `play_pcap_audio` would blindly send to
 sipp-uas's own loopback inside the container, never reaching FreeSwitch.
 
 `uas-answer-pcap.xml` therefore uses `play_pcap.pl` via `<exec command>` which

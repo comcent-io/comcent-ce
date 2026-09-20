@@ -9,21 +9,29 @@
   type PageError = { message: string; formErrors: { message: string; path: string[] }[] };
   let error: PageError | null = null;
   let lastFetchKey = '';
+  // The form is rendered only once the trunk has loaded. Rendering it empty
+  // and assigning the fetched trunk afterwards overwrites whatever was typed
+  // in the meantime, so an edit made before the response arrived was silently
+  // saved with the old value.
+  let isLoading = true;
 
   let showCredentialFields = false;
   async function fetchSipTrunk() {
+    isLoading = true;
     const result = await getJson<{ sipTrunks?: any[] }>(
       `/api/v2/${$page.params.subdomain}/sip-trunks`,
     );
     if (!result.ok) {
       error = { message: result.error, formErrors: [] };
       sipTrunk = null;
+      isLoading = false;
       return;
     }
 
     sipTrunk = (result.data.sipTrunks ?? []).find((st: any) => st.id === $page.params.id) ?? null;
     showCredentialFields = sipTrunk?.outboundUsername != null || sipTrunk?.outboundPassword != null;
     error = null;
+    isLoading = false;
   }
 
   $: if (browser) {
@@ -41,5 +49,7 @@
   {#if error}
     <ErrorMessage {error} />
   {/if}
-  <SipTrunkForm formData={sipTrunk ?? {}} isUpdate={true} {showCredentialFields} bind:error />
+  {#if !isLoading}
+    <SipTrunkForm formData={sipTrunk ?? {}} isUpdate={true} {showCredentialFields} bind:error />
+  {/if}
 </div>

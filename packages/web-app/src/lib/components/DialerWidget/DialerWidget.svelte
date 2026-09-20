@@ -93,7 +93,8 @@
         console.error('Network response was not ok');
         return [];
       }
-      return await response.json();
+      const payload = await response.json();
+      return payload.members ?? [];
     } catch (error) {
       console.error('Error fetching data:', error);
       return [];

@@ -62,6 +62,18 @@ async function createQueue(
   await page.getByRole('button', { name: /^Add$/ }).click();
 }
 
+/**
+ * The "Assigned members" card, and only that card. The component's root
+ * <section> also wraps the member search, whose result rows show the same
+ * name and username -- so scoping to the section lets an "is assigned"
+ * assertion pass off a search result before anything has been assigned.
+ */
+function assignedMembersPanel(page: Page) {
+  return page.locator('section > div').filter({
+    has: page.getByRole('heading', { name: 'Assigned members' }),
+  });
+}
+
 function queueRow(page: Page, queueName: string) {
   return page.locator(`tr:has(th:text-is("${queueName}"))`);
 }
@@ -407,10 +419,7 @@ test('Queue edit page, add member successfully', async ({ page }, testInfo) => {
   ).toBeVisible();
   await page.getByRole('button', { name: /Add to queue/i }).click();
 
-  const assignedSection = page
-    .locator('section')
-    .filter({ hasText: 'Assigned members' })
-    .first();
+  const assignedSection = assignedMembersPanel(page);
   await expect(assignedSection.getByText(name)).toBeVisible();
   await expect(assignedSection.getByText(username)).toBeVisible();
 });
@@ -435,14 +444,13 @@ test('Queue edit page, remove member successfully', async ({
   ).toBeVisible();
   await page.getByRole('button', { name: /Add to queue/i }).click();
 
-  const assignedSection = page
-    .locator('section')
-    .filter({ hasText: 'Assigned members' })
-    .first();
+  const assignedSection = assignedMembersPanel(page);
   await expect(assignedSection.getByText(name)).toBeVisible();
   await expect(assignedSection.getByText(username)).toBeVisible();
 
-  await assignedSection.getByRole('button', { name: 'Remove' }).click();
+  await assignedSection
+    .getByRole('button', { name: 'Remove', exact: true })
+    .click();
   await expect(page.getByText(`${name} removed from the queue`)).toBeVisible();
 
   await expect(assignedSection.getByText(name)).toHaveCount(0);

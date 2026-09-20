@@ -10,7 +10,12 @@
     },
     "jsonBody": {
       "metadata": {
-        "request_id": "e2e-mock"
+        "request_id": "e2e-mock",
+        "summary_info": {
+          "model_uuid": "e2e-mock",
+          "input_tokens": 100,
+          "output_tokens": 10
+        }
       },
       "results": {
         "summary": {
