@@ -22,32 +22,11 @@ const composeArgs = [
   'comcent-e2e',
 ];
 
-const SBC_ADMIN_SERVICE = process.env.E2E_SBC_ADMIN_SERVICE || 'sbc';
-
 function createClient() {
   return new Client({ connectionString: process.env.DATABASE_URL });
 }
 
-async function deleteKamailioCacheKey(table: string, key: string) {
-  await execFileAsync(
-    'docker',
-    [
-      ...composeArgs,
-      'exec',
-      '-T',
-      SBC_ADMIN_SERVICE,
-      'kamcmd',
-      'htable.delete',
-      table,
-      key,
-    ],
-    {
-      cwd: repoRoot,
-      timeout: 30_000,
-      maxBuffer: 4 * 1024 * 1024,
-    },
-  ).catch(() => undefined);
-}
+
 
 function buildDialGraph(target: string) {
   const nodeId = 'dial-node-1';
@@ -557,7 +536,6 @@ export async function ensureDefaultOutboundRoute(params: {
     await client.end();
   }
 
-  await deleteKamailioCacheKey('cache', `trunk_${params.number}`);
 }
 
 export async function ensureMemberInOrg(params: {
@@ -625,11 +603,6 @@ export async function ensureMemberInOrg(params: {
   } finally {
     await client.end();
   }
-
-  await deleteKamailioCacheKey(
-    'cache',
-    `user_${params.username}@${params.subdomain}.comcent.io`,
-  );
 
   if (!result) {
     throw new Error(

@@ -26,6 +26,7 @@ defmodule Comcent.Queue.AgentSession do
   use GenServer
   require Logger
 
+  alias Comcent.Queue.AgentSession.AttemptKey
   alias Comcent.Queue.AgentSession.Dialer
   alias Comcent.Queue.QueuedCall
   alias Comcent.Repo.OrgMember
@@ -33,6 +34,10 @@ defmodule Comcent.Queue.AgentSession do
 
   @supervisor Comcent.QueueDynamicSupervisor
   @dialer_safety_margin_ms 2_000
+
+  # How long uuid_bridge may take once the member has picked up. Only a
+  # backstop against a wedged FreeSWITCH; a healthy bridge takes milliseconds.
+  @bridge_backstop_ms 15_000
 
   # Public API -----------------------------------------------------------------
 
@@ -323,30 +328,55 @@ defmodule Comcent.Queue.AgentSession do
     end
   end
 
-  def handle_info({:attempt_timeout, reservation_id}, state) do
+  # The member picked up; all that remains is uuid_bridge, which is
+  # FreeSWITCH's work and not the agent's. The attempt timer measures time to
+  # answer, so it stops here. It used to keep running until the bridge had
+  # completed, so an agent who answered late in the ring window was timed out
+  # a moment later, mid-bridge: the call was torn down ("-ERR Invalid uuid"),
+  # the customer went back to waiting, and the agent -- who HAD answered -- was
+  # charged a no-answer and, at max_no_answers, forced Logged Out.
+  def handle_info({:dialer_member_answered, reservation_id}, state) do
     case state.reservation do
       %{id: ^reservation_id} = reservation ->
-        QueuedCall.mark_timed_out(reservation.call_id)
+        timer = Process.send_after(self(), {:bridge_timeout, reservation_id}, @bridge_backstop_ms)
 
-        {next_state, logged_out?} =
+        new_state =
           state
-          |> stop_dialer(:attempt_timeout)
           |> cancel_attempt_timer()
-          |> clear_dialer_monitor()
-          |> increment_no_answer(reservation.queue_id)
-          |> maybe_force_logout(reservation.queue_id)
+          |> put_attempt_timer(timer)
 
-        next_state = clear_reservation(next_state)
+        {:noreply, %{new_state | reservation: Map.put(reservation, :member_answered?, true)}}
 
-        next_state =
-          if logged_out? do
-            %{next_state | presence: "Logged Out"}
-          else
-            restore_presence_after_failure(next_state)
-          end
+      _ ->
+        {:noreply, state}
+    end
+  end
 
-        notify_scheduler(state, reservation, {:attempt_finished, reservation.call_id, :timed_out})
-        {:noreply, next_state}
+  def handle_info({:attempt_timeout, reservation_id}, state) do
+    case state.reservation do
+      # The ring timer fired and its message was already in the mailbox when
+      # the answer arrived. Cancelling the timer cannot recall it.
+      %{id: ^reservation_id, member_answered?: true} ->
+        {:noreply, state}
+
+      %{id: ^reservation_id} = reservation ->
+        {:noreply, time_out_attempt(state, reservation, _no_answer? = true)}
+
+      _ ->
+        {:noreply, state}
+    end
+  end
+
+  # The bridge never came back. That is not the agent's doing, so it frees the
+  # agent and the call without counting against the agent.
+  def handle_info({:bridge_timeout, reservation_id}, state) do
+    case state.reservation do
+      %{id: ^reservation_id} = reservation ->
+        Logger.warning(
+          "AgentSession #{state.subdomain}/#{state.user_id}: bridge did not complete within #{@bridge_backstop_ms} ms"
+        )
+
+        {:noreply, time_out_attempt(state, reservation, _no_answer? = false)}
 
       _ ->
         {:noreply, state}
@@ -453,10 +483,13 @@ defmodule Comcent.Queue.AgentSession do
     state
   end
 
-  defp hupall_attempt_out_of_band(%{freeswitch_ip: fs_ip, call_id: call_id})
+  defp hupall_attempt_out_of_band(%{freeswitch_ip: fs_ip, call_id: call_id, id: reservation_id})
        when is_binary(fs_ip) and is_binary(call_id) do
     Task.Supervisor.start_child(Comcent.TaskSupervisor, fn ->
-      cmd = "hupall NORMAL_CLEARING comcent_dialed_for_call_id #{call_id}"
+      # Scoped to this attempt, never to the whole call: see AttemptKey.build/2.
+      cmd =
+        "hupall NORMAL_CLEARING comcent_dialed_for_attempt " <>
+          AttemptKey.build(call_id, reservation_id)
 
       case SwitchX.Connection.Inbound.start_link(host: fs_ip, port: 8021) do
         {:ok, conn} ->
@@ -491,6 +524,46 @@ defmodule Comcent.Queue.AgentSession do
   end
 
   defp cancel_attempt_timer(state), do: state
+
+  defp put_attempt_timer(%{dialer: %{} = dialer} = state, timer) do
+    %{state | dialer: %{dialer | timer: timer}}
+  end
+
+  defp put_attempt_timer(state, timer) do
+    Process.cancel_timer(timer)
+    state
+  end
+
+  defp time_out_attempt(state, reservation, no_answer?) do
+    QueuedCall.mark_timed_out(reservation.call_id)
+
+    stopped =
+      state
+      |> stop_dialer(:attempt_timeout)
+      |> cancel_attempt_timer()
+      |> clear_dialer_monitor()
+
+    {next_state, logged_out?} =
+      if no_answer? do
+        stopped
+        |> increment_no_answer(reservation.queue_id)
+        |> maybe_force_logout(reservation.queue_id)
+      else
+        {stopped, false}
+      end
+
+    next_state = clear_reservation(next_state)
+
+    next_state =
+      if logged_out? do
+        %{next_state | presence: "Logged Out"}
+      else
+        restore_presence_after_failure(next_state)
+      end
+
+    notify_scheduler(state, reservation, {:attempt_finished, reservation.call_id, :timed_out})
+    next_state
+  end
 
   defp clear_reservation(state), do: %{state | reservation: nil}
 

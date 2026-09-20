@@ -18,11 +18,7 @@
     "test:e2e:telephony:sipp:build": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e build sipp sipp-uas",
     "test:e2e:stack:up": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e up -d --build",
     "test:e2e:stack:down": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e down --remove-orphans -v",
-    "test:e2e:stack:logs": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e logs --tail=200",
-    "test:e2e:telephony:stack:up": "E2E_SBC_ADMIN_SERVICE=sbc docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e up -d --build",
-    "test:e2e:telephony:stack:up:kamailio": "E2E_SBC_ADMIN_SERVICE=sbc-kamailio COMPOSE_PROFILES=kamailio docker compose -f docker-compose-e2e-telephony.yaml --env-file .env.e2e -p comcent-e2e-telephony up -d --build",
-    "test:e2e:telephony:stack:down": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e down --remove-orphans -v",
-    "test:e2e:telephony:stack:logs": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e logs --tail=200",
+    "test:e2e:stack:logs": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e logs --tail=3000",
     "test:vscode": "code e2e",
     "test": "npm run test --prefix packages/web-app && npm run test --prefix packages/sip-test-tools-ui",
     "docker:db:migrate": "docker compose exec -w /app server mix ecto.migrate",
@@ -52,7 +48,7 @@
     "npm": "^10.2.4"
   },
   "devDependencies": {
-    "@dotenvx/dotenvx": "^0.15.0",
+    "@dotenvx/dotenvx": "^2.28.0",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.16.0",
     "@typescript-eslint/eslint-plugin": "^8.18.0",

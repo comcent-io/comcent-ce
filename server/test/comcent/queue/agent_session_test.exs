@@ -31,7 +31,12 @@ defmodule Comcent.Queue.AgentSessionTest do
            Comcent.Registry,
            "agent_session_#{member.subdomain}_#{member.user_id}"
          ) do
-      [{pid, _}] -> GenServer.stop(pid, :normal)
+      # Through the supervisor, not GenServer.stop/2. The session is a
+      # :permanent child, so stopping it directly made the supervisor restart
+      # it, before and after every test. A handful of tests in a row tripped
+      # the restart intensity and took Comcent.QueueDynamicSupervisor down
+      # mid-suite; the next test then failed with "no process".
+      [{pid, _}] -> Horde.DynamicSupervisor.terminate_child(Comcent.QueueDynamicSupervisor, pid)
       [] -> :ok
     end
   end
@@ -236,6 +241,166 @@ defmodule Comcent.Queue.AgentSessionTest do
         assert state.reservation == nil
         assert state.no_answer_counts["queue-1"] == 1
         assert state.presence == "Logged Out"
+      end
+    end
+
+    # The ring timer measures how long the member took to pick up. It used to
+    # keep running until uuid_bridge had completed, so an agent who answered
+    # late in the ring window was timed out mid-bridge: call torn down, agent
+    # charged a no-answer and forced Logged Out -- for a call they answered.
+    test "a member who has answered is not timed out while the bridge is in progress" do
+      parent = self()
+      {:ok, presence} = Agent.start_link(fn -> "Available" end)
+
+      with_mocks([
+        {Comcent.Repo.OrgMember, [:passthrough],
+         [
+           get_current_presence: fn "acme", "user-1" -> presence_agent_get(presence) end,
+           update_member_presence: fn _, _, p ->
+             presence_agent_set(presence, p)
+             :ok
+           end,
+           update_member_presence_if_busy: fn _, _, _ -> :ok end,
+           update_member_presence_if_wrap_up: fn _, _, _ -> :ok end,
+           update_member_presence_to_on_call: fn _, _ -> :ok end,
+           force_member_logged_out: fn _, _ ->
+             presence_agent_set(presence, "Logged Out")
+             send(parent, :forced_logout)
+             :ok
+           end
+         ]},
+        {Comcent.Repo.Queue, [:passthrough],
+         [
+           get_queue_by_id: fn "queue-1", "acme" ->
+             %{reject_delay_time: 0, wrap_up_time: 0, max_no_answers: 1}
+           end
+         ]},
+        {Comcent.CallSession, [],
+         append_story_event: fn _id, _entry -> :ok end,
+         append_story_span: fn _id, _span -> :ok end},
+        {Comcent.Queue.AgentSession.Dialer, [],
+         start_link: fn _attempt -> {:ok, spawn(fn -> Process.sleep(:infinity) end)} end,
+         cancel: fn _pid, _ -> :ok end}
+      ]) do
+        seed_queued_call()
+
+        {:ok, reservation_id} = AgentSession.attempt(@member, "queue-1", "call-1")
+        {:ok, session} = AgentSession.ensure_started(@member)
+
+        send(session, {:dialer_member_answered, reservation_id})
+        # The ring timer firing anyway: its message was already in the mailbox.
+        send(session, {:attempt_timeout, reservation_id})
+
+        refute_receive :forced_logout, 200
+
+        state = AgentSession.get_state(@member)
+        assert state.reservation.id == reservation_id
+        assert Map.get(state.no_answer_counts, "queue-1", 0) == 0
+
+        send(session, {:dialer_answered, reservation_id, "member-uuid"})
+
+        state = AgentSession.get_state(@member)
+        assert state.reservation == nil
+        assert state.presence == "On Call"
+      end
+    end
+
+    test "an attempt nobody answered still times out as a no-answer" do
+      parent = self()
+      {:ok, presence} = Agent.start_link(fn -> "Available" end)
+
+      with_mocks([
+        {Comcent.Repo.OrgMember, [:passthrough],
+         [
+           get_current_presence: fn "acme", "user-1" -> presence_agent_get(presence) end,
+           update_member_presence: fn _, _, p ->
+             presence_agent_set(presence, p)
+             :ok
+           end,
+           update_member_presence_if_busy: fn _, _, _ -> :ok end,
+           update_member_presence_if_wrap_up: fn _, _, _ -> :ok end,
+           update_member_presence_to_on_call: fn _, _ -> :ok end,
+           force_member_logged_out: fn _, _ ->
+             presence_agent_set(presence, "Logged Out")
+             send(parent, :forced_logout)
+             :ok
+           end
+         ]},
+        {Comcent.Repo.Queue, [:passthrough],
+         [
+           get_queue_by_id: fn "queue-1", "acme" ->
+             %{reject_delay_time: 0, wrap_up_time: 0, max_no_answers: 1}
+           end
+         ]},
+        {Comcent.CallSession, [],
+         append_story_event: fn _id, _entry -> :ok end,
+         append_story_span: fn _id, _span -> :ok end},
+        {Comcent.Queue.AgentSession.Dialer, [],
+         start_link: fn _attempt -> {:ok, spawn(fn -> Process.sleep(:infinity) end)} end,
+         cancel: fn _pid, _ -> :ok end}
+      ]) do
+        seed_queued_call()
+
+        {:ok, reservation_id} = AgentSession.attempt(@member, "queue-1", "call-1")
+        {:ok, session} = AgentSession.ensure_started(@member)
+
+        send(session, {:attempt_timeout, reservation_id})
+
+        assert_receive :forced_logout, 500
+
+        state = AgentSession.get_state(@member)
+        assert state.reservation == nil
+        assert state.no_answer_counts["queue-1"] == 1
+      end
+    end
+
+    test "a bridge that never completes frees the agent without a no-answer" do
+      parent = self()
+      {:ok, presence} = Agent.start_link(fn -> "Available" end)
+
+      with_mocks([
+        {Comcent.Repo.OrgMember, [:passthrough],
+         [
+           get_current_presence: fn "acme", "user-1" -> presence_agent_get(presence) end,
+           update_member_presence: fn _, _, p ->
+             presence_agent_set(presence, p)
+             :ok
+           end,
+           update_member_presence_if_busy: fn _, _, _ -> :ok end,
+           update_member_presence_if_wrap_up: fn _, _, _ -> :ok end,
+           update_member_presence_to_on_call: fn _, _ -> :ok end,
+           force_member_logged_out: fn _, _ ->
+             presence_agent_set(presence, "Logged Out")
+             send(parent, :forced_logout)
+             :ok
+           end
+         ]},
+        {Comcent.Repo.Queue, [:passthrough],
+         [
+           get_queue_by_id: fn "queue-1", "acme" ->
+             %{reject_delay_time: 0, wrap_up_time: 0, max_no_answers: 1}
+           end
+         ]},
+        {Comcent.CallSession, [],
+         append_story_event: fn _id, _entry -> :ok end,
+         append_story_span: fn _id, _span -> :ok end},
+        {Comcent.Queue.AgentSession.Dialer, [],
+         start_link: fn _attempt -> {:ok, spawn(fn -> Process.sleep(:infinity) end)} end,
+         cancel: fn _pid, _ -> :ok end}
+      ]) do
+        seed_queued_call()
+
+        {:ok, reservation_id} = AgentSession.attempt(@member, "queue-1", "call-1")
+        {:ok, session} = AgentSession.ensure_started(@member)
+
+        send(session, {:dialer_member_answered, reservation_id})
+        send(session, {:bridge_timeout, reservation_id})
+
+        refute_receive :forced_logout, 200
+
+        state = AgentSession.get_state(@member)
+        assert state.reservation == nil
+        assert Map.get(state.no_answer_counts, "queue-1", 0) == 0
       end
     end
   end
