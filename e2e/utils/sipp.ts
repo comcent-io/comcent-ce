@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -99,8 +100,6 @@ async function runCompose(
   }
 }
 
-let sippCallCounter = 0;
-
 export async function runSipp(options: SippRunOptions) {
   const targetHost = options.targetHost;
   const targetPort = options.targetPort ?? 5060;
@@ -111,8 +110,11 @@ export async function runSipp(options: SippRunOptions) {
   const timeoutMs = options.timeoutMs ?? 90_000;
   const resetProcesses = options.resetProcesses ?? false;
 
-  const csvId = `sipp_${Date.now()}_${++sippCallCounter}`;
-  const csvPath = `/tmp/${csvId}.csv`;
+  // The SIPp containers are shared by every Playwright worker, so this path
+  // must be unique across processes. A per-process counter is not: workers
+  // running the same spec in lock-step reach the same counter value in the
+  // same millisecond, and one test's SIPp then reads another test's row.
+  const csvPath = `/tmp/sipp_${randomUUID()}.csv`;
   const csvArg = csvRows.length > 0 ? `-inf ${csvPath}` : '';
   const csvContent = ['SEQUENTIAL', ...csvRows]
     .map((row) => row)
@@ -154,11 +156,27 @@ export async function runSipp(options: SippRunOptions) {
   );
 }
 
+/**
+ * Stops the SIPp instances bound to the given local ports, and only those.
+ * The SIPp containers are shared by every Playwright worker, so a blanket
+ * `pkill sipp` also kills the agents of whichever specs happen to be running
+ * in parallel, which then fail with an agent that never answered.
+ */
 export async function stopSippProcesses(
-  services: Array<'sipp' | 'sipp-uas' | 'sipp-agent-a' | 'sipp-agent-b'>,
+  targets: Array<{
+    service: 'sipp' | 'sipp-uas' | 'sipp-agent-a' | 'sipp-agent-b';
+    port: number;
+  }>,
 ) {
+  const portsByService = new Map<string, Set<number>>();
+  for (const { service, port } of targets) {
+    const ports = portsByService.get(service) ?? new Set<number>();
+    ports.add(port);
+    portsByService.set(service, ports);
+  }
+
   await Promise.allSettled(
-    [...new Set(services)].map((service) =>
+    [...portsByService].map(([service, ports]) =>
       runCompose(
         [
           ...composeArgs,
@@ -167,7 +185,7 @@ export async function stopSippProcesses(
           service,
           'sh',
           '-c',
-          'pkill -x sipp || true',
+          `pkill -f '^sipp .* -p (${[...ports].join('|')})( |$)' || true`,
         ],
         30_000,
         true,
@@ -510,6 +528,31 @@ export async function killAllSippProcesses() {
         true,
       ),
     ),
+  );
+}
+
+/**
+ * FreeSWITCH reads the system clock once at startup and from then on advances
+ * its own clock from a monotonic timer. That timer stops while the Docker VM
+ * is suspended (laptop sleep), so on a long-lived local stack FreeSWITCH falls
+ * behind by however long the machine slept. A call story then starts in
+ * FreeSWITCH's past but ends at the server's "now", so a 10 second call is
+ * recorded as hours long and every assertion on durations or ordering is
+ * working with nonsense. `fsctl sync_clock` re-reads the system clock.
+ */
+export async function syncFreeSwitchClock() {
+  await runCompose(
+    [
+      ...composeArgs,
+      'exec',
+      '-T',
+      'freeswitch',
+      'fs_cli',
+      '-x',
+      'fsctl sync_clock',
+    ],
+    30_000,
+    true,
   );
 }
 
