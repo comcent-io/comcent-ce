@@ -46,37 +46,34 @@ services:
       - comcent-network
 
   minio:
-    # MinIO withdrew its images from Docker Hub; quay.io carries the same
-    # releases. A machine that pulled these long ago keeps working from its
-    # cache, which is how this went unnoticed until CI pulled fresh.
-    image: quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z
-    command: server /data --console-address ":9001"
+    # MinIO no longer publishes images anywhere public: Docker Hub went first,
+    # then quay.io. Bitnami's frozen build of the same release is still on
+    # Docker Hub, and it creates the bucket itself from MINIO_DEFAULT_BUCKETS,
+    # so there is no separate mc container to pull. A machine that pulled an
+    # old image keeps working from its cache, which is how each removal went
+    # unnoticed until a fresh pull.
+    image: docker.io/bitnamilegacy/minio:2025.2.28
+    # Bitnami runs as uid 1001 by default, which cannot write a minio_data
+    # volume created by the old image (owned by root): it exits with
+    # "Permission denied" and every recording upload fails. Root keeps
+    # existing installs working across the switch.
+    user: root
     environment:
       - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
       - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
+      - MINIO_DEFAULT_BUCKETS=${STORAGE_BUCKET_NAME}
     ports:
       - '10000:9000'
       - '10001:9001'
     volumes:
-      - minio_data:/data
-    networks:
-      - comcent-network
-
-  minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-03-12T17-29-24Z
-    depends_on:
-      - minio
-    environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - STORAGE_BUCKET_NAME=${STORAGE_BUCKET_NAME}
-    entrypoint: >
-      /bin/sh -c "
-      until mc alias set dev-minio http://minio:9000 $$AWS_ACCESS_KEY_ID $$AWS_SECRET_ACCESS_KEY; do
-        sleep 1;
-      done;
-      mc mb --ignore-existing dev-minio/$$STORAGE_BUCKET_NAME;
-      "
+      - minio_data:/bitnami/minio/data
+    # The bucket must exist before anything uploads; this passes only once
+    # the image has created it.
+    healthcheck:
+      test: ['CMD-SHELL', 'mc alias set hc http://localhost:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null && mc ls hc/"$$MINIO_DEFAULT_BUCKETS" >/dev/null']
+      interval: 3s
+      timeout: 5s
+      retries: 40
     networks:
       - comcent-network
 
@@ -95,7 +92,6 @@ services:
     depends_on:
       - postgres
       - minio
-      - minio-init
       - mailhog
     volumes:
       - ./server:/app
@@ -271,8 +267,8 @@ services:
         condition: service_healthy
       sbc:
         condition: service_started
-      minio-init:
-        condition: service_started
+      minio:
+        condition: service_healthy
     # Pin FS to a static IP so the FreeSWITCH ACL ("private" list) and
     # SBC dispatcher can reference a known address rather than whatever
     # docker happens to hand out on each restart.
