@@ -56,12 +56,14 @@ services:
       - comcent-network
 
   minio:
-    # MinIO withdrew its images from Docker Hub; quay.io carries the same
-    # releases. A machine that pulled these long ago keeps working from its
-    # cache, which is how this went unnoticed until CI pulled fresh.
-    image: quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z
-    command: server /data --console-address ":9001"
-    # Fixed test credentials, written literally on minio, minio-init and both
+    # MinIO no longer publishes images anywhere public: Docker Hub went first,
+    # then quay.io. Bitnami's frozen build of the same release is still on
+    # Docker Hub, and it creates the bucket itself from MINIO_DEFAULT_BUCKETS,
+    # so there is no separate mc container to pull. A machine that pulled an
+    # old image keeps working from its cache, which is how each removal went
+    # unnoticed until a fresh pull.
+    image: docker.io/bitnamilegacy/minio:2025.2.28
+    # Fixed test credentials, written literally on minio and both
     # of its clients (server, freeswitch). They used to be interpolated as
     # ${AWS_ACCESS_KEY_ID}, and Compose resolves that from the SHELL before
     # the env file. Anyone with AWS credentials exported -- most people who use
@@ -75,21 +77,17 @@ services:
     environment:
       - MINIO_ROOT_USER=miniotestkey
       - MINIO_ROOT_PASSWORD=miniotestsecret123
+      - MINIO_DEFAULT_BUCKETS=comcent-storage-dev
     ports:
       - '${E2E_MINIO_PORT:-59000}:9000'
       - '${E2E_MINIO_CONSOLE_PORT:-59001}:9001'
-    networks:
-      - comcent-network
-
-  minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-03-12T17-29-24Z
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-      until (/usr/bin/mc alias set local http://minio:9000 miniotestkey miniotestsecret123) do sleep 1; done &&
-      /usr/bin/mc mb -p local/comcent-storage-dev || true
-      "
+    # The bucket must exist before anything uploads; this passes only once
+    # the image has created it.
+    healthcheck:
+      test: ['CMD-SHELL', 'mc alias set hc http://localhost:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null && mc ls hc/"$$MINIO_DEFAULT_BUCKETS" >/dev/null']
+      interval: 3s
+      timeout: 5s
+      retries: 40
     networks:
       - comcent-network
 
@@ -109,7 +107,7 @@ services:
       - S3_ENDPOINT_URL=http://minio:9000
       - S3_PROXY_DOWNLOADS=true
       # Must match minio above; see the note there. The bucket is the one
-      # minio-init creates.
+      # minio creates from MINIO_DEFAULT_BUCKETS.
       - AWS_ACCESS_KEY_ID=miniotestkey
       - AWS_SECRET_ACCESS_KEY=miniotestsecret123
       - STORAGE_BUCKET_NAME=comcent-storage-dev
@@ -124,8 +122,8 @@ services:
         condition: service_started
       redis:
         condition: service_started
-      minio-init:
-        condition: service_started
+      minio:
+        condition: service_healthy
       mailhog:
         condition: service_started
       wiremock:
@@ -240,8 +238,8 @@ services:
         condition: service_started
       server:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
     networks:
       comcent-network:
         ipv4_address: 172.29.17.8
