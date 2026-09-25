@@ -577,8 +577,9 @@ defmodule ComcentWeb.Internal.HttpapiController do
   end
 
   # Helper function to convert media paths to HTTP URLs
-  defp convert_media_to_http(media_path) when is_binary(media_path) do
-    base_url = System.get_env("INTERNAL_API_BASE_URL")
+  @doc false
+  def convert_media_to_http(media_path) when is_binary(media_path) do
+    base_url = Application.fetch_env!(:comcent, :internal_api_base_url)
 
     if String.starts_with?(media_path, "s3://") do
       # Split the path components
@@ -597,7 +598,7 @@ defmodule ComcentWeb.Internal.HttpapiController do
     end
   end
 
-  defp convert_media_to_http(nil), do: ""
+  def convert_media_to_http(nil), do: ""
 
   # Helper function to find a voice bot in the database
   defp find_voice_bot(voice_bot_id, subdomain) do

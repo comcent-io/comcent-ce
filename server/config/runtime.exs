@@ -254,6 +254,14 @@ config :comcent, :sbc,
   ip: sbc_ip,
   rpc_api_token: rpc_api_token
 
+# Internal API as FreeSWITCH reaches it on the private network. Prompt
+# playback URLs handed to FreeSWITCH are built from it, so it must never be
+# the public URL. The default matches the compose service name, so installs
+# whose .env doesn't set it still get an absolute URL.
+config :comcent,
+       :internal_api_base_url,
+       System.get_env("INTERNAL_API_BASE_URL", "http://server:4000/internal-api")
+
 # RabbitMQ Configuration
 rabbitmq_url =
   System.get_env("RABBITMQ_URL") ||
@@ -289,62 +297,67 @@ config :comcent, :auth,
   allowed_signup_domains: allowed_signup_domains
 
 # Email Configuration
-smtp_url =
-  System.get_env("SMTP_URL") ||
+# The test suite keeps config/test.exs's Swoosh.Adapters.Test: runtime.exs
+# runs after it on every boot, so an unconditional SMTP adapter here would
+# replace it and send test emails to a server that isn't there.
+if config_env() != :test do
+  smtp_url =
+    System.get_env("SMTP_URL") ||
+      raise """
+      environment variable SMTP_URL is missing.
+      For example: smtp://username:password@mail.example.com:587
+      """
+
+  smtp_uri = URI.parse(smtp_url)
+
+  unless smtp_uri.scheme in ["smtp", "smtps"] and smtp_uri.host do
     raise """
-    environment variable SMTP_URL is missing.
-    For example: smtp://username:password@mail.example.com:587
+    environment variable SMTP_URL is invalid.
+    Expected format: smtp://username:password@mail.example.com:587
     """
+  end
 
-smtp_uri = URI.parse(smtp_url)
+  smtp_username =
+    if smtp_uri.userinfo,
+      do: URI.decode_www_form(smtp_uri.userinfo |> String.split(":") |> hd()),
+      else: ""
 
-unless smtp_uri.scheme in ["smtp", "smtps"] and smtp_uri.host do
-  raise """
-  environment variable SMTP_URL is invalid.
-  Expected format: smtp://username:password@mail.example.com:587
-  """
+  smtp_password =
+    case smtp_uri.userinfo do
+      nil ->
+        ""
+
+      userinfo ->
+        case String.split(userinfo, ":", parts: 2) do
+          [_username, password] -> URI.decode_www_form(password)
+          [_username] -> ""
+        end
+    end
+
+  smtp_port =
+    cond do
+      is_integer(smtp_uri.port) ->
+        smtp_uri.port
+
+      smtp_uri.scheme == "smtps" ->
+        465
+
+      true ->
+        587
+    end
+
+  config :comcent, Comcent.Mailer,
+    adapter: Swoosh.Adapters.SMTP,
+    relay: smtp_uri.host,
+    port: smtp_port,
+    username: smtp_username,
+    password: smtp_password,
+    ssl: smtp_uri.scheme == "smtps",
+    tls: if(smtp_uri.scheme == "smtps", do: :never, else: :if_available),
+    auth: :if_available,
+    retries: 2,
+    no_mx_lookups: false
 end
-
-smtp_username =
-  if smtp_uri.userinfo,
-    do: URI.decode_www_form(smtp_uri.userinfo |> String.split(":") |> hd()),
-    else: ""
-
-smtp_password =
-  case smtp_uri.userinfo do
-    nil ->
-      ""
-
-    userinfo ->
-      case String.split(userinfo, ":", parts: 2) do
-        [_username, password] -> URI.decode_www_form(password)
-        [_username] -> ""
-      end
-  end
-
-smtp_port =
-  cond do
-    is_integer(smtp_uri.port) ->
-      smtp_uri.port
-
-    smtp_uri.scheme == "smtps" ->
-      465
-
-    true ->
-      587
-  end
-
-config :comcent, Comcent.Mailer,
-  adapter: Swoosh.Adapters.SMTP,
-  relay: smtp_uri.host,
-  port: smtp_port,
-  username: smtp_username,
-  password: smtp_password,
-  ssl: smtp_uri.scheme == "smtps",
-  tls: if(smtp_uri.scheme == "smtps", do: :never, else: :if_available),
-  auth: :if_available,
-  retries: 2,
-  no_mx_lookups: false
 
 config :swoosh, :api_client, false
 

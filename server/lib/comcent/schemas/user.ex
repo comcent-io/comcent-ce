@@ -14,6 +14,10 @@ defmodule Comcent.Schemas.User do
     field(:verification_resend_window_started_at, :utc_datetime)
     field(:email_verification_token_hash, :string, redact: true)
     field(:email_verification_expires_at, :utc_datetime)
+    field(:password_reset_token_hash, :string, redact: true)
+    field(:password_reset_expires_at, :utc_datetime)
+    field(:password_reset_sent_at, :utc_datetime)
+    field(:password_changed_at, :utc_datetime)
     field(:picture, :string)
     field(:has_agreed_to_tos, :boolean, default: false)
     field(:is_super_admin, :boolean, default: false)
@@ -38,6 +42,10 @@ defmodule Comcent.Schemas.User do
       :verification_resend_window_started_at,
       :email_verification_token_hash,
       :email_verification_expires_at,
+      :password_reset_token_hash,
+      :password_reset_expires_at,
+      :password_reset_sent_at,
+      :password_changed_at,
       :picture,
       :has_agreed_to_tos,
       :is_super_admin,

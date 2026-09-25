@@ -34,6 +34,24 @@ export async function waitForVerificationLink(
   return link;
 }
 
+export async function waitForPasswordResetLink(
+  request: APIRequestContext,
+  email: string,
+  expectedMessages: number,
+): Promise<string> {
+  const messages = await waitForMessages(request, email, expectedMessages);
+  const link = extractLink(
+    messages,
+    /https?:\/\/[^\s"]+\/auth\/reset-password\/[^\s"<]+/,
+  );
+
+  if (!link) {
+    throw new Error(`Password reset email was not received for ${email}`);
+  }
+
+  return link;
+}
+
 export async function waitForInvitationLink(
   request: APIRequestContext,
   email: string,
@@ -81,14 +99,20 @@ async function waitForMessages(
 }
 
 function extractVerificationLink(messages: MailHogMessage[]): string | null {
-  return extractLink(messages, /https?:\/\/[^\s"]+\/auth\/verify-email\/[^\s"<]+/);
+  return extractLink(
+    messages,
+    /https?:\/\/[^\s"]+\/auth\/verify-email\/[^\s"<]+/,
+  );
 }
 
 function extractInvitationLink(messages: MailHogMessage[]): string | null {
   return extractLink(messages, /https?:\/\/[^\s"]+\/invitation\/[^\s"<]+/);
 }
 
-function extractLink(messages: MailHogMessage[], pattern: RegExp): string | null {
+function extractLink(
+  messages: MailHogMessage[],
+  pattern: RegExp,
+): string | null {
   for (const message of messages) {
     const bodies = [
       message.Content.Body,

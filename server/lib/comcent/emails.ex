@@ -32,6 +32,34 @@ defmodule Comcent.Emails do
     deliver_email(user.email, "Verify your Comcent email", html, text)
   end
 
+  def send_password_reset_email(%User{} = user, token) do
+    reset_url = password_reset_url(token)
+
+    html = """
+    <html lang="en">
+    <head><title>Reset your password</title></head>
+    <body>
+      <h3>Hello #{user.name},</h3>
+      <p>We received a request to reset the password for your Comcent account.</p>
+      <p><a href="#{reset_url}">Choose a new password</a></p>
+      <p>This link works once and expires in 1 hour. If you did not ask for it, you can ignore this email; your password stays the same.</p>
+    </body>
+    </html>
+    """
+
+    text = """
+    Hello #{user.name},
+
+    We received a request to reset the password for your Comcent account.
+
+    Choose a new password: #{reset_url}
+
+    This link works once and expires in 1 hour. If you did not ask for it, you can ignore this email; your password stays the same.
+    """
+
+    deliver_email(user.email, "Reset your Comcent password", html, text)
+  end
+
   def send_org_invite_email(%OrgInvite{} = invite, org_name) do
     invitation_url = invitation_url(invite.id)
 
@@ -84,6 +112,11 @@ defmodule Comcent.Emails do
   defp verification_url(token) do
     public_root_url = Application.fetch_env!(:comcent, :public_root_url)
     "#{normalize_public_root_url(public_root_url)}/auth/verify-email/#{token}"
+  end
+
+  defp password_reset_url(token) do
+    public_root_url = Application.fetch_env!(:comcent, :public_root_url)
+    "#{normalize_public_root_url(public_root_url)}/auth/reset-password/#{token}"
   end
 
   defp invitation_url(invitation_id) do

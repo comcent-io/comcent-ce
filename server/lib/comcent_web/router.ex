@@ -152,6 +152,8 @@ defmodule ComcentWeb.Router do
     post("/auth/claim-setup", AuthController, :claim_setup)
     post("/auth/verify-email", AuthController, :verify_email)
     post("/auth/resend-verification", AuthController, :resend_verification)
+    post("/auth/forgot-password", AuthController, :forgot_password)
+    post("/auth/reset-password", AuthController, :reset_password)
     get("/auth/oauth/:provider/start", AuthController, :oauth_start)
     get("/auth/oauth/:provider/callback", AuthController, :oauth_callback)
   end
