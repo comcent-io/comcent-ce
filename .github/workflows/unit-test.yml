@@ -100,7 +100,9 @@ jobs:
       SBC_IP: 10.0.0.1
       SMTP_URL: smtp://user:pass@localhost:1025
       SOURCE_EMAIL: 'Comcent CI <ci@example.com>'
-      PUBLIC_BASE_URL: https://ci.example.com
+      # Its host becomes the SIP user root domain, which the tests expect to be
+      # example.com (the config/test.exs default).
+      PUBLIC_BASE_URL: https://example.com
 
     steps:
       - name: Checkout Repository
