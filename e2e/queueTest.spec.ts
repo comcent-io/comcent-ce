@@ -63,6 +63,20 @@ async function createQueue(
 }
 
 /**
+ * Creates a queue and waits for the save to land (the form then opens the new
+ * queue's edit page). Without the wait, a navigation that follows straight
+ * away can overtake the save, so the queue is missing from the next page.
+ */
+async function createQueueAndWait(
+  page: Page,
+  input: QueueFormInput,
+  subdomain = 'acme',
+) {
+  await createQueue(page, input, subdomain);
+  await expect(page).toHaveURL(new RegExp(`/app/${subdomain}/queues/.+/edit$`));
+}
+
+/**
  * The "Assigned members" card, and only that card. The component's root
  * <section> also wraps the member search, whose result rows show the same
  * name and username -- so scoping to the section lets an "is assigned"
@@ -336,7 +350,7 @@ test('Queues page, add queue with existing name should fail', async ({
 }, testInfo) => {
   const queueName = uniqueQueueName('dupname', testInfo);
 
-  await createQueue(page, {
+  await createQueueAndWait(page, {
     name: queueName,
     extension: uniqueExtension(testInfo, 1),
   });
@@ -355,7 +369,7 @@ test('Queues page, add queue with existing extension should fail', async ({
 }, testInfo) => {
   const extension = uniqueExtension(testInfo, 1);
 
-  await createQueue(page, {
+  await createQueueAndWait(page, {
     name: uniqueQueueName('alpha', testInfo),
     extension,
   });
@@ -386,7 +400,7 @@ test('Queues page, update queue successfully', async ({ page }, testInfo) => {
   const updatedName = uniqueQueueName('sales', testInfo);
   const updatedExtension = uniqueExtension(testInfo, 4);
 
-  await createQueue(page, {
+  await createQueueAndWait(page, {
     name: queueName,
     extension: uniqueExtension(testInfo, 3),
   });
@@ -464,7 +478,7 @@ test('Queues page, update queue with invalid input', async ({
   page,
 }, testInfo) => {
   const queueName = uniqueQueueName('invalidq', testInfo);
-  await createQueue(page, {
+  await createQueueAndWait(page, {
     name: queueName,
     extension: uniqueExtension(testInfo, 6),
   });
@@ -580,7 +594,7 @@ test('Queues page, update queue without extension successfully', async ({
   const queueName = uniqueQueueName('taxbase', testInfo);
   const nextName = uniqueQueueName('tax', testInfo);
 
-  await createQueue(page, { name: queueName });
+  await createQueueAndWait(page, { name: queueName });
   await openQueueEdit(page, queueName);
   await fillQueueForm(page, { name: nextName, extension: '' });
   await page.getByRole('button', { name: 'Update' }).click();
@@ -595,11 +609,11 @@ test('Queues page, update queue with existing name should fail', async ({
   const firstQueueName = uniqueQueueName('firstq', testInfo);
   const secondQueueName = uniqueQueueName('secondq', testInfo);
 
-  await createQueue(page, {
+  await createQueueAndWait(page, {
     name: firstQueueName,
     extension: uniqueExtension(testInfo, 10),
   });
-  await createQueue(page, {
+  await createQueueAndWait(page, {
     name: secondQueueName,
     extension: uniqueExtension(testInfo, 11),
   });
@@ -623,8 +637,11 @@ test('Queues page, update queue with existing extension should fail', async ({
   const firstQueueName = uniqueQueueName('firstext', testInfo);
   const secondQueueName = uniqueQueueName('secondext', testInfo);
 
-  await createQueue(page, { name: firstQueueName, extension: sharedExtension });
-  await createQueue(page, {
+  await createQueueAndWait(page, {
+    name: firstQueueName,
+    extension: sharedExtension,
+  });
+  await createQueueAndWait(page, {
     name: secondQueueName,
     extension: uniqueExtension(testInfo, 14),
   });
@@ -647,7 +664,7 @@ test('Queues page, add queue in another organisation with the existing name and 
   const queueName = uniqueQueueName('sharedorg', testInfo);
   const extension = uniqueExtension(testInfo, 15);
 
-  await createQueue(page, { name: queueName, extension }, 'acme');
+  await createQueueAndWait(page, { name: queueName, extension }, 'acme');
   await createQueue(page, { name: queueName, extension }, 'heartcoders');
 
   await expect(
@@ -663,8 +680,8 @@ test('Queues page, update queue in another organisation with the existing name a
   const targetName = uniqueQueueName('updated', testInfo);
   const targetExtension = uniqueExtension(testInfo, 17);
 
-  await createQueue(page, { name: queueName, extension }, 'acme');
-  await createQueue(page, { name: queueName, extension }, 'heartcoders');
+  await createQueueAndWait(page, { name: queueName, extension }, 'acme');
+  await createQueueAndWait(page, { name: queueName, extension }, 'heartcoders');
 
   await openQueueEdit(page, queueName, 'heartcoders');
   await fillQueueForm(page, { name: targetName, extension: targetExtension });
