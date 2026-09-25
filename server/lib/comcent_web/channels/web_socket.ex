@@ -16,14 +16,18 @@ defmodule ComcentWeb.WebSocket do
           nil ->
             {:error, :unauthorized}
 
-          member ->
-            socket =
-              socket
-              |> assign(:current_user, user)
-              |> assign(:subdomain, subdomain)
-              |> assign(:current_member, member)
+          %{user: member_user} = member ->
+            if Comcent.Auth.session_current?(user.claims, member_user) do
+              socket =
+                socket
+                |> assign(:current_user, user)
+                |> assign(:subdomain, subdomain)
+                |> assign(:current_member, member)
 
-            {:ok, socket}
+              {:ok, socket}
+            else
+              {:error, :unauthorized}
+            end
         end
 
       error ->

@@ -12,7 +12,7 @@ defmodule ComcentWeb.Plugs.AdminAuth do
     case authenticate_request(conn) do
       {:ok, user} ->
         # Check if user has SUPER_ADMIN role in any organization
-        if has_super_admin_role?(user.email) do
+        if super_admin_with_current_session?(user) do
           conn
           |> assign(:current_user, user)
         else
@@ -35,16 +35,12 @@ defmodule ComcentWeb.Plugs.AdminAuth do
     end
   end
 
-  defp has_super_admin_role?(email) do
-    query =
-      from(u in User,
-        where: u.email == ^email and u.is_super_admin == true,
-        select: u.id
-      )
+  defp super_admin_with_current_session?(%{email: email, claims: claims}) do
+    query = from(u in User, where: u.email == ^email and u.is_super_admin == true)
 
     case Repo.one(query) do
       nil -> false
-      _ -> true
+      super_admin -> Auth.session_current?(claims, super_admin)
     end
   end
 

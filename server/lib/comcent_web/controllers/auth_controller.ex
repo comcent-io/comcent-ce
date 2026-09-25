@@ -1,11 +1,13 @@
 defmodule ComcentWeb.AuthController do
   use ComcentWeb, :controller
+  require Logger
   import Ecto.Query
 
   alias Comcent.Auth
   alias Comcent.Auth.EmailVerification
   alias Comcent.Auth.Oidc
   alias Comcent.Auth.Password
+  alias Comcent.Auth.PasswordReset
   alias Comcent.Auth.ProviderConfig
   alias Comcent.Emails
   alias Comcent.InstanceSetup
@@ -13,6 +15,7 @@ defmodule ComcentWeb.AuthController do
   alias Comcent.Schemas.{OrgInvite, User, UserIdentity}
 
   @verification_resend_cooldown_seconds 60
+  @password_reset_cooldown_seconds 60
   @verification_resend_limit_per_day 3
   @verification_resend_window_seconds 24 * 60 * 60
 
@@ -246,6 +249,89 @@ defmodule ComcentWeb.AuthController do
       domains ->
         "Signup is invite-only on this instance. " <>
           "Self-signup is only allowed for emails at: #{Enum.join(domains, ", ")}."
+    end
+  end
+
+  def forgot_password(conn, %{"email" => email}) when is_binary(email) do
+    if ProviderConfig.password_enabled?() do
+      case Repo.get_by(User, email: normalize_email(email)) do
+        %User{password_hash: password_hash} = user
+        when is_binary(password_hash) and password_hash != "" ->
+          maybe_send_password_reset(user)
+
+        _ ->
+          :ok
+      end
+
+      # The same answer whether or not the email has an account, so this
+      # endpoint can't be used to find out who is registered.
+      json(conn, %{
+        message: "If an account exists for that email, a password reset link has been sent."
+      })
+    else
+      conn |> put_status(:not_found) |> json(%{error: "Password authentication is disabled"})
+    end
+  end
+
+  def forgot_password(conn, _params) do
+    conn |> put_status(:bad_request) |> json(%{error: "Email is required"})
+  end
+
+  def reset_password(conn, %{"token" => token, "password" => password}) do
+    if ProviderConfig.password_enabled?() do
+      case PasswordReset.reset(token, password) do
+        {:ok, user} ->
+          session_token = Auth.sign_session_token(user, "password")
+          json(conn, %{token: session_token, user: session_user(user, "password")})
+
+        {:error, :password_too_short} ->
+          conn
+          |> put_status(:bad_request)
+          |> json(%{
+            error: "Password must be at least #{PasswordReset.min_password_length()} characters"
+          })
+
+        {:error, :token_expired} ->
+          conn |> put_status(:bad_request) |> json(%{error: "Reset link has expired."})
+
+        {:error, :invalid_token} ->
+          conn |> put_status(:bad_request) |> json(%{error: "Reset link is invalid."})
+      end
+    else
+      conn |> put_status(:not_found) |> json(%{error: "Password authentication is disabled"})
+    end
+  end
+
+  def reset_password(conn, _params) do
+    conn |> put_status(:bad_request) |> json(%{error: "Token and password are required"})
+  end
+
+  # One email per minute per user; requests inside the window are dropped
+  # quietly so the response stays the same.
+  defp maybe_send_password_reset(%User{password_reset_sent_at: sent_at} = user) do
+    now = DateTime.utc_now()
+
+    if sent_at && DateTime.diff(now, sent_at, :second) < @password_reset_cooldown_seconds do
+      :ok
+    else
+      {token, token_attrs} = PasswordReset.new_token(now)
+
+      Repo.transaction(fn ->
+        user = user |> User.changeset(token_attrs) |> Repo.update!()
+
+        case Emails.send_password_reset_email(user, token) do
+          {:ok, _} -> :ok
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+      |> case do
+        {:ok, :ok} ->
+          :ok
+
+        {:error, reason} ->
+          Logger.error("Password reset email to user #{user.id} failed: #{inspect(reason)}")
+          :ok
+      end
     end
   end
 
