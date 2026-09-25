@@ -1,6 +1,37 @@
 <script lang="ts">
-  export let form;
-  $: values = form?.values ?? {};
+  import { goto } from '$app/navigation';
+  import { postJson } from '$lib/http';
+  import { setSessionToken } from '$lib/session';
+
+  let token = '';
+  let name = '';
+  let email = '';
+  let password = '';
+  let orgName = '';
+  let subdomain = '';
+  let sipUsername = '';
+  let error = '';
+
+  async function claim() {
+    error = '';
+
+    const result = await postJson<{ token: string }>('/api/v2/auth/claim-setup', {
+      token,
+      name,
+      email,
+      password,
+      org_name: orgName,
+      subdomain,
+      sip_username: sipUsername,
+    });
+    if (!result.ok) {
+      error = result.error;
+      return;
+    }
+
+    setSessionToken(result.data.token);
+    await goto('/app', { invalidateAll: true });
+  }
 </script>
 
 <section class="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -11,19 +42,20 @@
         <h1 class="mt-4 text-4xl font-semibold leading-tight">Claim this instance.</h1>
         <p class="mt-4 max-w-xl text-sm text-slate-300">
           This Comcent install has no super-admin yet. The first person to enter the setup token
-          (printed in the server logs on startup) will become the super-admin and create the
-          initial organization. After that, signup is invite-only.
+          (printed in the server logs on startup) will become the super-admin and create the initial
+          organization. After that, signup is invite-only.
         </p>
         <p class="mt-4 max-w-xl text-xs text-slate-400">
           Lost the token? On the server host, run
-          <code class="rounded bg-slate-800 px-1.5 py-0.5">mix comcent.reset_setup_token</code>.
+          <code class="rounded bg-slate-800 px-1.5 py-0.5">mix comcent.reset_setup_token</code>
+          .
         </p>
       </div>
 
       <div
         class="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-700 dark:bg-slate-800"
       >
-        <form method="POST" action="?/claim" class="space-y-4">
+        <form method="POST" class="space-y-4" on:submit|preventDefault={claim}>
           <div>
             <label
               for="setup-token"
@@ -33,6 +65,7 @@
             </label>
             <input
               id="setup-token"
+              bind:value={token}
               name="token"
               type="text"
               required
@@ -50,10 +83,10 @@
             </label>
             <input
               id="setup-name"
+              bind:value={name}
               name="name"
               type="text"
               required
-              value={values.name ?? ''}
               class="block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </div>
@@ -67,10 +100,10 @@
             </label>
             <input
               id="setup-email"
+              bind:value={email}
               name="email"
               type="email"
               required
-              value={values.email ?? ''}
               class="block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
             />
           </div>
@@ -84,6 +117,7 @@
             </label>
             <input
               id="setup-password"
+              bind:value={password}
               name="password"
               type="password"
               required
@@ -107,10 +141,10 @@
                 </label>
                 <input
                   id="setup-org-name"
+                  bind:value={orgName}
                   name="orgName"
                   type="text"
                   required
-                  value={values.orgName ?? ''}
                   class="block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 />
               </div>
@@ -124,11 +158,11 @@
                 </label>
                 <input
                   id="setup-subdomain"
+                  bind:value={subdomain}
                   name="subdomain"
                   type="text"
                   required
                   pattern="[a-z0-9][a-z0-9-]*"
-                  value={values.subdomain ?? ''}
                   class="block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 />
               </div>
@@ -142,18 +176,18 @@
                 </label>
                 <input
                   id="setup-sip-username"
+                  bind:value={sipUsername}
                   name="sipUsername"
                   type="text"
                   required
-                  value={values.sipUsername ?? ''}
                   class="block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 />
               </div>
             </div>
           </div>
 
-          {#if form?.error}
-            <p class="text-sm text-red-600 dark:text-red-400">{form.error}</p>
+          {#if error}
+            <p class="text-sm text-red-600 dark:text-red-400">{error}</p>
           {/if}
 
           <button

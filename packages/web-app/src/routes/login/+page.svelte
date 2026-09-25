@@ -1,13 +1,49 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
+  import { postJson } from '$lib/http';
+  import { clearSessionToken, setSessionToken } from '$lib/session';
+
   export let data;
-  export let form;
 
   let mode: 'login' | 'register' = 'login';
+  let name = '';
+  let email = '';
+  let password = '';
+  let loginError = '';
+  let registerError = '';
 
-  $: if (form?.registerError) {
-    mode = 'register';
-  } else if (form?.loginError) {
-    mode = 'login';
+  function pendingVerificationUrl() {
+    return `/auth/verify-email/pending?email=${encodeURIComponent(email)}`;
+  }
+
+  async function login() {
+    loginError = '';
+
+    const result = await postJson<{ token: string }>('/api/v2/auth/login', { email, password });
+    if (!result.ok) {
+      if (result.status === 403) {
+        await goto(pendingVerificationUrl());
+        return;
+      }
+      loginError = result.error;
+      return;
+    }
+
+    setSessionToken(result.data.token);
+    await goto('/app', { invalidateAll: true });
+  }
+
+  async function register() {
+    registerError = '';
+
+    const result = await postJson('/api/v2/auth/register', { name, email, password });
+    if (!result.ok) {
+      registerError = result.error;
+      return;
+    }
+
+    clearSessionToken();
+    await goto(pendingVerificationUrl());
   }
 </script>
 
@@ -52,7 +88,7 @@
         </div>
 
         {#if mode === 'login'}
-          <form method="POST" action="?/login" class="space-y-4">
+          <form method="POST" class="space-y-4" on:submit|preventDefault={login}>
             <div>
               <label
                 for="login-email"
@@ -62,6 +98,7 @@
               </label>
               <input
                 id="login-email"
+                bind:value={email}
                 name="email"
                 type="email"
                 required
@@ -77,14 +114,15 @@
               </label>
               <input
                 id="login-password"
+                bind:value={password}
                 name="password"
                 type="password"
                 required
                 class="block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </div>
-            {#if form?.loginError}
-              <p class="text-sm text-red-600 dark:text-red-400">{form.loginError}</p>
+            {#if loginError}
+              <p class="text-sm text-red-600 dark:text-red-400">{loginError}</p>
             {/if}
             <button
               type="submit"
@@ -94,7 +132,7 @@
             </button>
           </form>
         {:else if data.authConfig.passwordEnabled}
-          <form method="POST" action="?/register" class="space-y-4">
+          <form method="POST" class="space-y-4" on:submit|preventDefault={register}>
             <div>
               <label
                 for="register-name"
@@ -104,6 +142,7 @@
               </label>
               <input
                 id="register-name"
+                bind:value={name}
                 name="name"
                 type="text"
                 required
@@ -119,6 +158,7 @@
               </label>
               <input
                 id="register-email"
+                bind:value={email}
                 name="email"
                 type="email"
                 required
@@ -134,14 +174,15 @@
               </label>
               <input
                 id="register-password"
+                bind:value={password}
                 name="password"
                 type="password"
                 required
                 class="block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
             </div>
-            {#if form?.registerError}
-              <p class="text-sm text-red-600 dark:text-red-400">{form.registerError}</p>
+            {#if registerError}
+              <p class="text-sm text-red-600 dark:text-red-400">{registerError}</p>
             {/if}
             <button
               type="submit"
