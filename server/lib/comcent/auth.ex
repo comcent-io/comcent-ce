@@ -1,8 +1,13 @@
 defmodule Comcent.Auth do
   alias Comcent.Auth.SessionToken
 
+  # Only session tokens authenticate a caller. Email-verification and OAuth
+  # state tokens are signed with the same key and carry claims that look
+  # similar, so the token type has to be checked here rather than trusted to
+  # whoever forwarded the request.
   def authenticate_with_jwt(token) do
     with {:ok, claims} <- SessionToken.verify(token),
+         "session" <- claims["token_type"],
          email when is_binary(email) <- claims["email"] do
       {:ok, %{email: email, claims: claims}}
     else
