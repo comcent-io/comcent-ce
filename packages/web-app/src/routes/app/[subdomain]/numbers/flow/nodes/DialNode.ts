@@ -1,4 +1,4 @@
-import type { DialNodeData } from '$lib/server/types/DialNodeData';
+import type { DialNodeData } from '$lib/types/DialNodeData';
 
 import DialNodeComponent from './DialNode.svelte';
 import { FlowNode } from './FlowNode';

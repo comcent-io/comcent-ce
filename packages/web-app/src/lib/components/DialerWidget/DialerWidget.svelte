@@ -17,7 +17,7 @@
   import CurrentCall from '$lib/components/DialerWidget/CurrentCall.svelte';
   import CallTime from '$lib/components/DialerWidget/CallTime.svelte';
   import { isValidPhoneNumber } from 'libphonenumber-js';
-  import type { MemberSearchResult } from '$lib/server/types/MemberSearchResult';
+  import type { MemberSearchResult } from '$lib/types/MemberSearchResult';
   import Spinner from '../Icons/Spinner.svelte';
   import toast from 'svelte-french-toast';
   import { Socket } from 'phoenix';

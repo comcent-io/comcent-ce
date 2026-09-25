@@ -11,7 +11,7 @@
   import type { Session } from 'sip.js';
   import type { SessionManager } from 'sip.js/lib/platform/web';
   import { isValidPhoneNumber } from 'libphonenumber-js';
-  import type { MemberSearchResult } from '$lib/server/types/MemberSearchResult';
+  import type { MemberSearchResult } from '$lib/types/MemberSearchResult';
 
   const dispatch = createEventDispatcher<{
     hangup: void;
