@@ -8,7 +8,7 @@
     "start:web-app": "dotenv -- node packages/web-app/build/index.js",
     "prepare": "if [ \"$NODE_ENV\" != \"production\" ]; then husky install; fi",
     "lint": "eslint . --ext .vue,.svelte,.html,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
-    "stage-format": "prettier --write",
+    "stage-format": "node tools/stage-format.mjs",
     "lint-staged": "lint-staged",
     "eslint-fix": "eslint --fix",
     "test:e2e": "dotenvx run --env-file=.env.e2e -- npm run test --prefix e2e",
