@@ -18,10 +18,9 @@ defmodule ComcentWeb.Plugs.EnsureIsOrgMember do
     end
   end
 
-  # This is called from SvelteKit's SSR `fetch`, which auto-follows redirects
-  # server-to-server, so it can't be a browser-facing `redirect(to: "/org")`
-  # here - that gets resolved against the API host and 404s. Return a
-  # structured error and let the frontend decide to navigate the browser.
+  # The web app calls this with `fetch`, which follows redirects silently, so
+  # a `redirect(to: "/org")` here would only hand it the /org page's HTML.
+  # Return a structured error and let the frontend navigate the browser.
   defp not_org_member(conn) do
     conn
     |> put_resp_content_type("application/json")
