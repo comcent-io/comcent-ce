@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { getJson } from '$lib/http';
+  import { logout } from '$lib/session';
 
   type OrgSummary = {
     id: string;
@@ -114,12 +115,13 @@
     </div>
   {/if}
 
-  <form method="POST" action="/logout" class="mt-5">
+  <div class="mt-5">
     <button
-      type="submit"
+      type="button"
+      on:click={logout}
       class="text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 focus:outline-none dark:focus:ring-red-800"
     >
       Logout
     </button>
-  </form>
+  </div>
 </div>

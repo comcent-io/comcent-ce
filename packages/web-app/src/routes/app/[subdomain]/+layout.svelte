@@ -18,6 +18,7 @@
   import AngleDown from '$lib/components/Icons/AngleDown.svelte';
   import { onMount, tick } from 'svelte';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
+  import { logout } from '$lib/session';
 
   export let data: LayoutData;
 
@@ -156,14 +157,13 @@
             </ul>
             <ul class="py-1 text-gray-700 dark:text-gray-300" aria-labelledby="dropdown">
               <li>
-                <form method="POST" action="/logout">
-                  <button
-                    type="submit"
-                    class="block w-full text-left py-2 px-4 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-                  >
-                    Logout
-                  </button>
-                </form>
+                <button
+                  type="button"
+                  on:click={logout}
+                  class="block w-full text-left py-2 px-4 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+                >
+                  Logout
+                </button>
               </li>
             </ul>
           </div>

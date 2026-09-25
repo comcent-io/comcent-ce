@@ -1,9 +1,9 @@
 import { redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import type { PageLoad } from './$types';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageLoad = ({ url }) => {
   const email = String(url.searchParams.get('email') || '').trim();
 
   if (!email) {
