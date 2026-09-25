@@ -1,0 +1,83 @@
+import { onDestroy } from 'svelte';
+import toast from './toast';
+import { endPause as _endPause, startPause as _startPause, update, useToasterStore } from './store';
+import type { Toast, ToastOptions, ToastPosition } from './types';
+
+function calculateOffset(
+  toast: Toast,
+  $toasts: Toast[],
+  opts?: { reverseOrder?: boolean; gutter?: number; defaultPosition?: ToastPosition },
+) {
+  const { reverseOrder, gutter = 8, defaultPosition } = opts || {};
+  const relevantToasts = $toasts.filter(
+    (t) => (t.position || defaultPosition) === (toast.position || defaultPosition) && t.height,
+  );
+  const toastIndex = relevantToasts.findIndex((t) => t.id === toast.id);
+  const toastsBefore = relevantToasts.filter((toast, i) => i < toastIndex && toast.visible).length;
+
+  return relevantToasts
+    .filter((t) => t.visible)
+    .slice(...(reverseOrder ? [toastsBefore + 1] : [0, toastsBefore]))
+    .reduce((acc, t) => acc + (t.height || 0) + gutter, 0);
+}
+
+const handlers = {
+  startPause() {
+    _startPause(Date.now());
+  },
+  endPause() {
+    _endPause(Date.now());
+  },
+  updateHeight: (toastId: string, height: number) => {
+    update({ id: toastId, height });
+  },
+  calculateOffset,
+};
+
+export default function useToaster(toastOptions?: ToastOptions) {
+  const { toasts, pausedAt } = useToasterStore(toastOptions);
+  const timeouts = new Map<Toast['id'], ReturnType<typeof setTimeout>>();
+  let _pausedAt: number | null = null;
+
+  const unsubscribes = [
+    pausedAt.subscribe(($pausedAt) => {
+      if ($pausedAt) {
+        for (const [, timeoutId] of timeouts) {
+          clearTimeout(timeoutId);
+        }
+        timeouts.clear();
+      }
+      _pausedAt = $pausedAt;
+    }),
+    toasts.subscribe(($toasts) => {
+      if (_pausedAt) {
+        return;
+      }
+      const now = Date.now();
+      for (const t of $toasts) {
+        if (timeouts.has(t.id) || t.duration === Infinity) {
+          continue;
+        }
+        const durationLeft = (t.duration || 0) + t.pauseDuration - (now - t.createdAt);
+        if (durationLeft < 0) {
+          if (t.visible) {
+            toast.dismiss(t.id);
+          }
+          return;
+        }
+        timeouts.set(
+          t.id,
+          setTimeout(() => toast.dismiss(t.id), durationLeft),
+        );
+      }
+    }),
+  ];
+
+  onDestroy(() => {
+    for (const unsubscribe of unsubscribes) {
+      unsubscribe();
+    }
+  });
+
+  return { toasts, handlers };
+}
