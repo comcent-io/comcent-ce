@@ -175,7 +175,6 @@ services:
       PUBLIC_BASE_URL: https://${COMCENT_DOMAIN}
       ORIGIN: https://${COMCENT_DOMAIN}
       PUBLIC_SIP_WS_URL: wss://${COMCENT_DOMAIN}:${SIP_WSS_PORT:-5063}/sip-ws
-      INTERNAL_API_BASE_URL: http://server:4000/internal-api
     depends_on:
       server:
         condition: service_healthy
@@ -337,7 +336,7 @@ configs:
       http:
         routers:
           comcent-api:
-            rule: "Host(`${COMCENT_DOMAIN}`) && (PathPrefix(`/api/`) || PathPrefix(`/ws`) || PathPrefix(`/health`) || PathPrefix(`/internal-api`))"
+            rule: "Host(`${COMCENT_DOMAIN}`) && (PathPrefix(`/api/`) || PathPrefix(`/ws`) || PathPrefix(`/health`))"
             entryPoints: [websecure]
             service: comcent-api
             priority: 100
