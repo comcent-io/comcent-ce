@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { deleteJson, getJson, postJson, putJson } from '$lib/http';
   import SkeletonLoadingList from '$lib/components/SkeletonLoadingList.svelte';
-  import toast from 'svelte-french-toast';
+  import toast from '$lib/toast';
   import WebhookForm from './WebhookForm.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Button from '$lib/components/Button.svelte';
@@ -18,19 +18,19 @@
     presenceUpdate: boolean;
   };
 
-  let showNewWebhookModal = false;
+  let showNewWebhookModal = $state(false);
 
-  let selectedWebhook: any;
+  let selectedWebhook: any = $state();
 
-  let showEditWebhookModal = false;
+  let showEditWebhookModal = $state(false);
 
-  let loadingWebhook = false;
-  let webhooks: OrgWebhook[] = [];
+  let loadingWebhook = $state(false);
+  let webhooks: OrgWebhook[] = $state([]);
 
   onMount(async () => {
     loadingWebhook = true;
     const result = await getJson<{ webhooks?: OrgWebhook[] }>(
-      `/api/v2/${$page.params.subdomain}/settings/webhooks`,
+      `/api/v2/${page.params.subdomain}/settings/webhooks`,
     );
     if (result.ok) {
       webhooks = Array.isArray(result.data) ? result.data : (result.data.webhooks ?? []);
@@ -49,13 +49,13 @@
     };
   }
 
-  let formData = newFormData();
+  let formData = $state(newFormData());
 
-  let creatingProgress = false;
+  let creatingProgress = $state(false);
   async function createWebhook() {
     creatingProgress = true;
     const result = await postJson<OrgWebhook>(
-      `/api/v2/${$page.params.subdomain}/settings/webhooks`,
+      `/api/v2/${page.params.subdomain}/settings/webhooks`,
       formData,
     );
     if (!result.ok) {
@@ -72,7 +72,7 @@
 
   async function deleteWebhook(webhook: OrgWebhook) {
     const result = await deleteJson(
-      `/api/v2/${$page.params.subdomain}/settings/webhooks/${webhook.id}`,
+      `/api/v2/${page.params.subdomain}/settings/webhooks/${webhook.id}`,
     );
     if (!result.ok) {
       toast.error(result.error);
@@ -83,12 +83,12 @@
     webhooks = webhooks.filter((wh) => wh.id !== webhook.id);
   }
 
-  let updateProgress = false;
+  let updateProgress = $state(false);
   async function onUpdateWebhook() {
     if (!selectedWebhook) return alert('No webhook selected');
     updateProgress = true;
     const result = await putJson<OrgWebhook>(
-      `/api/v2/${$page.params.subdomain}/settings/webhooks/${selectedWebhook.id}`,
+      `/api/v2/${page.params.subdomain}/settings/webhooks/${selectedWebhook.id}`,
       selectedWebhook,
     );
     if (!result.ok) {
@@ -109,7 +109,7 @@
 {:else}
   <div class="relative overflow-x-auto shadow-md sm:rounded-lg mt-4">
     <div>
-      <Button type="button" on:click={() => (showNewWebhookModal = true)}>New Webhook</Button>
+      <Button type="button" onclick={() => (showNewWebhookModal = true)}>New Webhook</Button>
     </div>
 
     <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400 mb-20">
@@ -157,7 +157,7 @@
                   value={webhook.authToken}
                 />
                 <button
-                  on:click={() => navigator.clipboard.writeText(webhook.authToken)}
+                  onclick={() => navigator.clipboard.writeText(webhook.authToken)}
                   class="dark:text-gray-400 dark:border-gray-600 border border-l-0 border-gray-300 rounded-r-md px-3 text-gray-900 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
                 >
                   <svg
@@ -188,7 +188,7 @@
             <td class="px-6 py-4 text-right">
               <button
                 type="button"
-                on:click={() => {
+                onclick={() => {
                   selectedWebhook = {
                     id: webhook.id,
                     name: webhook.name,
@@ -208,7 +208,7 @@
               <button
                 type="submit"
                 class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
-                on:click={() => deleteWebhook(webhook)}
+                onclick={() => deleteWebhook(webhook)}
               >
                 Delete
               </button>
@@ -223,26 +223,26 @@
 <Dialog
   title="New Webhook"
   showDialog={showNewWebhookModal}
-  on:close={() => {
+  onClose={() => {
     showNewWebhookModal = false;
   }}
 >
   <div class="px-6 py-6 lg:px-8">
-    <WebhookForm {formData} on:submit={createWebhook} isProgress={creatingProgress} />
+    <WebhookForm {formData} onSubmit={createWebhook} isProgress={creatingProgress} />
   </div>
 </Dialog>
 
 <Dialog
   title="Update Webhook"
   showDialog={showEditWebhookModal}
-  on:close={() => {
+  onClose={() => {
     showEditWebhookModal = false;
   }}
 >
   <div class="px-6 py-6 lg:px-8">
     <WebhookForm
       formData={selectedWebhook}
-      on:submit={onUpdateWebhook}
+      onSubmit={onUpdateWebhook}
       isProgress={updateProgress}
     />
   </div>

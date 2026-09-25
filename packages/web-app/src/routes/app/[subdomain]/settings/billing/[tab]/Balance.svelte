@@ -1,26 +1,26 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { getJson, postJson } from '$lib/http';
-  import toast from 'svelte-french-toast';
+  import toast from '$lib/toast';
   import { onMount } from 'svelte';
   import SkeletonLoadingList from '$lib/components/SkeletonLoadingList.svelte';
   import Button from '$lib/components/Button.svelte';
   import Card from '$lib/components/Card.svelte';
   import H6 from '$lib/components/html/H6.svelte';
 
-  let alertThresholdBalance = 5;
-  let balance = '...';
-  let billingAddress: any = null;
-  let loading = false;
+  let alertThresholdBalance = $state(5);
+  let balance = $state('...');
+  let billingAddress: any = $state(null);
+  let loading = $state(false);
 
   onMount(async () => {
     loading = true;
     const [alertResult, balanceResult, billingAddressResult] = await Promise.all([
       getJson<{ alertThresholdBalance: number }>(
-        `/api/v2/${$page.params.subdomain}/billing/alert-threshold`,
+        `/api/v2/${page.params.subdomain}/billing/alert-threshold`,
       ),
-      getJson<{ walletBalance: string }>(`/api/v2/${$page.params.subdomain}/billing/balance`),
-      getJson(`/api/v2/${$page.params.subdomain}/billing/address`),
+      getJson<{ walletBalance: string }>(`/api/v2/${page.params.subdomain}/billing/balance`),
+      getJson(`/api/v2/${page.params.subdomain}/billing/address`),
     ]);
 
     if (!alertResult.ok || !balanceResult.ok || !billingAddressResult.ok) {
@@ -35,10 +35,10 @@
     loading = false;
   });
 
-  let saveProgress = false;
+  let saveProgress = $state(false);
   async function onSave() {
     saveProgress = true;
-    const result = await postJson(`/api/v2/${$page.params.subdomain}/billing/alert-threshold`, {
+    const result = await postJson(`/api/v2/${page.params.subdomain}/billing/alert-threshold`, {
       alertThresholdBalance,
     });
     if (!result.ok) {
@@ -78,7 +78,7 @@
               class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-32 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
               bind:value={alertThresholdBalance}
             />
-            <Button on:click={onSave} type="button" progress={saveProgress}>Save</Button>
+            <Button onclick={onSave} type="button" progress={saveProgress}>Save</Button>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { onDestroy, onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { Socket } from 'phoenix';
@@ -25,7 +25,7 @@
     totalAgents: number;
   };
 
-  let queueDashboardData: QueueDashboardData | undefined;
+  let queueDashboardData: QueueDashboardData | undefined = $state();
   let currentTime = new Date();
 
   // Function to calculate waiting time
@@ -122,7 +122,7 @@
 
     socket = new Socket(`/ws`, {
       params: {
-        subdomain: $page.params.subdomain,
+        subdomain: page.params.subdomain,
         token: idToken,
       },
     });
@@ -130,7 +130,7 @@
     socket.connect();
 
     const channel = socket.channel(
-      `queue_dashboard:${$page.params.subdomain}:${$page.params.id}`,
+      `queue_dashboard:${page.params.subdomain}:${page.params.id}`,
       {},
     );
 
@@ -138,13 +138,13 @@
       .join()
       .receive('ok', (resp: any) => {
         console.log(
-          `Joined channel queue_dashboard:${$page.params.subdomain}:${$page.params.id}`,
+          `Joined channel queue_dashboard:${page.params.subdomain}:${page.params.id}`,
           resp,
         );
       })
       .receive('error', (resp: any) => {
         console.log(
-          `Unable to join channel queue_dashboard:${$page.params.subdomain}:${$page.params.id}`,
+          `Unable to join channel queue_dashboard:${page.params.subdomain}:${page.params.id}`,
           resp,
         );
       });
@@ -186,9 +186,7 @@
   });
 
   onMount(async () => {
-    const response = await fetch(
-      `/api/v2/${$page.params.subdomain}/queues/${$page.params.id}/state`,
-    );
+    const response = await fetch(`/api/v2/${page.params.subdomain}/queues/${page.params.id}/state`);
     if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
     const data = await response.json();
     queueDashboardData = data.state;

@@ -3,18 +3,30 @@
   import PreviousIcon from '$lib/components/Icons/PreviousIcon.svelte';
   import _ from 'lodash';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
-  export let baseUrl: string;
-  export let totalPages: number;
-  export let currentPage: number;
-  export let itemsPerPage: number;
-  export let totalCount: number;
-  export let onPageChange: ((page: number) => void) | undefined = undefined;
-  export let onItemsPerPageChange: ((itemsPerPage: number) => void) | undefined = undefined;
+  interface Props {
+    baseUrl: string;
+    totalPages: number;
+    currentPage: number;
+    itemsPerPage: number;
+    totalCount: number;
+    onPageChange?: ((page: number) => void) | undefined;
+    onItemsPerPageChange?: ((itemsPerPage: number) => void) | undefined;
+  }
+
+  let {
+    baseUrl,
+    totalPages,
+    currentPage,
+    itemsPerPage = $bindable(),
+    totalCount,
+    onPageChange = undefined,
+    onItemsPerPageChange = undefined,
+  }: Props = $props();
 
   const appendQueryParams = (url: string | undefined, params: Record<string, string | number>) => {
-    const origin = $page.url.origin;
+    const origin = page.url.origin;
     if (origin && url) {
       const urlObj = new URL(url, origin);
       Object.entries(params).forEach(([key, value]) => {
@@ -26,17 +38,15 @@
     return url || '';
   };
 
-  let pageNumbers: any[] = [];
-  $: if (currentPage === 1 || currentPage === 2) {
-    pageNumbers = _.range(1, Math.min(3, totalPages) + 1);
-  } else if (currentPage > 2) {
-    pageNumbers =
-      totalPages > currentPage
-        ? [currentPage - 1, currentPage, currentPage + 1]
-        : [currentPage - 2, currentPage - 1, currentPage];
-  }
+  let pageNumbers: number[] = $derived.by(() => {
+    if (currentPage === 1 || currentPage === 2) {
+      return _.range(1, Math.min(3, totalPages) + 1);
+    }
+    return totalPages > currentPage
+      ? [currentPage - 1, currentPage, currentPage + 1]
+      : [currentPage - 2, currentPage - 1, currentPage];
+  });
 
-  let form: any = null;
   const handleSelectChange = async () => {
     const totalPages = Math.ceil(totalCount / itemsPerPage);
     const newPage = totalPages < currentPage ? totalPages : currentPage;
@@ -63,7 +73,7 @@
       {#if totalPages > 3 && currentPage > 2}
         <li
           class="first:rounded-s-lg last:rounded-e-lg flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white cursor-pointer"
-          on:click={() => handlePageClick(1)}
+          onclick={() => handlePageClick(1)}
         >
           <span class="">Start</span>
         </li>
@@ -72,7 +82,7 @@
       {#if currentPage > 1}
         <li
           class="first:rounded-s-lg last:rounded-e-lg flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white cursor-pointer"
-          on:click={() => handlePageClick(currentPage - 1)}
+          onclick={() => handlePageClick(currentPage - 1)}
         >
           <span class="sr-only">Previous</span>
           <PreviousIcon />
@@ -84,7 +94,7 @@
           class="{currentPage === page
             ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-white text-bold'
             : ''} first:rounded-s-lg last:rounded-e-lg flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white cursor-pointer"
-          on:click={() => handlePageClick(page)}
+          onclick={() => handlePageClick(page)}
         >
           <span>
             {page}
@@ -95,7 +105,7 @@
       {#if currentPage < totalPages}
         <li
           class="first:rounded-s-lg last:rounded-e-lg flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white cursor-pointer"
-          on:click={() => handlePageClick(currentPage + 1)}
+          onclick={() => handlePageClick(currentPage + 1)}
         >
           <span class="sr-only">Next</span>
           <NextIcon />
@@ -105,7 +115,7 @@
       {#if currentPage + 1 < totalPages && totalPages > 3}
         <li
           class="first:rounded-s-lg last:rounded-e-lg flex items-center justify-center px-4 h-10 ms-0 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white cursor-pointer"
-          on:click={() => handlePageClick(totalPages)}
+          onclick={() => handlePageClick(totalPages)}
         >
           <span>End</span>
         </li>
@@ -113,7 +123,7 @@
     </ul>
   </nav>
 
-  <form bind:this={form}>
+  <form>
     <div class="flex h-10 space-x-1">
       <input type="hidden" name="page" value={currentPage} />
       <label for="items" class="mb-2 text-sm font-medium text-gray-900 dark:text-white">
@@ -123,8 +133,8 @@
         name="itemsPerPage"
         id="itemsPerPage"
         bind:value={itemsPerPage}
-        on:change={handleSelectChange}
-        on:click|preventDefault
+        onchange={handleSelectChange}
+        onclick={(e) => e.preventDefault()}
         class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
       >
         <option value={5}>5</option>

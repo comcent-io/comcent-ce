@@ -2,8 +2,8 @@
   import { goto } from '$app/navigation';
   import { postJson } from '$lib/http';
 
-  let saving = false;
-  let errorMessage = '';
+  let saving = $state(false);
+  let errorMessage = $state('');
 
   async function acceptTerms(event: Event) {
     event.preventDefault();
@@ -23,7 +23,7 @@
 
 <section class="bg-gray-50 dark:bg-gray-900">
   <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
-    <form method="POST" class="mt-3 mr-2" on:submit={acceptTerms}>
+    <form method="POST" class="mt-3 mr-2" onsubmit={acceptTerms}>
       <div
         class="max-w-lg p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
       >

@@ -1,22 +1,23 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
+  import { routeParam } from '$lib/routeParam';
   import { onMount } from 'svelte';
   import Pagination from '$lib/components/Pagination.svelte';
   import LabelFilter from '$lib/components/LabelFilter.svelte';
   import TableRow from './TableRow.svelte';
 
-  let searchText = '';
-  let callStories: any[] = [];
-  let totalPages = 0;
-  let currentPage = 1;
-  let itemsPerPage = 10;
-  let totalCount = 0;
-  let loading = false;
-  let error = '';
+  let searchText = $state('');
+  let callStories: any[] = $state([]);
+  let totalPages = $state(0);
+  let currentPage = $state(1);
+  let itemsPerPage = $state(10);
+  let totalCount = $state(0);
+  let loading = $state(false);
+  let error = $state('');
 
   // Label filter state
-  let appliedLabels: any[] = []; // Labels actually applied/sent to API
-  let labelFilterComponent: any;
+  let appliedLabels: any[] = $state([]); // Labels actually applied/sent to API
+  let labelFilterComponent: any = $state();
 
   // Function to fetch call stories from API
   async function fetchCallStories() {
@@ -44,7 +45,7 @@
       const queryString = new URLSearchParams(
         Object.entries(params).reduce((acc, [k, v]) => ({ ...acc, [k]: String(v) }), {}),
       ).toString();
-      const response = await fetch(`/api/v2/${$page.params.subdomain}/call-stories?${queryString}`);
+      const response = await fetch(`/api/v2/${page.params.subdomain}/call-stories?${queryString}`);
       if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
 
       const data = await response.json();
@@ -121,8 +122,8 @@
   }
 
   // Handle label filter apply event
-  function handleLabelApply(event: CustomEvent) {
-    appliedLabels = [...event.detail];
+  function handleLabelApply(labels: any[]) {
+    appliedLabels = [...labels];
 
     // Update URL with applied labels and reset to first page
     currentPage = 1;
@@ -186,7 +187,7 @@
 <!-- Filters Container -->
 <div class="max-w-7xl mx-auto mb-6 mt-2">
   <!-- Search Form with Filter Button -->
-  <form class="w-full" on:submit={handleSearch}>
+  <form class="w-full" onsubmit={handleSearch}>
     <label
       for="default-search"
       class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
@@ -223,7 +224,7 @@
         <button
           class="absolute inset-y-0 end-24 flex items-center ps-3"
           type="button"
-          on:click={clearSearch}
+          onclick={clearSearch}
         >
           <svg
             class="w-4 h-4 text-gray-500 dark:text-gray-400"
@@ -253,10 +254,10 @@
       <div class="mt-1.5">
         <LabelFilter
           bind:this={labelFilterComponent}
-          subdomain={$page.params.subdomain}
+          subdomain={routeParam('subdomain')}
           appliedCount={appliedLabels.length}
-          on:apply={handleLabelApply}
-          on:clear={handleLabelClear}
+          onApply={handleLabelApply}
+          onClear={handleLabelClear}
         />
       </div>
     </div>
@@ -307,7 +308,7 @@
 </div>
 
 <Pagination
-  baseUrl={`/app/${$page.params.subdomain}/call-story`}
+  baseUrl={`/app/${page.params.subdomain}/call-story`}
   {totalPages}
   {currentPage}
   {itemsPerPage}

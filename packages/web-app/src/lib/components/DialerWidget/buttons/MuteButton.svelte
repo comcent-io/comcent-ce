@@ -1,10 +1,18 @@
-<script>
-  export let muted = false;
+<script lang="ts">
+  // `muted` mirrors the call's state for display; `onchange` fires only when
+  // the agent clicks, never when the parent syncs `muted` from the session.
+  let {
+    muted = $bindable(false),
+    onchange,
+  }: { muted?: boolean; onchange?: (muted: boolean) => void } = $props();
 </script>
 
 <button
   type="button"
-  on:click={() => (muted = !muted)}
+  onclick={() => {
+    muted = !muted;
+    onchange?.(muted);
+  }}
   class="flex-1 rounded-lg border py-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
   class:active={muted}
   class:inactive={!muted}

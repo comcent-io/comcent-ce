@@ -1,7 +1,7 @@
 <script lang="ts">
   import { logout } from '$lib/session';
 
-  export let data;
+  let { data } = $props();
 </script>
 
 <section class="bg-white dark:bg-gray-900">
@@ -18,7 +18,7 @@
       </p>
       <button
         type="button"
-        on:click={logout}
+        onclick={logout}
         class="inline-flex text-white bg-primary-600 hover:bg-primary-800 focus:ring-4 focus:outline-none focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:focus:ring-primary-900 my-4"
       >
         Sign out

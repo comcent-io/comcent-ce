@@ -2,16 +2,22 @@
   import type { SelectedOutlet } from '../SelectedOutlet';
   import Outlet from '../utils/Outlet.svelte';
 
-  export let selectedOutlet: SelectedOutlet | null;
-  export let connected = false;
+  interface Props {
+    selectedOutlet: SelectedOutlet | null;
+    connected?: boolean;
+    onOutletSelected?: (outlet: SelectedOutlet) => void;
+    onDisconnectOutlet?: (outlet: SelectedOutlet) => void;
+  }
+
+  let { selectedOutlet, connected = false, onOutletSelected, onDisconnectOutlet }: Props = $props();
 </script>
 
 <Outlet
   nodeId="_start"
   {selectedOutlet}
   {connected}
-  on:outletSelected
-  on:disconnectOutlet
+  {onOutletSelected}
+  {onDisconnectOutlet}
   class="block w-[15rem] rounded-xl border-2 border-amber-400 bg-white p-4 shadow dark:border-amber-400 dark:bg-gray-800"
 >
   <h4 class="text-lg font-bold dark:text-white">Start</h4>

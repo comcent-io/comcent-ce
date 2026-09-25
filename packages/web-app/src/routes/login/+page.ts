@@ -17,14 +17,14 @@ export const load: PageLoad = async ({ fetch }) => {
   // its user is gone, so drop it rather than send it with every request.
   if (hasSessionToken()) {
     const session = await getJson('/api/v2/user/session', { fetchFn: fetch });
-    if (session.ok) throw redirect(303, '/');
+    if (session.ok) redirect(303, '/');
     if (session.status === 401) clearSessionToken();
   }
 
   const authConfigResult = await getJson<AuthConfig>('/api/v2/auth/config', { fetchFn: fetch });
 
   if (authConfigResult.ok && authConfigResult.data.bootstrapMode) {
-    throw redirect(303, '/setup');
+    redirect(303, '/setup');
   }
 
   return {

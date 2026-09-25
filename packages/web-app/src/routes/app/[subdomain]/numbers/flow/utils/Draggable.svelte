@@ -1,12 +1,37 @@
-<script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import type { FlowNode } from '../nodes/FlowNode';
-  const dispatch = createEventDispatcher();
-  export let node: FlowNode;
-  export let title = '';
+<script lang="ts" module>
+  import type { FlowNode } from '../nodes/FlowNode.svelte';
 
-  export let tx = node?.data?.screen?.tx ?? 0;
-  export let ty = node?.data?.screen?.ty ?? 0;
+  export type DragEnd = { node: FlowNode; tx: number; ty: number };
+</script>
+
+<script lang="ts">
+  import type { Snippet } from 'svelte';
+
+  interface Props {
+    node: FlowNode;
+    title?: string;
+    class?: string;
+    id?: string;
+    onDragEnd?: (drag: DragEnd) => void;
+    headerActions?: Snippet;
+    children?: Snippet;
+  }
+
+  let {
+    node,
+    title = '',
+    class: className = '',
+    id = undefined,
+    onDragEnd,
+    headerActions,
+    children,
+  }: Props = $props();
+
+  // Starts at the node's saved position; the drag owns it after that.
+  // svelte-ignore state_referenced_locally
+  let tx: number = $state(node?.data?.screen?.tx ?? 0);
+  // svelte-ignore state_referenced_locally
+  let ty: number = $state(node?.data?.screen?.ty ?? 0);
 
   let mouseDown = false;
   let mouseDownX = 0;
@@ -22,7 +47,7 @@
   function handleMouseUp() {
     if (mouseDown) {
       mouseDown = false;
-      dispatch('dragEnd', { node, tx, ty });
+      onDragEnd?.({ node, tx, ty });
     }
   }
 
@@ -34,7 +59,7 @@
   }
 
   // Svelte action to handle document event listeners with auto-cleanup
-  function documentListeners(node: HTMLElement) {
+  function documentListeners(_node: HTMLElement) {
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
@@ -48,14 +73,14 @@
 </script>
 
 <div
-  class="{$$restProps.class || ''} relative"
-  id={$$restProps.id || node.data.id || ''}
+  class="{className} relative"
+  id={id || node.data.id || ''}
   style="transform: translate({tx}px, {ty}px)"
   use:documentListeners
 >
   <div
     class="flex cursor-grab items-center justify-between rounded-t-lg border-b border-slate-200 bg-slate-100 px-3 py-2 active:cursor-grabbing dark:border-slate-700 dark:bg-slate-800"
-    on:mousedown={handleDragStart}
+    onmousedown={handleDragStart}
     role="button"
     tabindex="0"
   >
@@ -74,11 +99,16 @@
         Drag this header to reposition
       </p>
     </div>
-    <div class="ml-3 flex items-center gap-1.5" on:mousedown|stopPropagation>
-      <slot name="headerActions" />
+    <!-- Clicks on the header's buttons must not start a drag. -->
+    <div
+      class="ml-3 flex items-center gap-1.5"
+      role="presentation"
+      onmousedown={(e) => e.stopPropagation()}
+    >
+      {@render headerActions?.()}
     </div>
   </div>
   <div class="rounded-b-lg">
-    <slot />
+    {@render children?.()}
   </div>
 </div>

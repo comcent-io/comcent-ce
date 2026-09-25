@@ -9,7 +9,11 @@
     assignedTo: string;
   }
 
-  export let promises: Promise[] = [];
+  interface Props {
+    promises?: Promise[];
+  }
+
+  let { promises = [] }: Props = $props();
 
   function formatDateWithTime(dateString: string): string {
     return moment(dateString).format('YYYY/MM/DD hh:mm A');

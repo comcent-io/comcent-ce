@@ -16,14 +16,14 @@ type SessionUser = {
 export const ssr = false;
 
 export const load: LayoutLoad = async ({ fetch }) => {
-  if (!hasSessionToken()) throw redirect(303, '/login');
+  if (!hasSessionToken()) redirect(303, '/login');
 
   const session = await getJson<{ user: SessionUser }>('/api/v2/user/session', {
     fetchFn: fetch,
   });
   if (!session.ok) {
-    if (session.status === 401) throw redirect(303, '/login');
-    throw error(500, { message: session.error || 'Unable to validate current session' });
+    if (session.status === 401) redirect(303, '/login');
+    error(500, { message: session.error || 'Unable to validate current session' });
   }
 
   return {

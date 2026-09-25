@@ -1,16 +1,25 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { postJson, putJson } from '$lib/http';
   import { sipTrunkCreateSchema } from './schema';
   import ErrorMessage from '$lib/components/ErrorMessage.svelte';
 
   type FormError = { message: string; formErrors: { message: string; path: string[] }[] };
-  export let formData: any = {};
-  export let isUpdate = false;
-  export let showCredentialFields = false;
-  export let error: FormError | null = null;
-  let isLoading = false;
+  interface Props {
+    formData?: any;
+    isUpdate?: boolean;
+    showCredentialFields?: boolean;
+    error?: FormError | null;
+  }
+
+  let {
+    formData = $bindable({}),
+    isUpdate = false,
+    showCredentialFields = $bindable(false),
+    error = $bindable(null),
+  }: Props = $props();
+  let isLoading = $state(false);
 
   async function handleSubmit(event: Event) {
     event.preventDefault();
@@ -34,8 +43,8 @@
       };
 
       const result = isUpdate
-        ? await putJson(`/api/v2/${$page.params.subdomain}/sip-trunks/${formData.id}`, payload)
-        : await postJson(`/api/v2/${$page.params.subdomain}/sip-trunks`, payload);
+        ? await putJson(`/api/v2/${page.params.subdomain}/sip-trunks/${formData.id}`, payload)
+        : await postJson(`/api/v2/${page.params.subdomain}/sip-trunks`, payload);
 
       if (!result.ok) {
         error = { message: result.error, formErrors: [] };
@@ -44,7 +53,7 @@
       }
 
       error = null;
-      await goto(`/app/${$page.params.subdomain}/sip-trunks`, { invalidateAll: true });
+      await goto(`/app/${page.params.subdomain}/sip-trunks`, { invalidateAll: true });
     } catch (err: any) {
       const errors: any[] = [];
       if (err.errors?.length) {
@@ -73,7 +82,12 @@
   }
 </script>
 
-<form on:submit|preventDefault={handleSubmit}>
+<form
+  onsubmit={(e) => {
+    e.preventDefault();
+    handleSubmit(e);
+  }}
+>
   <div class="mb-6">
     <div
       class="p-4 mb-4 text-sm text-blue-800 rounded-lg bg-blue-50 dark:bg-gray-800 dark:text-blue-400"

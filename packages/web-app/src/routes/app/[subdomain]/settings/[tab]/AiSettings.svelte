@@ -1,14 +1,14 @@
 <script lang="ts">
   import Button from '$lib/components/Button.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { getJson, postJson } from '$lib/http';
-  import toast from 'svelte-french-toast';
+  import toast from '$lib/toast';
   import { onMount } from 'svelte';
   import SkeletonLoadingList from '$lib/components/SkeletonLoadingList.svelte';
   import H3 from '$lib/components/html/H3.svelte';
   import moment from 'moment-timezone';
 
-  let aiSettings = {
+  let aiSettings = $state({
     enableTranscription: false,
     enableSentimentAnalysis: false,
     enableSummary: false,
@@ -16,19 +16,19 @@
     enableDailySummary: false,
     dailySummaryTimeZone: 'UTC',
     dailySummaryTime: '09:00',
-  };
+  });
 
-  let labels = [{ id: 1, name: '', description: '' }];
+  let labels = $state([{ id: 1, name: '', description: '' }]);
   let nextLabelId = 2;
 
-  let loading = false;
-  let loaded = false;
+  let loading = $state(false);
+  let loaded = $state(false);
 
   // All available timezones for the dropdown
   const timezones = moment.tz.names();
   onMount(async () => {
     loading = true;
-    const result = await getJson<any>(`/api/v2/${$page.params.subdomain}/settings/ai-analysis`);
+    const result = await getJson<any>(`/api/v2/${page.params.subdomain}/settings/ai-analysis`);
     if (!result.ok) {
       toast.error('Error occurred while fetching settings. Please try again later.');
       loading = false;
@@ -80,7 +80,7 @@
     }
   }
 
-  let saveProgress = false;
+  let saveProgress = $state(false);
   async function onSave() {
     saveProgress = true;
 
@@ -89,7 +89,7 @@
       .filter((label) => label.name.trim() !== '' || label.description.trim() !== '')
       .map(({ name, description }) => ({ name: name.trim(), description: description.trim() }));
 
-    const result = await postJson(`/api/v2/${$page.params.subdomain}/settings/ai-analysis`, {
+    const result = await postJson(`/api/v2/${page.params.subdomain}/settings/ai-analysis`, {
       enableTranscription: aiSettings.enableTranscription,
       enableSentimentAnalysis: aiSettings.enableSentimentAnalysis,
       enableSummary: aiSettings.enableSummary,
@@ -125,7 +125,7 @@
             type="checkbox"
             class="sr-only peer"
             bind:checked={aiSettings.enableTranscription}
-            on:change={onEnableTranscriptChanged}
+            onchange={onEnableTranscriptChanged}
           />
           <div
             class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:w-5 after:h-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
@@ -237,7 +237,7 @@
                 name="enableLabels"
                 type="checkbox"
                 bind:checked={aiSettings.enableLabels}
-                on:change={onEnableLabelsChanged}
+                onchange={onEnableLabelsChanged}
                 class="sr-only peer"
                 disabled={!aiSettings.enableTranscription}
               />
@@ -285,7 +285,7 @@
                       {#if index === labels.length - 1}
                         <button
                           type="button"
-                          on:click={addLabel}
+                          onclick={addLabel}
                           class="flex items-center justify-center w-10 h-10 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
                           title="Add new label"
                         >
@@ -308,7 +308,7 @@
                       {#if labels.length > 1}
                         <button
                           type="button"
-                          on:click={() => removeLabel(label.id)}
+                          onclick={() => removeLabel(label.id)}
                           class="flex items-center justify-center w-10 h-10 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
                           title="Remove this label"
                         >
@@ -336,7 +336,7 @@
         </ul>
       </li>
       <li>
-        <Button on:click={onSave} progress={saveProgress} className="mt-4">Save</Button>
+        <Button onclick={onSave} progress={saveProgress} className="mt-4">Save</Button>
       </li>
     </ul>
   </div>

@@ -1,9 +1,14 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
 
-  let displayTime = '0:00';
+  let displayTime = $state('0:00');
   let timer: any;
-  export let startTime: Date;
+  interface Props {
+    startTime: Date;
+    [key: string]: any;
+  }
+
+  let { startTime, ...rest }: Props = $props();
   onMount(() => {
     timer = setInterval(() => {
       const now = new Date().getTime();
@@ -19,6 +24,6 @@
   });
 </script>
 
-<span class="text-gray-500 dark:text-gray-400 {$$restProps.class}">
+<span class="text-gray-500 dark:text-gray-400 {rest.class}">
   {displayTime}
 </span>

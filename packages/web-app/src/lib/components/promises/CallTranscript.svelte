@@ -6,18 +6,23 @@
     message: string;
   }
 
-  export let transcriptData: { transcriptChat?: TranscriptChat[] } | null = null;
+  interface Props {
+    transcriptData?: { transcriptChat?: TranscriptChat[] } | null;
+  }
+
+  let { transcriptData = null }: Props = $props();
 
   function getDisplayName(currentParty: string): string {
     if (currentParty.startsWith('+')) return currentParty;
     return currentParty.split('@')[0].split('_')[0];
   }
 
-  $: hasTranscript =
+  let hasTranscript = $derived(
     transcriptData &&
-    transcriptData.transcriptChat &&
-    Array.isArray(transcriptData.transcriptChat) &&
-    transcriptData.transcriptChat.length > 0;
+      transcriptData.transcriptChat &&
+      Array.isArray(transcriptData.transcriptChat) &&
+      transcriptData.transcriptChat.length > 0,
+  );
 </script>
 
 <div

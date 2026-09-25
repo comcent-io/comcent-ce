@@ -1,9 +1,14 @@
 <script lang="ts">
-  export let icon: 'check' | 'chart' | 'user' | 'status';
-  export let title: string;
-  export let value: string | number;
-  export let subtitle: string = '';
-  export let color: 'blue' | 'green' | 'purple' = 'blue';
+  interface Props {
+    icon: 'check' | 'chart' | 'user' | 'status';
+    title: string;
+    value: string | number;
+    subtitle?: string;
+    color?: 'blue' | 'green' | 'purple';
+    children?: import('svelte').Snippet;
+  }
+
+  let { icon, title, value, subtitle = '', color = 'blue', children }: Props = $props();
 
   const iconPaths = {
     check: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
@@ -56,7 +61,7 @@
       {#if subtitle}
         <p class="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
       {/if}
-      <slot />
+      {@render children?.()}
     </div>
   </div>
 </div>

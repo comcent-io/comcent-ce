@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { tick } from 'svelte';
-  import toast from 'svelte-french-toast';
+  import { tick, untrack } from 'svelte';
+  import toast from '$lib/toast';
   import Dialog from '$lib/components/Dialog.svelte';
   import Spinner from '$lib/components/Icons/Spinner.svelte';
   import CallInfoHeader from './CallInfoHeader.svelte';
@@ -8,16 +8,20 @@
   import CallRecordings from './CallRecordings.svelte';
   import CallTranscript from './CallTranscript.svelte';
 
-  export let showModal: boolean = false;
-  export let callStoryId: string = '';
-  export let subdomain: string;
+  interface Props {
+    showModal?: boolean;
+    callStoryId?: string;
+    subdomain: string;
+  }
 
-  let loading = false;
-  let error: string | null = null;
-  let callStory: any = null;
-  let transcriptData: any = null;
-  let audioRecordings: any[] = [];
-  let promises: any[] = [];
+  let { showModal = $bindable(false), callStoryId = '', subdomain }: Props = $props();
+
+  let loading = $state(false);
+  let error: string | null = $state(null);
+  let callStory: any = $state(null);
+  let transcriptData: any = $state(null);
+  let audioRecordings: any[] = $state([]);
+  let promises: any[] = $state([]);
 
   async function loadCallDetails() {
     if (!callStoryId) return;
@@ -97,14 +101,16 @@
     promises = [];
   }
 
-  // Reactive statement to load data when modal opens or callStoryId changes
-  $: if (showModal && callStoryId) {
-    loadCallDetails();
-  }
+  // Load the call's details when the modal opens or shows another call.
+  $effect(() => {
+    if (showModal && callStoryId) {
+      untrack(() => loadCallDetails());
+    }
+  });
 </script>
 
 {#if showModal}
-  <Dialog title="Call Details" on:close={handleClose} showDialog={showModal} className="max-w-2xl">
+  <Dialog title="Call Details" onClose={handleClose} showDialog={showModal} className="max-w-2xl">
     {#key callStoryId}
       {#if loading}
         <div class="flex justify-center items-center h-64">

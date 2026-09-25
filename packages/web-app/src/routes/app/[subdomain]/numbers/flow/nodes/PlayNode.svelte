@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount } from 'svelte';
-  import type { SelectedOutlet } from '../SelectedOutlet';
+  import { onMount } from 'svelte';
   import type { PlayNode } from './PlayNode';
-  import { page } from '$app/stores';
+  import type { NodeProps } from './NodeProps';
+  import { page } from '$app/state';
+  import { routeParam } from '$lib/routeParam';
   import Draggable from '../utils/Draggable.svelte';
   import Inlet from '../utils/Inlet.svelte';
   import CloseButton from '../utils/CloseButton.svelte';
@@ -14,37 +15,37 @@
   import type { AudioChangePayload } from '../AudioChangedPayload';
   import { uploadRecording } from '../uploadRecording';
 
-  const dispatch = createEventDispatcher();
-  export let node: PlayNode;
-  export let selectedOutlet: SelectedOutlet | null;
-  export let inletConnected = false;
-  export let inletConnectable = false;
-  let editData = JSON.parse(JSON.stringify(node.data));
-  let editing = false;
+  let {
+    node,
+    inletConnected = false,
+    inletConnectable = false,
+    onClose,
+    onInletSelected,
+    onDisconnectInlet,
+    onDragEnd,
+    onStatusChanged,
+  }: NodeProps<PlayNode> = $props();
+  let editing = $state(false);
   let deleteFileName = '';
-  let savedMediaURL = '';
-  const subdomain = $page.params.subdomain;
+  let savedMediaURL = $state('');
+  const subdomain = routeParam('subdomain');
 
   let changedAudio: AudioChangePayload | undefined;
 
   export async function triggerUpload() {
     if (changedAudio) {
-      dispatch('statusChanged', { nodeId: node.data.id, status: 'uploading' });
-      const s3Url = await uploadRecording($page.params.subdomain, changedAudio);
-      dispatch('statusChanged', { nodeId: node.data.id, status: 'completed' });
+      onStatusChanged?.({ nodeId: node.data.id, status: 'uploading' });
+      const s3Url = await uploadRecording(routeParam('subdomain'), changedAudio);
+      onStatusChanged?.({ nodeId: node.data.id, status: 'completed' });
       if (s3Url) {
-        node.data = editData;
         editing = false;
         node.data.data.media = s3Url; // Update the node data with the S3 URL
         if (deleteFileName) {
           await deleteS3File(subdomain, deleteFileName);
         }
-        dispatch('updated', { node: node });
       } else {
         throw Error('User is not a member of this org');
       }
-    } else {
-      console.log('skip uploading');
     }
   }
 
@@ -55,19 +56,17 @@
     }
   });
 
-  function onAudioChange(e: CustomEvent) {
-    changedAudio = e.detail;
+  function onAudioChange(audio: AudioChangePayload) {
+    changedAudio = audio;
   }
 
   function onUpdate() {
-    node.data = editData;
     editing = false;
     if (changedAudio) {
       if (node.data.data.media) {
         deleteFileName = node.data.data.media;
       }
     }
-    dispatch('updated', { node: node });
   }
 </script>
 
@@ -75,19 +74,18 @@
   {node}
   title={node.data.type}
   class="block w-[17rem] rounded-lg border-2 border-amber-400 bg-white shadow dark:border-amber-400 dark:bg-gray-800"
-  on:dragEnd
+  {onDragEnd}
 >
-  <svelte:fragment slot="headerActions">
-    <EditButton on:edit={() => (editing = true)} />
-    <CloseButton on:close />
-  </svelte:fragment>
+  {#snippet headerActions()}
+    <EditButton onEdit={() => (editing = true)} />
+    <CloseButton {onClose} />
+  {/snippet}
   <Inlet
-    {selectedOutlet}
     {node}
     connected={inletConnected}
     connectable={inletConnectable}
-    on:inletSelected
-    on:disconnectInlet
+    {onInletSelected}
+    {onDisconnectInlet}
   >
     <div class="space-y-1 p-3">
       {#if savedMediaURL}
@@ -115,7 +113,7 @@
           <button
             type="button"
             class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
-            on:click={() => (editing = false)}
+            onclick={() => (editing = false)}
           >
             <svg
               class="w-3 h-3"
@@ -141,11 +139,7 @@
 
           <div class="flex items-center space-x-6">
             <!-- <p class="text-center text-lg font-medium">Upload audio file / record audio</p> Add this line just above the audio tag -->
-            <MediaUploadRecord
-              nodeId={node.data.id}
-              audioUrl={savedMediaURL}
-              on:audioChange={onAudioChange}
-            />
+            <MediaUploadRecord nodeId={node.data.id} audioUrl={savedMediaURL} {onAudioChange} />
             <!-- Separate container for the duration text with reserved space -->
           </div>
         </div>
@@ -156,7 +150,7 @@
           <button
             data-modal-hide="defaultModal"
             type="button"
-            on:click={onUpdate}
+            onclick={onUpdate}
             class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
           >
             Save
@@ -164,7 +158,7 @@
           <button
             data-modal-hide="defaultModal"
             type="button"
-            on:click={() => (editing = false)}
+            onclick={() => (editing = false)}
             class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600"
           >
             Cancel

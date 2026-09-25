@@ -1,6 +1,10 @@
 <script lang="ts">
-  export let totalPromisesCreated: number = 0;
-  export let totalPromisesClosed: number = 0;
+  interface Props {
+    totalPromisesCreated?: number;
+    totalPromisesClosed?: number;
+  }
+
+  let { totalPromisesCreated = 0, totalPromisesClosed = 0 }: Props = $props();
 </script>
 
 <div

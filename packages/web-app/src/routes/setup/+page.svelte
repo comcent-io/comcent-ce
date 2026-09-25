@@ -3,14 +3,14 @@
   import { postJson } from '$lib/http';
   import { setSessionToken } from '$lib/session';
 
-  let token = '';
-  let name = '';
-  let email = '';
-  let password = '';
-  let orgName = '';
-  let subdomain = '';
-  let sipUsername = '';
-  let error = '';
+  let token = $state('');
+  let name = $state('');
+  let email = $state('');
+  let password = $state('');
+  let orgName = $state('');
+  let subdomain = $state('');
+  let sipUsername = $state('');
+  let error = $state('');
 
   async function claim() {
     error = '';
@@ -55,7 +55,14 @@
       <div
         class="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-700 dark:bg-slate-800"
       >
-        <form method="POST" class="space-y-4" on:submit|preventDefault={claim}>
+        <form
+          method="POST"
+          class="space-y-4"
+          onsubmit={(e) => {
+            e.preventDefault();
+            claim();
+          }}
+        >
           <div>
             <label
               for="setup-token"

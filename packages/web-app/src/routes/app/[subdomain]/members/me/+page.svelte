@@ -1,17 +1,20 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { deleteJson, postJson } from '$lib/http';
-  import toast from 'svelte-french-toast';
+  import toast from '$lib/toast';
   import { publicSipUserRootDomain } from '$lib/publicConfig';
-  export let data;
+  let { data } = $props();
   const sipDomain = publicSipUserRootDomain || 'example.com';
-  let isLoading = false;
-  let hasChanged = false;
-  let showNewKeyModal = false;
-  let apiKeyErrorMessage = '';
-  let newApiKeyName = '';
-  let memberProfile = data.member;
-  let selectedNumber = memberProfile.number?.number || '';
+  let isLoading = $state(false);
+  let hasChanged = $state(false);
+  let showNewKeyModal = $state(false);
+  let apiKeyErrorMessage = $state('');
+  let newApiKeyName = $state('');
+  // A local copy the page edits and saves.
+  // svelte-ignore state_referenced_locally
+  let memberProfile = $state(data.member);
+  // svelte-ignore state_referenced_locally
+  let selectedNumber = $state(memberProfile.number?.number || '');
 
   function handleSelectionChange(event: Event) {
     const target = event.target as HTMLSelectElement;
@@ -22,7 +25,7 @@
   async function handleNumberUpdate(event: Event) {
     event.preventDefault();
     isLoading = true;
-    const result = await postJson(`/api/v2/${$page.params.subdomain}/members/default-number`, {
+    const result = await postJson(`/api/v2/${page.params.subdomain}/members/default-number`, {
       number: selectedNumber,
     });
 
@@ -45,7 +48,7 @@
     apiKeyErrorMessage = '';
 
     const result = await postJson<{ apiKey: string; name: string }>(
-      `/api/v2/${$page.params.subdomain}/me/api-keys`,
+      `/api/v2/${page.params.subdomain}/me/api-keys`,
       { name: newApiKeyName },
     );
 
@@ -66,7 +69,7 @@
 
   async function removeApiKey(apiKey: string) {
     const result = await deleteJson(
-      `/api/v2/${$page.params.subdomain}/me/api-keys/${encodeURIComponent(apiKey)}`,
+      `/api/v2/${page.params.subdomain}/me/api-keys/${encodeURIComponent(apiKey)}`,
     );
 
     if (!result.ok) {
@@ -90,7 +93,7 @@
     <h5 class="mb-1 text-xl font-medium text-gray-900 dark:text-white">{data.user.name}</h5>
     <span class="text-sm text-gray-500 dark:text-gray-400">{memberProfile.role}</span>
     <span class="text-sm text-gray-500 dark:text-gray-400">
-      {memberProfile.username}@{$page.params.subdomain}.{sipDomain}
+      {memberProfile.username}@{page.params.subdomain}.{sipDomain}
     </span>
   </div>
 </div>
@@ -99,7 +102,7 @@
   <div class="mb-3">
     <button
       type="button"
-      on:click={() => (showNewKeyModal = true)}
+      onclick={() => (showNewKeyModal = true)}
       class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
     >
       New key
@@ -138,7 +141,7 @@
                 value={apiKey.apiKey}
               />
               <button
-                on:click={() => navigator.clipboard.writeText(apiKey.apiKey)}
+                onclick={() => navigator.clipboard.writeText(apiKey.apiKey)}
                 class="dark:text-gray-400 dark:border-gray-600 border border-l-0 border-gray-300 rounded-r-md px-3 text-gray-900 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
               >
                 <svg
@@ -162,7 +165,7 @@
             <button
               type="button"
               class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
-              on:click={() => removeApiKey(apiKey.apiKey)}
+              onclick={() => removeApiKey(apiKey.apiKey)}
             >
               Delete
             </button>
@@ -184,7 +187,7 @@
       <button
         type="button"
         class="absolute top-3 right-2.5 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
-        on:click={() => (showNewKeyModal = false)}
+        onclick={() => (showNewKeyModal = false)}
       >
         <svg
           class="w-3 h-3"
@@ -217,7 +220,13 @@
           </div>
         {/if}
         <h3 class="mb-4 text-xl font-medium text-gray-900 dark:text-white">New Api Key</h3>
-        <form class="space-y-6" on:submit|preventDefault={createApiKey}>
+        <form
+          class="space-y-6"
+          onsubmit={(e) => {
+            e.preventDefault();
+            createApiKey(e);
+          }}
+        >
           <div>
             <label for="email" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
               Name
@@ -242,7 +251,7 @@
     </div>
   </div>
 </div>
-<form method="POST" on:submit={handleNumberUpdate}>
+<form method="POST" onsubmit={handleNumberUpdate}>
   <div class="max-w-xl mt-10">
     <label for="defaultNumber" class="block mb-2 text-lg font-bold text-gray-900 dark:text-white">
       Default Outbound Number
@@ -253,7 +262,7 @@
         id="defaultNumber"
         class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-3/4 p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:text-white"
         bind:value={selectedNumber}
-        on:change={handleSelectionChange}
+        onchange={handleSelectionChange}
       >
         {#each data.numbers as number}
           <option value={number.number}>{number.name} ({number.number})</option>

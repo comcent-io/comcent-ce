@@ -1,15 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
-  export let callStoryId: string;
+  interface Props {
+    callStoryId: string;
+  }
 
-  let summaryData: { summary: string } | null = null;
+  let { callStoryId }: Props = $props();
+
+  let summaryData: { summary: string } | null = $state(null);
 
   async function fetchSummary(callStoryId: string) {
     console.log('fetching summary');
     const response = await fetch(
-      `/api/v2/${$page.params.subdomain}/call-story/${callStoryId}/summary`,
+      `/api/v2/${page.params.subdomain}/call-story/${callStoryId}/summary`,
     );
     if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
     return response.json();

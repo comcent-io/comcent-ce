@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
-  import { page } from '$app/stores';
+  import { untrack } from 'svelte';
+  import { page } from '$app/state';
   import { getJson } from '$lib/http';
   import VoiceBotForm from '../../VoiceBotForm.svelte';
   import type { voiceBotData } from '../../schema';
 
-  let formData: voiceBotData = {
+  let formData: voiceBotData = $state({
     id: '',
     name: '',
     instructions: '',
@@ -16,28 +16,30 @@
     isEnqueue: false,
     queues: [],
     pipeline: 'DEEPGRAM_AND_OPENAI',
-  };
+  });
   let lastFetchKey = '';
   // The form is rendered only once the bot has loaded; see the note in
   // sip-trunks/[id]/edit for why an empty form must not be shown first.
-  let isLoading = true;
+  let isLoading = $state(true);
 
   async function fetchVoiceBot() {
     isLoading = true;
     const result = await getJson<any>(
-      `/api/v2/${$page.params.subdomain}/voice-bots/${$page.params.id}`,
+      `/api/v2/${page.params.subdomain}/voice-bots/${page.params.id}`,
     );
     formData = result.ok ? result.data : {};
     isLoading = false;
   }
 
-  $: if (browser) {
-    const nextFetchKey = `${$page.params.subdomain}|${$page.params.id}`;
+  // Refetch when the URL or the org changes. The fetch itself is untracked,
+  // so the state it reads and writes does not re-run this.
+  $effect(() => {
+    const nextFetchKey = `${page.params.subdomain}|${page.params.id}`;
     if (nextFetchKey !== lastFetchKey) {
       lastFetchKey = nextFetchKey;
-      fetchVoiceBot();
+      untrack(() => fetchVoiceBot());
     }
-  }
+  });
 </script>
 
 <h3 class="text-3xl font-bold dark:text-white">Voice Bots Edit</h3>

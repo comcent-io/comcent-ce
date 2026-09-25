@@ -3,9 +3,13 @@
   import DailySummaryListItem from './DailySummaryListItem.svelte';
   import Spinner from '$lib/components/Icons/Spinner.svelte';
 
-  export let dailySummaries: DailySummary[] = [];
-  export let loading: boolean = false;
-  export let onSelectSummary: (date: string) => void;
+  interface Props {
+    dailySummaries?: DailySummary[];
+    loading?: boolean;
+    onSelectSummary: (date: string) => void;
+  }
+
+  let { dailySummaries = [], loading = false, onSelectSummary }: Props = $props();
 </script>
 
 <div>

@@ -1,35 +1,36 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { browser } from '$app/environment';
   import Pagination from '$lib/components/Pagination.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { goto } from '$app/navigation';
   import { getJson, postJson } from '$lib/http';
 
-  export let data;
+  let { data } = $props();
 
   interface numberToBeDeletedType {
     id: string;
     name: string;
   }
 
-  let numberToBeDeleted: numberToBeDeletedType | null = null;
-  let numbers: any[] = [];
-  let currentPage = 1;
-  let itemsPerPage = 10;
-  let totalPages = 1;
-  let totalCount = 0;
-  let isLoading = false;
+  let numberToBeDeleted: numberToBeDeletedType | null = $state(null);
+  let numbers: any[] = $state([]);
+  let currentPage = $state(1);
+  let itemsPerPage = $state(10);
+  let totalPages = $state(1);
+  let totalCount = $state(0);
+  let isLoading = $state(false);
   let latestRequestId = 0;
   let lastFetchKey = '';
 
-  let isDeletePopUp = false;
-  let errorMessage = '';
-  const subdomain = $page.params.subdomain;
+  let isDeletePopUp = $state(false);
+  let errorMessage = $state('');
+  const subdomain = page.params.subdomain;
 
   async function fetchNumbers() {
     const requestId = ++latestRequestId;
-    const searchParams = $page.url.searchParams;
+    const searchParams = page.url.searchParams;
     const requestedCurrentPage = parseInt(searchParams.get('page') || '1', 10);
     const requestedItemsPerPage = parseInt(searchParams.get('itemsPerPage') || '10', 10);
     isLoading = true;
@@ -66,13 +67,15 @@
     isLoading = false;
   }
 
-  $: if (browser) {
-    const nextFetchKey = `${$page.url.search}|${$page.params.subdomain}`;
+  // Refetch when the URL or the org changes. The fetch itself is untracked,
+  // so the state it reads and writes does not re-run this.
+  $effect(() => {
+    const nextFetchKey = `${page.url.search}|${page.params.subdomain}`;
     if (nextFetchKey !== lastFetchKey) {
       lastFetchKey = nextFetchKey;
-      fetchNumbers();
+      untrack(() => fetchNumbers());
     }
-  }
+  });
 
   function toggleDeletePopUp() {
     isDeletePopUp = !isDeletePopUp;
@@ -126,8 +129,8 @@
 {#if isDeletePopUp}
   <ConfirmDialog
     message={`Are you sure you want to delete the ${numberToBeDeleted?.name}?`}
-    on:cancel={toggleDeletePopUp}
-    on:confirm={handleSubmit}
+    onCancel={toggleDeletePopUp}
+    onConfirm={handleSubmit}
   />
 {/if}
 
@@ -175,7 +178,7 @@
 
               <button
                 type="button"
-                on:click={() => setOrgDefaultNumber(number.id)}
+                onclick={() => setOrgDefaultNumber(number.id)}
                 class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
               >
                 Set As Default
@@ -183,9 +186,9 @@
 
               <button
                 type="button"
-                on:click={toggleDeletePopUp}
-                on:click={() => {
+                onclick={() => {
                   numberToBeDeleted = number;
+                  toggleDeletePopUp();
                 }}
                 class="font-medium text-red-600 dark:text-red-500 hover:underline"
               >

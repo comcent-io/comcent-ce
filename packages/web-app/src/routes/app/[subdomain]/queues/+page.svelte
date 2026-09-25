@@ -1,24 +1,24 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { goto } from '$app/navigation';
-  import toast from 'svelte-french-toast';
+  import toast from '$lib/toast';
   import Spinner from '$lib/components/Icons/Spinner.svelte';
   import { onMount } from 'svelte';
 
-  export let data;
+  let { data } = $props();
 
-  let isDeletePopUp = false;
-  let isDeleteInProgress = false;
-  let queues: any[] = [];
-  const subdomain = $page.params.subdomain;
+  let isDeletePopUp = $state(false);
+  let isDeleteInProgress = $state(false);
+  let queues: any[] = $state([]);
+  const subdomain = page.params.subdomain;
 
   interface QueueToBeDeletedType {
     id: string;
     name: string;
   }
 
-  let queueToBeDeleted: QueueToBeDeletedType | null = null;
+  let queueToBeDeleted: QueueToBeDeletedType | null = $state(null);
 
   function toggleDeletePopUp() {
     isDeletePopUp = !isDeletePopUp;
@@ -69,8 +69,8 @@
 {#if isDeletePopUp}
   <ConfirmDialog
     message={`Are you sure you want to delete the ${queueToBeDeleted?.name}?`}
-    on:cancel={toggleDeletePopUp}
-    on:confirm={handleDelete}
+    onCancel={toggleDeletePopUp}
+    onConfirm={handleDelete}
   />
 {/if}
 
@@ -119,7 +119,7 @@
             {:else}
               <button
                 type="button"
-                on:click={() => {
+                onclick={() => {
                   queueToBeDeleted = queue;
                   toggleDeletePopUp();
                 }}

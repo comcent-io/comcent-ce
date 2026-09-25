@@ -1,7 +1,7 @@
 <script lang="ts">
   import ComplianceTabs from '../../compliance/ComplianceTabs.svelte';
   import moment from 'moment-timezone';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { onDestroy, onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { Socket } from 'phoenix';
@@ -18,12 +18,12 @@
     };
   }
 
-  let complianceTasks: ComplianceTask[] = [];
+  let complianceTasks: ComplianceTask[] = $state([]);
 
   let socket: Socket | undefined;
   async function fetchComplianceTasks() {
     const result = await getJson<{ complianceTasks: ComplianceTask[] }>(
-      `/api/v2/${$page.params.subdomain}/compliance/status`,
+      `/api/v2/${page.params.subdomain}/compliance/status`,
     );
 
     if (!result.ok) {
@@ -46,22 +46,22 @@
 
     socket = new Socket(`/ws`, {
       params: {
-        subdomain: $page.params.subdomain,
+        subdomain: page.params.subdomain,
         token: idToken,
       },
     });
 
     socket.connect();
 
-    const channel = socket.channel(`compliance:${$page.params.subdomain}`, {});
+    const channel = socket.channel(`compliance:${page.params.subdomain}`, {});
 
     channel
       .join()
       .receive('ok', (resp: any) => {
-        console.log(`Joined channel compliance:${$page.params.subdomain}`, resp);
+        console.log(`Joined channel compliance:${page.params.subdomain}`, resp);
       })
       .receive('error', (resp: any) => {
-        console.log(`Unable to join channel compliance:${$page.params.subdomain}`, resp);
+        console.log(`Unable to join channel compliance:${page.params.subdomain}`, resp);
       });
 
     channel.on(`compliance_update`, (payload: any) => {
@@ -124,7 +124,7 @@
           {#if complianceTask.type === 'DOWNLOAD' && complianceTask.status === 'COMPLETED' && complianceTask.data?.fileName}
             <td class="px-6 py-4 font-medium">
               <a
-                href={`/api/v2/${$page.params.subdomain}/compliance/downloads/${complianceTask.data.fileName}`}
+                href={`/api/v2/${page.params.subdomain}/compliance/downloads/${complianceTask.data.fileName}`}
                 class="text-blue-600 dark:text-blue-500 hover:underline"
               >
                 Download

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
-  import { page } from '$app/stores';
+  import { untrack } from 'svelte';
+  import { page } from '$app/state';
   import { getJson, postJson } from '$lib/http';
   import Pagination from '$lib/components/Pagination.svelte';
-  import toast from 'svelte-french-toast';
+  import toast from '$lib/toast';
   import Button from '$lib/components/Button.svelte';
   import CopyIcon from '$lib/components/Icons/CopyIcon.svelte';
 
@@ -25,30 +25,30 @@
     inviteResendCount: number;
   };
 
-  let showInviteForm = false;
-  let activeView: 'members' | 'pending-invites' = 'members';
+  let showInviteForm = $state(false);
+  let activeView: 'members' | 'pending-invites' = $state('members');
 
-  export let data;
-  let members: Member[] = [];
-  let pendingInvites: PendingInvite[] = [];
-  let currentPage = 1;
-  let itemsPerPage = 10;
-  let orgMemberCount = 0;
-  let pendingInviteCount = 0;
-  let totalPages = 0;
-  let allowMemberInvite = false;
-  let isLoading = false;
-  let userEmail = '';
-  let userRole = '';
-  let inviteInProgress = false;
-  let resendInProgressInviteId: string | null = null;
+  let { data } = $props();
+  let members: Member[] = $state([]);
+  let pendingInvites: PendingInvite[] = $state([]);
+  let currentPage = $state(1);
+  let itemsPerPage = $state(10);
+  let orgMemberCount = $state(0);
+  let pendingInviteCount = $state(0);
+  let totalPages = $state(0);
+  let allowMemberInvite = $state(false);
+  let isLoading = $state(false);
+  let userEmail = $state('');
+  let userRole = $state('');
+  let inviteInProgress = $state(false);
+  let resendInProgressInviteId: string | null = $state(null);
   let latestRequestId = 0;
   let lastFetchKey = '';
 
   async function fetchMembers() {
     const requestId = ++latestRequestId;
     isLoading = true;
-    const searchParams = $page.url.searchParams;
+    const searchParams = page.url.searchParams;
     const requestedPage = parseInt(searchParams.get('page') || '1', 10);
     const requestedItemsPerPage = parseInt(searchParams.get('itemsPerPage') || '10', 10);
 
@@ -62,7 +62,7 @@
       totalPages?: number;
       allowMemberInvite?: boolean;
     }>(
-      `/api/v2/${$page.params.subdomain}/admin/members?page=${requestedPage}&itemsPerPage=${requestedItemsPerPage}`,
+      `/api/v2/${page.params.subdomain}/admin/members?page=${requestedPage}&itemsPerPage=${requestedItemsPerPage}`,
     );
 
     if (requestId !== latestRequestId) return;
@@ -93,17 +93,19 @@
     isLoading = false;
   }
 
-  $: if (browser) {
-    const nextFetchKey = `${$page.url.search}|${$page.params.subdomain}`;
+  // Refetch when the URL or the org changes. The fetch itself is untracked,
+  // so the state it reads and writes does not re-run this.
+  $effect(() => {
+    const nextFetchKey = `${page.url.search}|${page.params.subdomain}`;
     if (nextFetchKey !== lastFetchKey) {
       lastFetchKey = nextFetchKey;
-      fetchMembers();
+      untrack(() => fetchMembers());
     }
-  }
+  });
 
   async function inviteUser() {
     inviteInProgress = true;
-    const result = await postJson(`/api/v2/${$page.params.subdomain}/members/invite`, {
+    const result = await postJson(`/api/v2/${page.params.subdomain}/members/invite`, {
       email: userEmail,
       role: userRole,
     });
@@ -122,7 +124,10 @@
 
   async function resendInvite(inviteId: string) {
     resendInProgressInviteId = inviteId;
-    const result = await postJson(`/api/v2/${$page.params.subdomain}/members/invite/${inviteId}/resend`, {});
+    const result = await postJson(
+      `/api/v2/${page.params.subdomain}/members/invite/${inviteId}/resend`,
+      {},
+    );
 
     if (!result.ok) {
       toast.error(result.error ?? 'Unable to resend invite');
@@ -148,7 +153,7 @@
     <div class="flex items-start">
       <div class="relative group">
         <button
-          on:click={() => (showInviteForm = true)}
+          onclick={() => (showInviteForm = true)}
           disabled={!allowMemberInvite}
           class={`text-white ${
             !allowMemberInvite ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-700 hover:bg-blue-800'
@@ -171,7 +176,13 @@
       </div>
     </div>
   {:else}
-    <form method="POST" on:submit|preventDefault={inviteUser}>
+    <form
+      method="POST"
+      onsubmit={(e) => {
+        e.preventDefault();
+        inviteUser();
+      }}
+    >
       <label for="email" class="mb-2 text-sm font-medium text-gray-900 dark:text-white">
         Email
       </label>
@@ -209,7 +220,7 @@
             ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500'
             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300'
         }`}
-        on:click={() => (activeView = 'members')}
+        onclick={() => (activeView = 'members')}
         type="button"
       >
         Members ({orgMemberCount})
@@ -222,7 +233,7 @@
             ? 'border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500'
             : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300'
         }`}
-        on:click={() => (activeView = 'pending-invites')}
+        onclick={() => (activeView = 'pending-invites')}
         type="button"
       >
         Pending Invites ({pendingInviteCount})
@@ -275,7 +286,7 @@
                     value={member.sipPassword}
                   />
                   <button
-                    on:click={() => navigator.clipboard.writeText(member.sipPassword)}
+                    onclick={() => navigator.clipboard.writeText(member.sipPassword)}
                     class="dark:text-gray-400 dark:border-gray-600 border border-l-0 border-gray-300 rounded-r-md px-3 text-gray-900 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
                   >
                     <CopyIcon />
@@ -291,7 +302,7 @@
               <td class="px-6 py-4">
                 <a
                   class="text-blue-600 dark:text-blue-500 hover:underline"
-                  href="/app/{$page.params.subdomain}/members/{member.user.id}/edit"
+                  href="/app/{page.params.subdomain}/members/{member.user.id}/edit"
                 >
                   Edit
                 </a>
@@ -344,7 +355,7 @@
                 <button
                   class="text-blue-600 dark:text-blue-500 hover:underline disabled:text-gray-400 disabled:no-underline"
                   disabled={resendInProgressInviteId === invite.id}
-                  on:click={() => resendInvite(invite.id)}
+                  onclick={() => resendInvite(invite.id)}
                   type="button"
                 >
                   {resendInProgressInviteId === invite.id ? 'Resending...' : 'Resend'}

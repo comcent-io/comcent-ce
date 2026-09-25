@@ -1,10 +1,10 @@
-import { FlowNode } from './FlowNode';
+import { FlowNode } from './FlowNode.svelte';
 import WeekTimeNodeComponent from './WeekTimeNode.svelte';
 import { v4 as uuidv4 } from 'uuid';
 import type { WeekTimeData } from '$lib/types/WeekTimeData';
 
 export class WeekTimeNode extends FlowNode {
-  data: WeekTimeData;
+  declare data: WeekTimeData;
   component = WeekTimeNodeComponent;
   constructor(data?: WeekTimeData) {
     super();

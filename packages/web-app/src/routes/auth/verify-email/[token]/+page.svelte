@@ -1,15 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { postJson } from '$lib/http';
   import { setSessionToken } from '$lib/session';
 
-  let error = '';
+  let error = $state('');
 
   onMount(async () => {
     const result = await postJson<{ token: string }>('/api/v2/auth/verify-email', {
-      token: $page.params.token,
+      token: page.params.token,
     });
 
     if (!result.ok || !result.data.token) {

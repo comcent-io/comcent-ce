@@ -2,11 +2,11 @@
   import { onMount } from 'svelte';
   import H3 from '$lib/components/html/H3.svelte';
   import ClipBoardCopyIcon from '$lib/components/Icons/ClipBoardCopyIcon.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { deleteJson, getJson } from '$lib/http';
 
-  export let data;
+  let { data } = $props();
 
   interface voiceBotToBeDeletedType {
     id: string;
@@ -19,13 +19,13 @@
     apiKey: string;
   }
 
-  let voiceBotToBeDeleted: voiceBotToBeDeletedType | null = null;
+  let voiceBotToBeDeleted: voiceBotToBeDeletedType | null = $state(null);
 
-  let isDeletePopUp = false;
-  let errorMessage = '';
-  const subdomain = $page.params.subdomain;
-  let voiceBots: VoiceBot[] = [];
-  let loading = false;
+  let isDeletePopUp = $state(false);
+  let errorMessage = $state('');
+  const subdomain = page.params.subdomain;
+  let voiceBots: VoiceBot[] = $state([]);
+  let loading = $state(false);
 
   async function loadVoiceBots() {
     loading = true;
@@ -80,8 +80,8 @@
 {#if isDeletePopUp}
   <ConfirmDialog
     message={`Are you sure you want to delete the ${voiceBotToBeDeleted?.name}?`}
-    on:cancel={toggleDeletePopUp}
-    on:confirm={handleSubmit}
+    onCancel={toggleDeletePopUp}
+    onConfirm={handleSubmit}
   />
 {/if}
 
@@ -117,7 +117,7 @@
                   value={voiceBot.apiKey}
                 />
                 <button
-                  on:click={() => navigator.clipboard.writeText(voiceBot.apiKey)}
+                  onclick={() => navigator.clipboard.writeText(voiceBot.apiKey)}
                   class="dark:text-gray-400 dark:border-gray-600 border border-l-0 border-gray-300 rounded-r-md px-3 text-gray-900 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
                 >
                   <ClipBoardCopyIcon />
@@ -135,9 +135,9 @@
               </a>
               <button
                 type="button"
-                on:click={toggleDeletePopUp}
-                on:click={() => {
+                onclick={() => {
                   voiceBotToBeDeleted = voiceBot;
+                  toggleDeletePopUp();
                 }}
                 class="font-medium text-red-600 dark:text-red-500 hover:underline"
               >

@@ -1,16 +1,16 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { getJson } from '$lib/http';
   import TimeSince from './TimeSince.svelte';
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { Socket } from 'phoenix';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
   import { publicSipUserRootDomain } from '$lib/publicConfig';
 
   const sipDomain = publicSipUserRootDomain || 'example.com';
 
-  let members: any[] = [];
+  let members: any[] = $state([]);
   let lastFetchKey = '';
 
   const colors: Record<string, string> = {
@@ -21,7 +21,7 @@
   };
 
   async function fetchMembers() {
-    const result = await getJson<{ members: any[] }>(`/api/v2/${$page.params.subdomain}/members`);
+    const result = await getJson<{ members: any[] }>(`/api/v2/${page.params.subdomain}/members`);
     if (!result.ok) {
       members = [];
       return;
@@ -43,22 +43,22 @@
 
     socket = new Socket(`/ws`, {
       params: {
-        subdomain: $page.params.subdomain,
+        subdomain: page.params.subdomain,
         token: idToken,
       },
     });
 
     socket.connect();
 
-    const channel = socket.channel(`presence:${$page.params.subdomain}`, {});
+    const channel = socket.channel(`presence:${page.params.subdomain}`, {});
 
     channel
       .join()
       .receive('ok', (resp: any) => {
-        console.log(`Joined channel presence:${$page.params.subdomain}`, resp);
+        console.log(`Joined channel presence:${page.params.subdomain}`, resp);
       })
       .receive('error', (resp: any) => {
-        console.log(`Unable to join channel presence:${$page.params.subdomain}`, resp);
+        console.log(`Unable to join channel presence:${page.params.subdomain}`, resp);
       });
 
     channel.on(`presence_update`, (payload: any) => {
@@ -90,13 +90,15 @@
     }
   });
 
-  $: if (browser) {
-    const nextFetchKey = $page.params.subdomain;
+  // Refetch when the URL or the org changes. The fetch itself is untracked,
+  // so the state it reads and writes does not re-run this.
+  $effect(() => {
+    const nextFetchKey = page.params.subdomain ?? '';
     if (nextFetchKey !== lastFetchKey) {
       lastFetchKey = nextFetchKey;
-      fetchMembers();
+      untrack(() => fetchMembers());
     }
-  }
+  });
 </script>
 
 <h3 class="text-3xl font-bold dark:text-white mb-5">Presence</h3>
@@ -115,7 +117,7 @@
         <div class="object-cover">
           <h5 class="text-md font-medium text-gray-900 dark:text-white">{member.user.name}</h5>
           <div class="text-sm text-gray-500 dark:text-gray-400">
-            {member.username}@{$page.params.subdomain}.{sipDomain}
+            {member.username}@{page.params.subdomain}.{sipDomain}
           </div>
           <div class="text-sm text-gray-500 dark:text-gray-400">
             <div class="inline-block w-2 h-2 rounded-full {colors[member.presence]}"></div>

@@ -21,7 +21,7 @@
 
   let countries: Country[] = [];
   let countryStatesMap: Record<string, CountryState[]> = {};
-  let formData: CreateOrgSchema = {
+  let formData: CreateOrgSchema = $state({
     name: '',
     subdomain: '',
     useCustomDomain: false,
@@ -36,11 +36,11 @@
     state: '',
     city: '',
     zip: '',
-  };
+  });
 
-  let errorMessage = '';
-  let loading = false;
-  let orgCreationInProgress = false;
+  let errorMessage = $state('');
+  let loading = $state(false);
+  let orgCreationInProgress = $state(false);
 
   onMount(() => {
     void loadContext();
@@ -113,7 +113,7 @@
       Loading organization setup...
     </div>
   {/if}
-  <form method="POST" on:submit={handleOrgCreation}>
+  <form method="POST" onsubmit={handleOrgCreation}>
     <div class="mx-auto max-w-xl pt-14">
       <div class="">
         <Card className="mb-4">

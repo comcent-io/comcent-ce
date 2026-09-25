@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { browser } from '$app/environment';
   import { Socket } from 'phoenix';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
@@ -15,13 +15,13 @@
     callee: string | null;
   };
 
-  let liveCalls: LiveCall[] = [];
+  let liveCalls: LiveCall[] = $state([]);
   let socket: Socket | undefined;
-  let loading = true;
+  let loading = $state(true);
 
   async function fetchLiveCalls() {
     try {
-      const response = await fetch(`/api/v2/${$page.params.subdomain}/calls/live`);
+      const response = await fetch(`/api/v2/${page.params.subdomain}/calls/live`);
       if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
       const data = await response.json();
       liveCalls = data.liveCalls || [];
@@ -62,22 +62,22 @@
 
     socket = new Socket(`/ws`, {
       params: {
-        subdomain: $page.params.subdomain,
+        subdomain: page.params.subdomain,
         token: idToken,
       },
     });
 
     socket.connect();
 
-    const channel = socket.channel(`live_calls:${$page.params.subdomain}`, {});
+    const channel = socket.channel(`live_calls:${page.params.subdomain}`, {});
 
     channel
       .join()
       .receive('ok', (resp: any) => {
-        console.log(`Joined channel live_calls:${$page.params.subdomain}`, resp);
+        console.log(`Joined channel live_calls:${page.params.subdomain}`, resp);
       })
       .receive('error', (resp: any) => {
-        console.log(`Unable to join channel live_calls:${$page.params.subdomain}`, resp);
+        console.log(`Unable to join channel live_calls:${page.params.subdomain}`, resp);
       });
 
     channel.on('live_call_update', (payload: any) => {

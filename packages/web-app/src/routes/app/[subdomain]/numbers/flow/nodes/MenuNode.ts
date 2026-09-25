@@ -1,10 +1,10 @@
 import MenuComponent from './MenuNode.svelte';
 import { v4 as uuidv4 } from 'uuid';
-import { FlowNode } from './FlowNode';
+import { FlowNode } from './FlowNode.svelte';
 import type { MenuNodeData } from '$lib/types/MenuNodeData';
 
 export class MenuNode extends FlowNode {
-  data: MenuNodeData;
+  declare data: MenuNodeData;
   component = MenuComponent;
   constructor(data?: MenuNodeData) {
     super();

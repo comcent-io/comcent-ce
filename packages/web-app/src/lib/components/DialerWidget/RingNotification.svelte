@@ -1,25 +1,25 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
   import type { Invitation } from 'sip.js';
 
-  export let primary: Invitation;
-  export let waiting: Invitation[] = [];
-  export let isIgnored = false;
-  export let currentCallerName: string | undefined = undefined;
-
-  const dispatch = createEventDispatcher();
-
-  function onAnswer(invitation: Invitation) {
-    dispatch('answer', invitation);
+  interface Props {
+    primary: Invitation;
+    waiting?: Invitation[];
+    isIgnored?: boolean;
+    currentCallerName?: string | undefined;
+    onAnswer?: (invitation: Invitation) => void;
+    onDecline?: (invitation: Invitation) => void;
+    onIgnore?: (invitation: Invitation) => void;
   }
 
-  function onDecline(invitation: Invitation) {
-    dispatch('decline', invitation);
-  }
-
-  function onIgnore(invitation: Invitation) {
-    dispatch('ignore', invitation);
-  }
+  let {
+    primary,
+    waiting = [],
+    isIgnored = false,
+    currentCallerName = undefined,
+    onAnswer,
+    onDecline,
+    onIgnore,
+  }: Props = $props();
 
   function displayName(invitation: Invitation) {
     return invitation.remoteIdentity.displayName || invitation.remoteIdentity.uri.aor;
@@ -48,7 +48,9 @@
       ? 'bg-gray-100 dark:bg-gray-800'
       : 'bg-red-50 dark:bg-red-950'}"
   >
-    <span class="h-2 w-2 rounded-full {isIgnored ? 'bg-gray-400' : 'bg-red-500 dark:bg-red-400'}" />
+    <span
+      class="h-2 w-2 rounded-full {isIgnored ? 'bg-gray-400' : 'bg-red-500 dark:bg-red-400'}"
+    ></span>
     <span
       class="text-xs font-bold uppercase tracking-wide {isIgnored
         ? 'text-gray-500 dark:text-gray-400'
@@ -92,14 +94,14 @@
     <div class="mt-4 flex gap-2">
       <button
         type="button"
-        on:click={() => onAnswer(primary)}
+        onclick={() => onAnswer?.(primary)}
         class="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-bold text-white transition-colors hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 dark:focus:ring-green-800"
       >
         Answer
       </button>
       <button
         type="button"
-        on:click={() => onDecline(primary)}
+        onclick={() => onDecline?.(primary)}
         class="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-bold text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-300 dark:focus:ring-red-800"
       >
         Decline
@@ -107,7 +109,7 @@
       {#if !isIgnored}
         <button
           type="button"
-          on:click={() => onIgnore(primary)}
+          onclick={() => onIgnore?.(primary)}
           class="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           Ignore
@@ -139,14 +141,14 @@
               </div>
               <button
                 type="button"
-                on:click={() => onAnswer(invitation)}
+                onclick={() => onAnswer?.(invitation)}
                 class="whitespace-nowrap rounded-md bg-green-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-700"
               >
                 Answer
               </button>
               <button
                 type="button"
-                on:click={() => onDecline(invitation)}
+                onclick={() => onDecline?.(invitation)}
                 class="whitespace-nowrap rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Decline

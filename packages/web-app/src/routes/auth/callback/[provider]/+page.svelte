@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { getJson } from '$lib/http';
   import { setSessionToken } from '$lib/session';
 
   onMount(async () => {
-    const { origin, searchParams } = $page.url;
-    const provider = $page.params.provider;
+    const { origin, searchParams } = page.url;
+    const provider = page.params.provider;
     const redirectUri = `${origin}/auth/callback/${provider}`;
     const callbackUrl =
       `/api/v2/auth/oauth/${provider}/callback?code=${encodeURIComponent(searchParams.get('code') || '')}` +

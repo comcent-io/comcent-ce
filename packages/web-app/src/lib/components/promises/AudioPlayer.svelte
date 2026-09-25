@@ -1,11 +1,21 @@
 <script lang="ts">
-  export let url: string;
-  export let currentParty: string;
-  export let isPlaying: boolean = false;
-  export let currentTime: number = 0;
-  export let duration: number = 0;
+  interface Props {
+    url: string;
+    currentParty: string;
+    isPlaying?: boolean;
+    currentTime?: number;
+    duration?: number;
+  }
 
-  let audioElement: HTMLAudioElement | null = null;
+  let {
+    url,
+    currentParty,
+    isPlaying = $bindable(false),
+    currentTime = $bindable(0),
+    duration = $bindable(0),
+  }: Props = $props();
+
+  let audioElement: HTMLAudioElement | null = $state(null);
 
   function getDisplayName(party: string): string {
     if (party.startsWith('+')) return party;
@@ -60,11 +70,11 @@
   <audio
     bind:this={audioElement}
     src={url}
-    on:timeupdate={handleTimeUpdate}
-    on:loadedmetadata={handleLoadedMetadata}
-    on:ended={handleEnded}
+    ontimeupdate={handleTimeUpdate}
+    onloadedmetadata={handleLoadedMetadata}
+    onended={handleEnded}
     class="hidden"
-  />
+  ></audio>
 
   <!-- Speaker Info & Controls Container -->
   <div class="flex items-center justify-between gap-4">
@@ -92,7 +102,7 @@
     <div class="flex-1 flex items-center space-x-3">
       <!-- Play/Pause Button -->
       <button
-        on:click={togglePlayPause}
+        onclick={togglePlayPause}
         class="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-full shadow-md transition-all duration-200 transform hover:scale-105"
       >
         {#if isPlaying}
@@ -108,11 +118,11 @@
 
       <!-- Progress Bar with Time -->
       <div class="flex-1 space-y-1">
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           class="h-2 bg-slate-400 dark:bg-gray-600 rounded-full cursor-pointer relative overflow-hidden group"
-          on:click={seekAudio}
+          onclick={seekAudio}
         >
           <div
             class="h-full bg-indigo-600 rounded-full transition-all duration-100"

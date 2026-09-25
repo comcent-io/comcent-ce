@@ -23,14 +23,14 @@ export const load: LayoutLoad = async ({ url, params, fetch, parent }) => {
     organizations: any[];
   }>(`/api/v2/${params.subdomain}/me/context`, { fetchFn: fetch });
   if (!result.ok) {
-    if (result.status === 401) throw redirect(303, '/login');
+    if (result.status === 401) redirect(303, '/login');
     if (
       result.status === 404 &&
       (result.data as { error?: string } | null)?.error === 'not_org_member'
     ) {
-      throw redirect(303, '/org');
+      redirect(303, '/org');
     }
-    throw error(result.status || 500, { message: result.error });
+    error(result.status || 500, { message: result.error });
   }
 
   const { numbers, memberProfile: member, organizations } = result.data;
@@ -41,7 +41,7 @@ export const load: LayoutLoad = async ({ url, params, fetch, parent }) => {
 
   const section = url.pathname.split('/').filter(Boolean)[2];
   if (section && ADMIN_SECTIONS.includes(section) && member.role !== 'ADMIN') {
-    throw redirect(303, `/app/${params.subdomain}`);
+    redirect(303, `/app/${params.subdomain}`);
   }
 
   return {

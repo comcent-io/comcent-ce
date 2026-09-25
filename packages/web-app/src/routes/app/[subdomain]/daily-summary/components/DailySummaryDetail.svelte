@@ -6,19 +6,31 @@
   import SentimentCard from './SentimentCard.svelte';
   import Spinner from '$lib/components/Icons/Spinner.svelte';
 
-  export let selectedDate: string;
-  export let loadingDetails: boolean = false;
-  export let executiveSummary: string = '';
-  export let sentimentCounts: SentimentCounts | null = null;
-  export let totalPromisesCreated: number = 0;
-  export let totalPromisesClosed: number = 0;
-  export let onBack: () => void;
+  interface Props {
+    selectedDate: string;
+    loadingDetails?: boolean;
+    executiveSummary?: string;
+    sentimentCounts?: SentimentCounts | null;
+    totalPromisesCreated?: number;
+    totalPromisesClosed?: number;
+    onBack: () => void;
+  }
+
+  let {
+    selectedDate,
+    loadingDetails = false,
+    executiveSummary = '',
+    sentimentCounts = null,
+    totalPromisesCreated = 0,
+    totalPromisesClosed = 0,
+    onBack,
+  }: Props = $props();
 </script>
 
 <div>
   <button
     class="mb-6 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center"
-    on:click={onBack}
+    onclick={onBack}
   >
     ← Back to List
   </button>

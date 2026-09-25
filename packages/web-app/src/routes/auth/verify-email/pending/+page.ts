@@ -7,7 +7,7 @@ export const load: PageLoad = ({ url }) => {
   const email = String(url.searchParams.get('email') || '').trim();
 
   if (!email) {
-    throw redirect(303, '/login');
+    redirect(303, '/login');
   }
 
   return {

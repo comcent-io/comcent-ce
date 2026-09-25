@@ -2,13 +2,13 @@
   import { onDestroy } from 'svelte';
   import { postJson } from '$lib/http';
 
-  export let data;
+  let { data } = $props();
 
-  let remainingSeconds = 0;
+  let remainingSeconds = $state(0);
   let countdownInterval: ReturnType<typeof setInterval> | null = null;
-  let resendSuccess = '';
-  let resendError = '';
-  let isSubmitting = false;
+  let resendSuccess = $state('');
+  let resendError = $state('');
+  let isSubmitting = $state(false);
 
   function clearCountdown() {
     if (countdownInterval) {
@@ -37,6 +37,8 @@
     }, 1000);
   }
 
+  // The cooldown the page loaded with; resends restart it.
+  // svelte-ignore state_referenced_locally
   startCountdown(data.resendCooldownSeconds);
 
   async function resendVerification() {
@@ -111,7 +113,7 @@
         {:else}
           <button
             type="button"
-            on:click={resendVerification}
+            onclick={resendVerification}
             disabled={isSubmitting}
             class="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-cyan-500 dark:text-slate-950"
           >

@@ -1,15 +1,16 @@
-<script>
+<script lang="ts">
   import { INITIAL_SCALE, scale } from '$lib/scaleStore';
 
-  export let span;
-  export let localScale = INITIAL_SCALE;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let { span, localScale = $bindable(INITIAL_SCALE) }: { span: any; localScale?: number } =
+    $props();
   scale.subscribe((value) => {
     localScale = value;
   });
 
-  let showTooltip = false;
+  let showTooltip = $state(false);
 
-  const SPAN_COLORS = {
+  const SPAN_COLORS: Record<string, string | number> = {
     DIAL_WAIT: '#FFF1BC',
     RINGING: '#FFB7B7',
     ON_CALL: '#64CCC5',
@@ -17,7 +18,7 @@
     QUEUED: '#A2FF86',
   };
 
-  const SPAN_Z_INDEX = {
+  const SPAN_Z_INDEX: Record<string, string | number> = {
     DIAL_WAIT: 0,
     RINGING: 0,
     ON_CALL: 0,
@@ -25,22 +26,22 @@
     QUEUED: 1,
   };
 
-  const SPAN_HEIGHT = {
+  const SPAN_HEIGHT: Record<string, string | number> = {
     ON_CALL: 26,
     DIAL_WAIT: 26,
     RINGING: 26,
     DEFAULT: 18,
   };
 
-  let height = SPAN_HEIGHT[span.type] ?? SPAN_HEIGHT.DEFAULT;
+  let height = $derived(SPAN_HEIGHT[span.type] ?? SPAN_HEIGHT.DEFAULT);
 </script>
 
 <div
   class="inline-block absolute"
-  on:mouseenter={() => (showTooltip = true)}
-  on:mouseleave={() => (showTooltip = false)}
-  on:blur={() => (showTooltip = false)}
-  on:focus={() => (showTooltip = true)}
+  onmouseenter={() => (showTooltip = true)}
+  onmouseleave={() => (showTooltip = false)}
+  onblur={() => (showTooltip = false)}
+  onfocus={() => (showTooltip = true)}
   role="graphics-object"
   tabindex="-1"
   style="transform: translateX({span.relativeStartAt * localScale}px); width: {(span.relativeEndAt -

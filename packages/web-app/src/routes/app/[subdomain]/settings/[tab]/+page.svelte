@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import WebhookSettings from './WebhookSettings.svelte';
   import ApiKeysSettings from './ApiKeysSettings.svelte';
   import AiSettings from './AiSettings.svelte';
@@ -10,7 +10,7 @@
     { name: 'AI & Analysis', tab: 'ai-analysis', current: false },
   ];
 
-  $: currentTab = $page.params.tab;
+  let currentTab = $derived(page.params.tab);
 
   const inactiveTabClass =
     'inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300';

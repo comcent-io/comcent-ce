@@ -6,5 +6,5 @@
   viewBox="0 0 18 18"
 >
   <path d="M2 8h14v2H2z" />
-  <span class="sr-only">Remove time slot</span>
 </svg>
+<span class="sr-only">Remove time slot</span>

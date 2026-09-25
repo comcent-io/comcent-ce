@@ -1,11 +1,19 @@
-<script>
-  import { createEventDispatcher } from 'svelte';
+<script lang="ts">
+  import type { Snippet } from 'svelte';
 
-  const dispatch = createEventDispatcher();
-
-  export let showDialog = false;
-  export let title = '';
-  export let className = 'max-w-xl';
+  let {
+    showDialog = false,
+    title = '',
+    className = 'max-w-xl',
+    onClose,
+    children,
+  }: {
+    showDialog?: boolean;
+    title?: string;
+    className?: string;
+    onClose?: () => void;
+    children?: Snippet;
+  } = $props();
 </script>
 
 {#if showDialog}
@@ -24,7 +32,7 @@
           <button
             type="button"
             class="absolute top-3 right-2.5 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
-            on:click={() => dispatch('close')}
+            onclick={() => onClose?.()}
           >
             <svg
               class="w-3 h-3"
@@ -46,7 +54,7 @@
         </div>
         <!-- Modal body -->
         <div class="p-4 md:p-5 space-y-4 overflow-auto">
-          <slot />
+          {@render children?.()}
         </div>
       </div>
     </div>

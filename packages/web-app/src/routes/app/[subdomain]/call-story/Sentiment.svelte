@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
-  export let callStoryId: string;
+  import { page } from '$app/state';
+  interface Props {
+    callStoryId: string;
+  }
+
+  let { callStoryId }: Props = $props();
 
   const smile = {
     positive: '😊',
@@ -11,12 +15,12 @@
 
   type SentimentType = keyof typeof smile;
 
-  let sentimentData: { sentiment: Record<string, SentimentType> } | null = null;
+  let sentimentData: { sentiment: Record<string, SentimentType> } | null = $state(null);
 
   async function fetchSentiment(callStoryId: string) {
     console.log('fetching sentiment');
     const response = await fetch(
-      `/api/v2/${$page.params.subdomain}/call-story/${callStoryId}/sentiment`,
+      `/api/v2/${page.params.subdomain}/call-story/${callStoryId}/sentiment`,
     );
     if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
     return response.json();

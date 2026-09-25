@@ -1,9 +1,13 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
 
-  export let src = '';
+  interface Props {
+    src?: string;
+  }
+
+  let { src = '' }: Props = $props();
   let audio: any = null;
-  let isPlaying = false;
+  let isPlaying = $state(false);
   let isAudioInitialized = false;
 
   function handleButtonClick(event: any) {
@@ -35,7 +39,7 @@
   });
 </script>
 
-<button type="button" on:click={handleButtonClick} class="icon-button">
+<button type="button" onclick={handleButtonClick} class="icon-button">
   {#if isPlaying}
     <svg
       width="25px"

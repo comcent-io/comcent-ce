@@ -1,30 +1,37 @@
 <script lang="ts">
   import CloseIcon from '$lib/components/Icons/CloseIcon.svelte';
   import PlusIcon from '$lib/components/Icons/PlusIcon.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import Spinner from '$lib/components/Icons/Spinner.svelte';
   import { onMount } from 'svelte';
   import type { voiceBotData } from './schema';
 
-  export let isUpdate = false;
-  let isLoading = false;
-  let errorMessage = '';
-  const subdomain = $page.params.subdomain;
-  let availableQueues: Array<{ id: string; name: string }> = [];
-  let isLoadingQueues = false;
+  let isLoading = $state(false);
+  let errorMessage = $state('');
+  const subdomain = page.params.subdomain;
+  let availableQueues: Array<{ id: string; name: string }> = $state([]);
+  let isLoadingQueues = $state(false);
 
-  export let formData: voiceBotData = {
-    id: '',
-    name: '',
-    instructions: '',
-    notToDoInstructions: '',
-    greetingInstructions: '',
-    mcpServers: [],
-    isHangup: false,
-    isEnqueue: false,
-    queues: [],
-    pipeline: 'DEEPGRAM_AND_OPENAI',
-  };
+  interface Props {
+    isUpdate?: boolean;
+    formData?: voiceBotData;
+  }
+
+  let {
+    isUpdate = false,
+    formData = $bindable({
+      id: '',
+      name: '',
+      instructions: '',
+      notToDoInstructions: '',
+      greetingInstructions: '',
+      mcpServers: [],
+      isHangup: false,
+      isEnqueue: false,
+      queues: [],
+      pipeline: 'DEEPGRAM_AND_OPENAI',
+    }),
+  }: Props = $props();
 
   onMount(async () => {
     await fetchQueues();
@@ -102,8 +109,10 @@
     );
   }
 
-  $: remainingQueues = availableQueues.filter((queue) => !formData.queues.includes(queue.name));
-  $: canAddMoreQueues = remainingQueues.length > 0;
+  let remainingQueues = $derived(
+    availableQueues.filter((queue) => !formData.queues.includes(queue.name)),
+  );
+  let canAddMoreQueues = $derived(remainingQueues.length > 0);
 
   function addMcpServer() {
     formData.mcpServers.push({ url: '', token: '' });
@@ -116,7 +125,7 @@
   }
 </script>
 
-<form method="POST" on:submit={handleSubmit}>
+<form method="POST" onsubmit={handleSubmit}>
   <div class="mb-6">
     {#if errorMessage}
       <div class="text-red-500 mb-4">
@@ -222,7 +231,7 @@
           />
           <button
             type="button"
-            on:click={() => removeMcpServer(index)}
+            onclick={() => removeMcpServer(index)}
             class="text-gray-400 bg-transparent rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center"
           >
             <CloseIcon />
@@ -240,7 +249,7 @@
     {/each}
     <button
       type="button"
-      on:click={addMcpServer}
+      onclick={addMcpServer}
       class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm py-2 mr-2 px-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
     >
       <div class="flex items-center">
@@ -291,12 +300,12 @@
             No queues available. Please create a queue first.
           </div>
         {:else}
-          {#each formData.queues as queue, index}
+          {#each formData.queues as _queue, index}
             <div class="flex items-center space-x-1">
               <select
                 id="queueName"
                 name="queueName"
-                bind:value={queue}
+                bind:value={formData.queues[index]}
                 class="bg-gray-50 mb-3 border border-gray-300 text-gray-900 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-1/3 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                 required
               >
@@ -307,7 +316,7 @@
               </select>
               <button
                 type="button"
-                on:click={() => removeQueue(index)}
+                onclick={() => removeQueue(index)}
                 class="text-gray-400 bg-transparent rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center"
               >
                 <CloseIcon />
@@ -317,7 +326,7 @@
           {#if canAddMoreQueues}
             <button
               type="button"
-              on:click={addQueue}
+              onclick={addQueue}
               class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm py-2 mr-2 px-2 mb-3 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
             >
               <div class="flex items-center">

@@ -1,20 +1,19 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import FlowDiagram from './flow/FlowDiagram.svelte';
   import type { numberData } from './schema';
-  export let sipTrunks: any[] = [];
-  let flowDiagram;
-  let isLoading = false;
-  let errorMessage = '';
-  const subdomain = $page.params.subdomain;
+  let flowDiagram: FlowDiagram | undefined = $state();
+  let isLoading = $state(false);
+  let errorMessage = $state('');
+  const subdomain = page.params.subdomain;
 
-  async function handleSubmit(this: HTMLFormElement) {
+  async function handleSubmit() {
     isLoading = true;
     errorMessage = '';
     try {
-      await flowDiagram.triggerUploads();
-      await flowDiagram.cleanupUploads();
+      await flowDiagram?.triggerUploads();
+      await flowDiagram?.cleanupUploads();
 
       if (!formData.allowOutboundRegex) {
         formData.allowOutboundRegex = '';
@@ -61,18 +60,33 @@
     nodes: {},
     outlets: {},
   });
-  export let formData: numberData = {
-    id: '',
-    number: '',
-    name: '',
-    sipTrunkId: '',
-    allowOutboundRegex: '',
-    inboundFlowGraph: defaultInboundFlow,
-  };
-  export let isUpdate = false;
+  interface Props {
+    sipTrunks?: any[];
+    formData?: numberData;
+    isUpdate?: boolean;
+  }
+
+  let {
+    sipTrunks = [],
+    formData = $bindable({
+      id: '',
+      number: '',
+      name: '',
+      sipTrunkId: '',
+      allowOutboundRegex: '',
+      inboundFlowGraph: defaultInboundFlow,
+    }),
+    isUpdate = false,
+  }: Props = $props();
 </script>
 
-<form on:submit|preventDefault={handleSubmit} class="space-y-8">
+<form
+  onsubmit={(e) => {
+    e.preventDefault();
+    handleSubmit();
+  }}
+  class="space-y-8"
+>
   {#if errorMessage}
     <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-600">
       {errorMessage}
@@ -162,13 +176,13 @@
     <FlowDiagram
       bind:this={flowDiagram}
       inboundFlowGraph={formData.inboundFlowGraph || defaultInboundFlow}
-      on:update={(data) => (formData.inboundFlowGraph = data.detail)}
+      onUpdate={(json) => (formData.inboundFlowGraph = json)}
     />
   </section>
 
   <button
     type="button"
-    on:click={handleSubmit}
+    onclick={handleSubmit}
     disabled={isLoading}
     class="w-full rounded-lg bg-blue-700 px-5 py-3 text-center text-sm font-medium text-white focus:outline-none focus:ring-4 focus:ring-blue-300 hover:bg-blue-800 sm:w-auto dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
   >

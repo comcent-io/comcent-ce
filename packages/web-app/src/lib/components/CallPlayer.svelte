@@ -2,55 +2,40 @@
   import PauseIcon from '$lib/components/Icons/PauseIcon.svelte';
   import { INITIAL_SCALE, scale } from '$lib/scaleStore.js';
   import PlayIcon from '$lib/components/Icons/PlayIcon.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
-  export let callSpan;
-  let localScale = INITIAL_SCALE;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let { callSpan }: { callSpan: any } = $props();
+  let localScale = $state(INITIAL_SCALE);
   scale.subscribe((value) => {
     localScale = value;
   });
 
-  $: recordUrl = `/api/v2/${$page.params.subdomain}/call-story/${callSpan.callStoryId}/record/${callSpan.metadata.fileName}`;
-
-  $: playerWidth = localScale * (callSpan.relativeEndAt - audioRelativeStartTime);
-
   const fullWaveHeight = 20;
   const waveIncrement = 3;
-  let waveData = [];
-  $: {
-    const points = [];
-    for (let i = 0; i < playerWidth; i += waveIncrement) {
-      const height = Math.max(5, Math.random() * fullWaveHeight);
-      points.push({
-        x: i,
-        y: (fullWaveHeight - height) / 2,
-        height: height,
-        width: 2,
-      });
-    }
-    waveData = points;
-  }
 
-  let playing = false;
+  let playing = $state(false);
 
-  let audio;
+  let audio: HTMLAudioElement | undefined = $state();
 
   function onPlayButtonClick() {
     if (playing) {
-      audio.pause();
+      audio?.pause();
     } else {
-      audio.play();
+      audio?.play();
     }
     playing = !playing;
   }
 
-  let currentTime = 0;
+  let currentTime = $state(0);
 
-  function onTimeUpdate(event) {
-    currentTime = event.target.currentTime;
+  function onTimeUpdate(event: Event) {
+    currentTime = (event.target as HTMLAudioElement).currentTime;
   }
 
-  function onClickSeekBar(event) {
+  function onClickSeekBar(event: Event & { currentTarget: HTMLElement }) {
+    // Seeking needs a pointer position; a key press has none.
+    if (!audio || !(event instanceof MouseEvent)) return;
     audio.currentTime =
       (event.clientX - event.currentTarget.getBoundingClientRect().left) / localScale;
   }
@@ -65,21 +50,41 @@
     seekBarDown = false;
   }
 
-  function onMouseMoveSeekBar(event) {
+  function onMouseMoveSeekBar(event: MouseEvent & { currentTarget: HTMLElement }) {
     if (!seekBarDown) {
       return;
     }
+    if (!audio) return;
     audio.currentTime =
       (event.clientX - event.currentTarget.getBoundingClientRect().left) / localScale;
   }
 
-  let audioRelativeStartTime = callSpan?.relativeStartAt ?? 0;
-  function onDurationChange(event) {
-    const duration = event.target.duration;
+  // Corrected once the audio's real duration is known.
+  // svelte-ignore state_referenced_locally
+  let audioRelativeStartTime = $state(callSpan?.relativeStartAt ?? 0);
+  function onDurationChange(event: Event) {
+    const duration = (event.target as HTMLAudioElement).duration;
     if (!isNaN(duration) && duration !== Infinity && callSpan) {
       audioRelativeStartTime = callSpan.relativeEndAt - duration;
     }
   }
+  let recordUrl = $derived(
+    `/api/v2/${page.params.subdomain}/call-story/${callSpan.callStoryId}/record/${callSpan.metadata.fileName}`,
+  );
+  let playerWidth = $derived(localScale * (callSpan.relativeEndAt - audioRelativeStartTime));
+  let waveData = $derived.by(() => {
+    const points = [];
+    for (let i = 0; i < playerWidth; i += waveIncrement) {
+      const height = Math.max(5, Math.random() * fullWaveHeight);
+      points.push({
+        x: i,
+        y: (fullWaveHeight - height) / 2,
+        height: height,
+        width: 2,
+      });
+    }
+    return points;
+  });
 </script>
 
 <div class="relative">
@@ -90,11 +95,11 @@
     <div
       class="mb-1 bg-gray-200 dark:bg-gray-700 overflow-hidden inline-block"
       style="height: {fullWaveHeight}px; width: {playerWidth}px;"
-      on:click={onClickSeekBar}
-      on:mousedown={onMouseDownSeekBar}
-      on:mouseup={onMouseUpSeekBar}
-      on:mousemove={onMouseMoveSeekBar}
-      on:keydown={onClickSeekBar}
+      onclick={onClickSeekBar}
+      onmousedown={onMouseDownSeekBar}
+      onmouseup={onMouseUpSeekBar}
+      onmousemove={onMouseMoveSeekBar}
+      onkeydown={onClickSeekBar}
       role="button"
       tabindex="-1"
     >
@@ -120,7 +125,7 @@
       <div class="bg-red-500" style="height: 6px; width: {localScale * currentTime}px;"></div>
     </div>
     <button
-      on:click={onPlayButtonClick}
+      onclick={onPlayButtonClick}
       class="text-gray-900 dark:text-white font-medium rounded-full text-sm p-1 text-center inline-flex items-center"
     >
       {#if playing}
@@ -133,8 +138,8 @@
     <audio
       bind:this={audio}
       src={recordUrl}
-      on:timeupdate={onTimeUpdate}
-      on:durationchange={onDurationChange}
-    />
+      ontimeupdate={onTimeUpdate}
+      ondurationchange={onDurationChange}
+    ></audio>
   </div>
 </div>

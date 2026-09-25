@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount } from 'svelte';
-  import type { SelectedOutlet } from '../SelectedOutlet';
+  import { onMount } from 'svelte';
   import type { MenuNode } from './MenuNode';
-  import { page } from '$app/stores';
+  import type { NodeProps } from './NodeProps';
+  import type { SelectedOutlet } from '../SelectedOutlet';
+  import { page } from '$app/state';
+  import { routeParam } from '$lib/routeParam';
   import Draggable from '../utils/Draggable.svelte';
   import Inlet from '../utils/Inlet.svelte';
   import CloseButton from '../utils/CloseButton.svelte';
@@ -15,39 +17,49 @@
   import type { AudioChangePayload } from '../AudioChangedPayload';
   import { uploadRecording } from '../uploadRecording';
 
-  const dispatch = createEventDispatcher();
-  export let node: MenuNode;
-  let newOutletKey = '';
-  let addingOption = false;
-  let errorMessage = '';
-  export let selectedOutlet: SelectedOutlet | null;
-  export let inletConnected = false;
-  export let inletConnectable = false;
+  let {
+    node,
+    selectedOutlet,
+    inletConnected = false,
+    inletConnectable = false,
+    onClose,
+    onOutletSelected,
+    onDisconnectOutlet,
+    onInletSelected,
+    onDisconnectInlet,
+    onDragEnd,
+  }: NodeProps<MenuNode> = $props();
 
-  let editData = JSON.parse(JSON.stringify(node.data));
-  let editing = false;
+  let newOutletKey = $state('');
+  let addingOption = $state(false);
+  let errorMessage = $state('');
 
-  let audioRecordingURLs = {
+  // A working copy for the edit form; saved into the node on Update.
+  // svelte-ignore state_referenced_locally
+  let editData = $state(JSON.parse(JSON.stringify(node.data)));
+  let editing = $state(false);
+
+  let audioRecordingURLs = $state({
     savedPromptAudioURL: '',
     savedErrorAudioURL: '',
     promptAudioURL: '',
     errorAudioURL: '',
-  };
+  });
 
   let updatedFiles: Record<string, AudioChangePayload> = {};
   let oldFiles: Record<string, string> = {};
-  let isMainContentLoaded = false;
+  let isMainContentLoaded = $state(false);
 
   let changedPromptAudio: AudioChangePayload | undefined;
   let changedErrorAudio: AudioChangePayload | undefined;
 
-  const subdomain = $page.params.subdomain;
+  const subdomain = routeParam('subdomain');
 
   export async function triggerUpload() {
     if (Object.keys(updatedFiles).length > 0) {
       for (let key in updatedFiles) {
         const changedAudio = updatedFiles[key];
-        const s3Url = await uploadRecording($page.params.subdomain, changedAudio);
+        const s3Url = await uploadRecording(routeParam('subdomain'), changedAudio);
         if (s3Url) {
           if (key === 'prompt') {
             node.data.data.promptAudio = s3Url; // Update the node data with the S3 URL
@@ -57,7 +69,6 @@
           if (oldFiles[key]) {
             await deleteS3File(subdomain, oldFiles[key]);
           }
-          dispatch('updated', { node: node });
         } else {
           throw Error('User is not a member of this org');
         }
@@ -80,16 +91,16 @@
     isMainContentLoaded = true;
   });
 
-  function onPromptAudioChange(event: CustomEvent<AudioChangePayload>) {
-    changedPromptAudio = event.detail;
+  function onPromptAudioChange(audio: AudioChangePayload) {
+    changedPromptAudio = audio;
   }
 
-  function onErrorAudioChange(event: CustomEvent<AudioChangePayload>) {
-    changedErrorAudio = event.detail;
+  function onErrorAudioChange(audio: AudioChangePayload) {
+    changedErrorAudio = audio;
   }
 
   function onUpdate() {
-    node.data = editData;
+    node.data = $state.snapshot(editData);
     editing = false;
     if (changedPromptAudio) {
       updatedFiles['prompt'] = changedPromptAudio;
@@ -99,7 +110,6 @@
       updatedFiles['error'] = changedErrorAudio;
       oldFiles['error'] = node.data.data.errorAudio;
     }
-    dispatch('updated', { node: node });
   }
 
   function tryAddOutlet() {
@@ -120,23 +130,20 @@
       node.data.outlets[normalizedOutletKey] = '';
       newOutletKey = '';
       addingOption = false;
-      node.data.outlets = { ...node.data.outlets };
     } else {
       errorMessage = normalizedOutletKey + ' already exists.';
     }
   }
 
-  function handleKeydown(event) {
+  function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter') {
       event.preventDefault();
       tryAddOutlet();
     }
   }
 
-  function handleDeleteOutlet(event) {
-    const { outletId } = event.detail;
+  function handleDeleteOutlet({ outletId }: SelectedOutlet) {
     delete node.data.outlets[outletId];
-    node.data.outlets = { ...node.data.outlets };
   }
 
   function showAddOption() {
@@ -155,19 +162,18 @@
   {node}
   title={node.data.type}
   class="block w-[18.5rem] rounded-lg border-2 border-amber-400 bg-white shadow dark:border-amber-400 dark:bg-gray-800"
-  on:dragEnd
+  {onDragEnd}
 >
-  <svelte:fragment slot="headerActions">
-    <EditButton on:edit={() => (editing = true)} />
-    <CloseButton on:close />
-  </svelte:fragment>
+  {#snippet headerActions()}
+    <EditButton onEdit={() => (editing = true)} />
+    <CloseButton {onClose} />
+  {/snippet}
   <Inlet
-    {selectedOutlet}
     {node}
     connected={inletConnected}
     connectable={inletConnectable}
-    on:inletSelected
-    on:disconnectInlet
+    {onInletSelected}
+    {onDisconnectInlet}
   >
     <div class="space-y-3 p-3">
       <div
@@ -214,7 +220,7 @@
           <button
             type="button"
             class="inline-flex shrink-0 items-center rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/50"
-            on:click={showAddOption}
+            onclick={showAddOption}
           >
             Add option
           </button>
@@ -242,20 +248,20 @@
               type="text"
               inputmode="numeric"
               bind:value={newOutletKey}
-              on:keydown={handleKeydown}
+              onkeydown={handleKeydown}
               placeholder="1"
             />
             <button
               type="button"
               class="inline-flex shrink-0 items-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
-              on:click={tryAddOutlet}
+              onclick={tryAddOutlet}
             >
               Add
             </button>
             <button
               type="button"
               class="inline-flex shrink-0 items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-              on:click={cancelAddOption}
+              onclick={cancelAddOption}
             >
               Cancel
             </button>
@@ -282,9 +288,9 @@
           connected={Boolean(node.data.outlets[key])}
           isDeletable={true}
           class="w-full text-left"
-          on:outletSelected
-          on:disconnectOutlet
-          on:deleteOutlet={handleDeleteOutlet}
+          {onOutletSelected}
+          {onDisconnectOutlet}
+          onDeleteOutlet={handleDeleteOutlet}
         >
           <div class="pr-8">
             <p
@@ -317,7 +323,7 @@
           <button
             type="button"
             class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
-            on:click={() => (editing = false)}
+            onclick={() => (editing = false)}
           >
             <svg
               class="w-3 h-3"
@@ -344,7 +350,7 @@
             <MediaUploadRecord
               audioUrl={audioRecordingURLs.promptAudioURL}
               nodeId={node.data.id}
-              on:audioChange={onPromptAudioChange}
+              onAudioChange={onPromptAudioChange}
             />
           </div>
           <p class="text-left text-lg font-medium text-white pb--2 mb--1">Error Audio:</p>
@@ -353,7 +359,7 @@
             <MediaUploadRecord
               audioUrl={audioRecordingURLs.errorAudioURL}
               nodeId={node.data.id}
-              on:audioChange={onErrorAudioChange}
+              onAudioChange={onErrorAudioChange}
             />
           </div>
           <div class="space-y-6">
@@ -408,7 +414,7 @@
           <button
             data-modal-hide="defaultModal"
             type="button"
-            on:click={onUpdate}
+            onclick={onUpdate}
             class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
           >
             Save
@@ -416,7 +422,7 @@
           <button
             data-modal-hide="defaultModal"
             type="button"
-            on:click={() => (editing = false)}
+            onclick={() => (editing = false)}
             class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600"
           >
             Cancel
