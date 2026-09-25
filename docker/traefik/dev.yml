@@ -3,7 +3,7 @@ http:
     comcent-api:
       entryPoints:
         - web
-      rule: PathPrefix(`/api/v2`) || PathPrefix(`/ws`) || PathPrefix(`/health`) || PathPrefix(`/internal-api`)
+      rule: PathPrefix(`/api/v2`) || PathPrefix(`/ws`) || PathPrefix(`/health`)
       service: comcent-api
       priority: 100
 
