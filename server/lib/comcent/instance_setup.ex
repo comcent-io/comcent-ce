@@ -60,6 +60,11 @@ defmodule Comcent.InstanceSetup do
       {:error, _step, %Ecto.Changeset{} = changeset, _changes} ->
         {:error, format_changeset_error(changeset)}
 
+      # A Multi.run step (wrong token, already claimed, super-admin exists)
+      # failed with its own message.
+      {:error, _step, reason, _changes} when is_atom(reason) or is_binary(reason) ->
+        {:error, reason}
+
       {:error, reason} when is_atom(reason) or is_binary(reason) ->
         {:error, reason}
     end
