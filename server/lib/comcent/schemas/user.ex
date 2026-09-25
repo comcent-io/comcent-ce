@@ -12,6 +12,8 @@ defmodule Comcent.Schemas.User do
     field(:verification_email_sent_at, :utc_datetime)
     field(:verification_resend_count, :integer, default: 0)
     field(:verification_resend_window_started_at, :utc_datetime)
+    field(:email_verification_token_hash, :string, redact: true)
+    field(:email_verification_expires_at, :utc_datetime)
     field(:picture, :string)
     field(:has_agreed_to_tos, :boolean, default: false)
     field(:is_super_admin, :boolean, default: false)
@@ -34,6 +36,8 @@ defmodule Comcent.Schemas.User do
       :verification_email_sent_at,
       :verification_resend_count,
       :verification_resend_window_started_at,
+      :email_verification_token_hash,
+      :email_verification_expires_at,
       :picture,
       :has_agreed_to_tos,
       :is_super_admin,

@@ -3,6 +3,7 @@ defmodule ComcentWeb.AuthController do
   import Ecto.Query
 
   alias Comcent.Auth
+  alias Comcent.Auth.EmailVerification
   alias Comcent.Auth.Oidc
   alias Comcent.Auth.Password
   alias Comcent.Auth.ProviderConfig
@@ -157,25 +158,15 @@ defmodule ComcentWeb.AuthController do
   end
 
   def verify_email(conn, %{"token" => token}) do
-    with {:ok, claims} <- Auth.verify_any_token(token),
-         :ok <- validate_email_verification_claims(claims),
-         {:ok, user} <- mark_user_email_verified(claims) do
-      session_token = Auth.sign_session_token(user, "password")
-      json(conn, %{token: session_token, user: session_user(user, "password")})
-    else
+    case EmailVerification.verify(token) do
+      {:ok, user} ->
+        session_token = Auth.sign_session_token(user, "password")
+        json(conn, %{token: session_token, user: session_user(user, "password")})
+
       {:error, :token_expired} ->
         conn |> put_status(:bad_request) |> json(%{error: "Verification link has expired."})
 
       {:error, :invalid_token} ->
-        conn |> put_status(:bad_request) |> json(%{error: "Verification link is invalid."})
-
-      {:error, :user_not_found} ->
-        conn |> put_status(:bad_request) |> json(%{error: "Verification link is invalid."})
-
-      {:error, message} when is_binary(message) ->
-        conn |> put_status(:bad_request) |> json(%{error: message})
-
-      _ ->
         conn |> put_status(:bad_request) |> json(%{error: "Verification link is invalid."})
     end
   end
@@ -274,20 +265,24 @@ defmodule ComcentWeb.AuthController do
   end
 
   defp create_password_user(params) do
+    {token, token_attrs} = EmailVerification.new_token()
+
     Repo.transaction(fn ->
       user =
         %User{id: Ecto.UUID.generate()}
-        |> User.changeset(%{
-          email: normalize_email(params["email"]),
-          name: String.trim(params["name"] || ""),
-          password_hash: Password.hash(params["password"]),
-          is_email_verified: false,
-          verification_email_sent_at: DateTime.utc_now(),
-          verification_resend_count: 0
-        })
+        |> User.changeset(
+          Map.merge(token_attrs, %{
+            email: normalize_email(params["email"]),
+            name: String.trim(params["name"] || ""),
+            password_hash: Password.hash(params["password"]),
+            is_email_verified: false,
+            verification_email_sent_at: DateTime.utc_now(),
+            verification_resend_count: 0
+          })
+        )
         |> Repo.insert!()
 
-      case send_verification_email(user) do
+      case send_verification_email(user, token) do
         :ok -> user
         {:error, reason} -> Repo.rollback(reason)
       end
@@ -298,10 +293,9 @@ defmodule ComcentWeb.AuthController do
     end
   end
 
-  defp send_verification_email(user) do
+  defp send_verification_email(user, token) do
     user
-    |> Auth.sign_email_verification_token()
-    |> then(&Emails.send_verification_email(user, &1))
+    |> Emails.send_verification_email(token)
     |> case do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, reason}
@@ -316,12 +310,15 @@ defmodule ComcentWeb.AuthController do
 
       with :ok <- ensure_resend_cooldown_elapsed(user, now),
            :ok <- ensure_daily_resend_limit_not_reached(user, now) do
+        # A new token replaces the stored hash, so earlier links stop working.
+        {token, token_attrs} = EmailVerification.new_token(now)
+
         updated_user =
           user
-          |> User.changeset(resend_tracking_attrs(user, now))
+          |> User.changeset(Map.merge(resend_tracking_attrs(user, now), token_attrs))
           |> Repo.update!()
 
-        case send_verification_email(updated_user) do
+        case send_verification_email(updated_user, token) do
           :ok -> generic_resend_response()
           {:error, reason} -> Repo.rollback(reason)
         end
@@ -402,34 +399,6 @@ defmodule ComcentWeb.AuthController do
       retry_after_seconds: @verification_resend_cooldown_seconds
     }
   end
-
-  defp validate_email_verification_claims(%{"token_type" => "email_verification"}), do: :ok
-  defp validate_email_verification_claims(_claims), do: {:error, :invalid_token}
-
-  defp mark_user_email_verified(%{"sub" => user_id, "email" => email}) do
-    normalized_email = normalize_email(email)
-
-    case Repo.get(User, user_id) do
-      %User{} = user ->
-        if normalize_email(user.email) != normalized_email do
-          {:error, :invalid_token}
-        else
-          user
-          |> User.changeset(%{
-            is_email_verified: true,
-            verification_email_sent_at: nil,
-            verification_resend_count: 0,
-            verification_resend_window_started_at: nil
-          })
-          |> Repo.update()
-        end
-
-      nil ->
-        {:error, :user_not_found}
-    end
-  end
-
-  defp mark_user_email_verified(_claims), do: {:error, :invalid_token}
 
   defp find_or_create_oauth_user(oauth_user) do
     if normalize_email(oauth_user.email) == "" do
