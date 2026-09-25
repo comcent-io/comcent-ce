@@ -120,6 +120,14 @@
                 required
                 class="block w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-cyan-500 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
               />
+              {#if data.authConfig.passwordEnabled}
+                <a
+                  href="/auth/forgot-password"
+                  class="mt-2 inline-block text-sm font-medium text-cyan-700 hover:text-cyan-900 dark:text-cyan-300 dark:hover:text-cyan-200"
+                >
+                  Forgot password?
+                </a>
+              {/if}
             </div>
             {#if loginError}
               <p class="text-sm text-red-600 dark:text-red-400">{loginError}</p>

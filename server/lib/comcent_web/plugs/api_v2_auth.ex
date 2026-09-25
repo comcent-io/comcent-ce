@@ -14,7 +14,7 @@ defmodule ComcentWeb.Plugs.ApiV2Auth do
       {:ok, claims_user} ->
         member = get_member(claims_user.email)
 
-        if member do
+        if member && Auth.session_current?(claims_user.claims, member) do
           conn
           |> assign(:current_user, member)
           |> assign(:current_claims_user, claims_user)
