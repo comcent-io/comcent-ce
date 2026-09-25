@@ -42,15 +42,4 @@ defmodule Comcent.Auth do
   def sign_state_token(claims, expires_in_seconds \\ 600) do
     SessionToken.sign(Map.put(claims, "token_type", "oauth_state"), expires_in_seconds)
   end
-
-  def sign_email_verification_token(user, expires_in_seconds \\ 24 * 60 * 60) do
-    SessionToken.sign(
-      %{
-        "sub" => user.id,
-        "email" => user.email,
-        "token_type" => "email_verification"
-      },
-      expires_in_seconds
-    )
-  end
 end
