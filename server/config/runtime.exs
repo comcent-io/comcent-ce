@@ -254,6 +254,14 @@ config :comcent, :sbc,
   ip: sbc_ip,
   rpc_api_token: rpc_api_token
 
+# Internal API as FreeSWITCH reaches it on the private network. Prompt
+# playback URLs handed to FreeSWITCH are built from it, so it must never be
+# the public URL. The default matches the compose service name, so installs
+# whose .env doesn't set it still get an absolute URL.
+config :comcent,
+       :internal_api_base_url,
+       System.get_env("INTERNAL_API_BASE_URL", "http://server:4000/internal-api")
+
 # RabbitMQ Configuration
 rabbitmq_url =
   System.get_env("RABBITMQ_URL") ||
