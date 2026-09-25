@@ -39,3 +39,103 @@ jobs:
 
       - name: Run unit tests
         run: npm run test
+
+  # The Elixir tests boot the full OTP application, so they need the services
+  # its supervision tree connects to: Postgres, Redis and RabbitMQ. They need
+  # none of the docker compose stack the integration workflow builds.
+  server:
+    name: server (elixir)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # pgvector, not stock postgres, and the same tag as docker-compose.yaml:
+        # a migration creates the "vector" extension.
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: comcent_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 15
+
+    env:
+      MIX_ENV: test
+      POSTGRES_HOST: localhost
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_SSL_ENABLED: 'false'
+      REDIS_URL: redis://localhost:6379
+      RABBITMQ_URL: amqp://guest:guest@localhost
+      # config/runtime.exs raises for each of these in every environment, not
+      # just prod, so the suite cannot boot without them. Placeholders, not
+      # secrets: no test makes an external call.
+      STORAGE_BUCKET_NAME: test-placeholder
+      RPC_API_TOKEN: test-placeholder
+      SBC_IP: 10.0.0.1
+      SMTP_URL: smtp://user:pass@localhost:1025
+      SOURCE_EMAIL: 'Comcent CI <ci@example.com>'
+      # Its host becomes the SIP user root domain, which the tests expect to be
+      # example.com (the config/test.exs default).
+      PUBLIC_BASE_URL: https://example.com
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          # Matched to docker/Dockerfile-server so CI and the image compile on
+          # the same toolchain.
+          elixir-version: '1.18.3'
+          otp-version: '27.3'
+
+      - name: Cache deps and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            server/deps
+            server/_build
+          key: ${{ runner.os }}-mix-${{ hashFiles('server/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        working-directory: server
+        run: mix deps.get
+
+      - name: Check formatting
+        working-directory: server
+        run: mix format --check-formatted
+
+      - name: Compile without warnings
+        working-directory: server
+        run: mix compile --warnings-as-errors
+
+      - name: Run tests
+        working-directory: server
+        run: mix test
