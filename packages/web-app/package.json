@@ -50,8 +50,8 @@
   },
   "type": "module",
   "dependencies": {
-    "@sentry/node": "8.55.2",
-    "@sentry/sveltekit": "8.55.2",
+    "@sentry/node": "11.0.0",
+    "@sentry/sveltekit": "11.0.0",
     "@toast-ui/editor": "^3.2.2",
     "@zerodevx/svelte-json-view": "^2.0.0",
     "get-func-name": "^2.0.2",
@@ -63,7 +63,7 @@
     "marked": "^16.4.2",
     "moment": "^2.29.4",
     "moment-timezone": "^0.5.43",
-    "nanoid": "^4.0.2",
+    "nanoid": "^5.1.16",
     "nprogress": "^0.2.0",
     "phoenix": "^1.7.21",
     "randomcolor": "^0.6.2",
@@ -71,7 +71,7 @@
     "svelte-writable-derived": "^3.1.1",
     "ts-node": "^10.9.2",
     "update-browserslist-db": "^1.0.13",
-    "uuid": "^9.0.0",
+    "uuid": "^14.0.0",
     "zod": "^3.22.0"
   },
   "engines": {
