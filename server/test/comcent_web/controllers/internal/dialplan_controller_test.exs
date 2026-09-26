@@ -1,7 +1,7 @@
 defmodule ComcentWeb.Internal.DialplanControllerTest do
   @moduledoc """
   The dialplan's handling of a number's allowed outbound pattern, which it
-  enforces on every outside call that leaves through that number's trunk.
+  enforces on every outbound call that leaves through that number's trunk.
   """
 
   use ComcentWeb.ConnCase
@@ -133,7 +133,7 @@ defmodule ComcentWeb.Internal.DialplanControllerTest do
       assert response(conn, 403) =~ "destination not allowed from this number"
     end
 
-    test "applies to an inbound call redirected to an outside number", %{conn: conn} do
+    test "applies to an inbound call redirected to an external number", %{conn: conn} do
       org = org()
       number = number(org, allow_outbound_regex: @north_america)
 
@@ -203,7 +203,7 @@ defmodule ComcentWeb.Internal.DialplanControllerTest do
     Repo.insert!(struct!(OrgMember, Keyword.merge(defaults, attrs)))
   end
 
-  # An agent's call to an outside number, as FreeSWITCH asks for it: the From
+  # An agent's call to an external number, as FreeSWITCH asks for it: the From
   # host is under the SIP user root domain, which is what marks it internal.
   # With no `number` the call carries no X-outbound-number header, so the
   # dialplan falls back to the member's and then the org's default number.

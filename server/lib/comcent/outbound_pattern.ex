@@ -1,13 +1,13 @@
 defmodule Comcent.OutboundPattern do
   @moduledoc """
-  A number's `allow_outbound_regex`: the destinations an outside call placed
+  A number's `allow_outbound_regex`: the destinations an outbound call placed
   from that number is allowed to reach. Empty (nil, "" or only whitespace)
   means unrestricted.
 
   ## What the pattern is matched against
 
   The destination as it is actually sent to the carrier, not as it was typed.
-  Before an outside call leaves on a trunk, the dialled string is rewritten by
+  Before an outbound call leaves on a trunk, the dialled string is rewritten by
   `Comcent.DialUtils.convert_number_to_e164_or_us11/2` relative to the number
   placing the call (see `Comcent.DialUtils.create_dial_string_for_sip_trunk/4`):
 
@@ -43,7 +43,7 @@ defmodule Comcent.OutboundPattern do
   end
 
   @doc """
-  Whether an outside call from `from_number` to `destination` is allowed by
+  Whether an outbound call from `from_number` to `destination` is allowed by
   `pattern`.
 
   Returns `:ok`, `{:error, :destination_not_allowed}`, or

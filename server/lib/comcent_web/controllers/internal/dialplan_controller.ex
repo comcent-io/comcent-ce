@@ -435,9 +435,9 @@ defmodule ComcentWeb.Internal.DialplanController do
     end
   end
 
-  # Every outside call leaves through a number's trunk, so this is where that
+  # Every outbound call leaves through a number's trunk, so this is where that
   # number's allowed-destination pattern is enforced - for calls an agent
-  # places and for inbound calls redirected to an outside number alike.
+  # places and for inbound calls redirected to an external number alike.
   # Comcent.OutboundPattern documents what the pattern is matched against.
   defp dial_trunk(number, destination_number, subdomain, context) do
     case OutboundPattern.check(number.allow_outbound_regex, number.number, destination_number) do
@@ -455,7 +455,7 @@ defmodule ComcentWeb.Internal.DialplanController do
 
       # The pattern was saved before patterns were validated. Refuse rather
       # than ignore it, so a broken restriction never quietly allows every
-      # destination - and log it as an error, because every outside call from
+      # destination - and log it as an error, because every outbound call from
       # this number fails until someone fixes it in the number settings.
       {:error, :invalid_pattern} ->
         Logger.error(

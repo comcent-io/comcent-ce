@@ -46,7 +46,7 @@ defmodule Comcent.Schemas.Number do
     |> unique_constraint(:number)
   end
 
-  # A pattern that doesn't compile would refuse every outside call from this
+  # A pattern that doesn't compile would refuse every outbound call from this
   # number (see Comcent.OutboundPattern), so it is turned away here instead.
   defp validate_outbound_regex(changeset) do
     validate_change(changeset, :allow_outbound_regex, fn field, pattern ->

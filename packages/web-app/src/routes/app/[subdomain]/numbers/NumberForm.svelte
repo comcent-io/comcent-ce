@@ -170,7 +170,7 @@
           bind:value={formData.allowOutboundRegex}
         />
         <p id="allowOutboundRegexHelp" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          {`Outside calls from this number to a destination that doesn't match are refused. Destinations are checked in E.164 form (+14155550123), so ^\\+1[0-9]{10}$ allows only North American numbers. Leave empty to allow any destination.`}
+          {`Outbound calls from this number to a destination that doesn't match are refused. Destinations are checked in E.164 form (+14155550123), so ^\\+1[0-9]{10}$ allows only North American numbers. Leave empty to allow any destination.`}
         </p>
       </div>
     </div>
