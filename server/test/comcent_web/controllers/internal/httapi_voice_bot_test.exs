@@ -1,10 +1,8 @@
 defmodule ComcentWeb.Internal.HttpapiVoiceBotTest do
   @moduledoc """
   A call routed into a voice bot step of a number's inbound flow must be
-  bridged to that bot. The flow is stored the way it was saved, so the voice
-  bot node's id can be spelled `voiceBotId` (the flow editor sends the flow as
-  a JSON string, which is stored untouched) or `voice_bot_id` (a flow sent as
-  a JSON object is snake_cased by the request decoder). Both must work.
+  bridged to that bot. The flow is a JSON document stored exactly as the
+  editor sent it, so the node carries the editor's own key, `voiceBotId`.
   """
 
   use ComcentWeb.ConnCase, async: false
@@ -85,18 +83,6 @@ defmodule ComcentWeb.Internal.HttpapiVoiceBotTest do
     save_flow(ctx.number, Jason.encode!(graph))
 
     assert stored_voice_bot_node(ctx.number)["data"]["voiceBotId"] == ctx.voice_bot.id
-
-    body = ctx.conn |> inbound_call(ctx.number) |> response(200)
-    assert body =~ ~s(application="bridge")
-    assert body =~ "sip:#{ctx.voice_bot.id}@"
-  end
-
-  test "bridges to the bot of a flow saved as a JSON object (voice_bot_id)", ctx do
-    graph = voice_bot_flow(%{"voiceBotName" => "Receptionist", "voiceBotId" => ctx.voice_bot.id})
-    # A flow sent as a JSON object is snake_cased by the request decoder.
-    save_flow(ctx.number, ComcentWeb.JsonCase.snake_case_keys(graph))
-
-    assert stored_voice_bot_node(ctx.number)["data"]["voice_bot_id"] == ctx.voice_bot.id
 
     body = ctx.conn |> inbound_call(ctx.number) |> response(200)
     assert body =~ ~s(application="bridge")

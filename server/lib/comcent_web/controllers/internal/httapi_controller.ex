@@ -575,20 +575,14 @@ defmodule ComcentWeb.Internal.HttpapiController do
     end
   end
 
-  # The flow editor saves the flow as a JSON string, which the request decoder
-  # does not snake_case, so its nodes are stored exactly as the editor wrote
-  # them: `voiceBotId`. A flow sent as a JSON object is snake_cased on the way
-  # in instead, and ends up with `voice_bot_id`. Accept either, so a call routed
-  # into a voice bot step reaches its bot whichever way the flow was saved.
+  # The flow is a JSON document stored as the editor wrote it, so its keys are
+  # the editor's own camelCase: the bot is `voiceBotId`. (Only table columns
+  # are snake_case.)
   defp voice_bot_id_from_node(node) do
-    data = node["data"] || %{}
-
-    Enum.find_value(["voiceBotId", "voice_bot_id"], fn key ->
-      case data[key] do
-        id when is_binary(id) and id != "" -> id
-        _ -> nil
-      end
-    end)
+    case get_in(node, ["data", "voiceBotId"]) do
+      id when is_binary(id) and id != "" -> id
+      _ -> nil
+    end
   end
 
   # Helper function to convert media paths to HTTP URLs
