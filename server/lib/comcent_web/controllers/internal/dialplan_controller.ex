@@ -355,7 +355,7 @@ defmodule ComcentWeb.Internal.DialplanController do
         join: o in "orgs",
         on: n.org_id == o.id,
         join: m in "org_members",
-        on: n.id == m.default_number_id,
+        on: n.id == m.number_id,
         left_join: s in "sip_trunks",
         on: n.sip_trunk_id == s.id,
         where: o.subdomain == ^subdomain and m.username == ^username,
