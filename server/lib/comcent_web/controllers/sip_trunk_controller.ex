@@ -13,6 +13,14 @@ defmodule ComcentWeb.SipTrunkController do
     json(conn, %{sip_trunks: sip_trunks})
   end
 
+  # The address a customer configures on their carrier's side of a trunk. It
+  # comes from this deployment's configuration because it differs per install;
+  # when it isn't configured it comes back as nil so the page can leave it out
+  # instead of showing an address that would get calls rejected.
+  def get_settings(conn, _params) do
+    json(conn, %{public_ip: present(Application.get_env(:comcent, :sbc)[:public_ip])})
+  end
+
   def create(conn, params) do
     subdomain = conn.assigns[:subdomain]
     Logger.info("Creating sip trunk for org #{subdomain}")
@@ -120,6 +128,15 @@ defmodule ComcentWeb.SipTrunkController do
         end
     end
   end
+
+  defp present(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp present(_), do: nil
 
   defp format_errors(changeset) do
     Enum.map(changeset.errors, fn {field, {message, _}} -> "#{field}: #{message}" end)

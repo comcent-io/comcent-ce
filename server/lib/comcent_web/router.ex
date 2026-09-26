@@ -80,6 +80,7 @@ defmodule ComcentWeb.Router do
     delete("/numbers/:id", NumberController, :delete)
     post("/numbers/:id/set-default", NumberController, :set_default)
     get("/sip-trunks", SipTrunkController, :get_sip_trunks)
+    get("/sip-trunks/settings", SipTrunkController, :get_settings)
     post("/sip-trunks", SipTrunkController, :create)
     put("/sip-trunks/:id", SipTrunkController, :update)
     delete("/sip-trunks/:id", SipTrunkController, :delete)

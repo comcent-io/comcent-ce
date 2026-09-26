@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
-  import { postJson, putJson } from '$lib/http';
+  import { getJson, postJson, putJson } from '$lib/http';
   import { sipTrunkCreateSchema } from './schema';
   import ErrorMessage from '$lib/components/ErrorMessage.svelte';
 
@@ -20,6 +20,21 @@
     error = $bindable(null),
   }: Props = $props();
   let isLoading = $state(false);
+
+  // The address the customer configures on their carrier. It differs per
+  // deployment, so it comes from the server; when it isn't configured the hint
+  // is left out rather than guessed, because a wrong address gets calls
+  // rejected.
+  let publicIp = $state<string | null>(null);
+
+  $effect(() => {
+    const subdomain = page.params.subdomain;
+    getJson<{ publicIp: string | null }>(`/api/v2/${subdomain}/sip-trunks/settings`).then(
+      (result) => {
+        if (result.ok) publicIp = result.data.publicIp;
+      },
+    );
+  });
 
   async function handleSubmit(event: Event) {
     event.preventDefault();
@@ -89,26 +104,26 @@
   }}
 >
   <div class="mb-6">
-    <div
-      class="p-4 mb-4 text-sm text-blue-800 rounded-lg bg-blue-50 dark:bg-gray-800 dark:text-blue-400"
-      role="alert"
-    >
-      <h5 class="text-lg">Settings</h5>
-      <div>
-        <span class="font-bold">Whitelist IP:</span>
-        We send SIP request from IP address
-        <span class="italic">34.194.225.59/32</span>
-        . Please configure this IP in your SIP Trunk provider.
+    {#if publicIp}
+      <div
+        class="p-4 mb-4 text-sm text-blue-800 rounded-lg bg-blue-50 dark:bg-gray-800 dark:text-blue-400"
+        role="alert"
+      >
+        <h5 class="text-lg">Settings</h5>
+        <div>
+          <span class="font-bold">Whitelist IP:</span>
+          We send SIP requests from IP address
+          <span class="italic">{publicIp}</span>
+          . Please whitelist this IP with your SIP trunk provider.
+        </div>
+        <div>
+          <span class="font-bold">SIP Server:</span>
+          Our SIP server can be reached at IP
+          <span class="italic">{publicIp}</span>
+          . Please configure this with your SIP trunk provider.
+        </div>
       </div>
-      <div>
-        <span class="font-bold">SIP Server:</span>
-        Our sip server can be reached at
-        <span class="italic">sip-server.example.com</span>
-        (preferred) or at ip
-        <span class="italic">34.194.225.59</span>
-        . Please configure this in your SIP Trunk. provider.
-      </div>
-    </div>
+    {/if}
     {#if error}
       <ErrorMessage {error} />
     {/if}

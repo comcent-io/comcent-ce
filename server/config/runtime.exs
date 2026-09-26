@@ -250,8 +250,14 @@ rpc_api_token =
     environment variable RPC_API_TOKEN is missing.
     """
 
+# SBC_PUBLIC_IP is the address carriers see this deployment's SIP traffic come
+# from and send it to: the SBC's public, carrier-facing address, not SBC_IP. It
+# is shown on the SIP trunk page so customers can whitelist it with their
+# carrier. Optional; when unset the page shows no address rather than a wrong
+# one.
 config :comcent, :sbc,
   ip: sbc_ip,
+  public_ip: System.get_env("SBC_PUBLIC_IP"),
   rpc_api_token: rpc_api_token
 
 # Internal API as FreeSWITCH reaches it on the private network. Prompt
