@@ -38,7 +38,6 @@ defmodule Comcent.Schemas.Org do
     has_many(:queues, Comcent.Schemas.Queue, foreign_key: :org_id)
     has_many(:call_stories, Comcent.Schemas.CallStory, foreign_key: :org_id)
     has_many(:org_invites, Comcent.Schemas.OrgInvite, foreign_key: :org_id)
-    has_many(:api_keys, Comcent.Schemas.OrgApiKey, foreign_key: :org_id)
     has_many(:webhooks, Comcent.Schemas.OrgWebhook, foreign_key: :org_id)
     has_many(:audit_logs, Comcent.Schemas.OrgAuditLog, foreign_key: :org_id)
     has_many(:billing_addresses, Comcent.Schemas.OrgBillingAddress, foreign_key: :org_id)
