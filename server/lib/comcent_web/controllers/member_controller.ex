@@ -5,7 +5,7 @@ defmodule ComcentWeb.MemberController do
   alias Comcent.Repo.Org, as: OrgRepo
   alias Comcent.Repo.Number, as: NumberRepo
   alias Comcent.Repo.OrgMember, as: OrgMemberRepo
-  alias Comcent.Schemas.{Org, OrgMember, User, Number, MemberApiKey}
+  alias Comcent.Schemas.{Org, OrgMember, User, Number}
   require Logger
 
   def update_presence(conn, %{"subdomain" => subdomain} = params) do
@@ -235,23 +235,6 @@ defmodule ComcentWeb.MemberController do
       )
       |> Repo.one()
 
-    api_keys =
-      if member_profile do
-        from(mak in MemberApiKey,
-          where: mak.org_id == ^member_profile.org_id and mak.user_id == ^member_profile.user.id,
-          order_by: [asc: mak.name],
-          select: %{
-            api_key: mak.api_key,
-            name: mak.name,
-            created_at: mak.created_at,
-            updated_at: mak.updated_at
-          }
-        )
-        |> Repo.all()
-      else
-        []
-      end
-
     organizations =
       from(u in User,
         join: om in OrgMember,
@@ -281,72 +264,11 @@ defmodule ComcentWeb.MemberController do
       end)
 
     json(conn, %{
-      memberProfile: Map.put(member_profile || %{}, :api_keys, api_keys),
+      memberProfile: member_profile || %{},
       organizations: organizations,
       orgSettings: OrgRepo.get_org_settings(subdomain),
       numbers: numbers
     })
-  end
-
-  def create_api_key(conn, %{"subdomain" => subdomain, "name" => name}) do
-    current_user = conn.assigns[:current_user]
-
-    cond do
-      String.trim(name) == "" or String.length(String.trim(name)) < 3 ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{errorMessage: "Name must be at least 3 characters"})
-
-      true ->
-        case get_member_identity(current_user.email, subdomain) do
-          nil ->
-            conn |> put_status(:not_found) |> json(%{error: "Org member not found"})
-
-          %{org_id: org_id, user_id: user_id} ->
-            now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-            attrs = %{
-              api_key: :crypto.strong_rand_bytes(32) |> Base.encode16(case: :lower),
-              name: String.trim(name),
-              org_id: org_id,
-              user_id: user_id,
-              created_at: now,
-              updated_at: now
-            }
-
-            case Repo.insert(MemberApiKey.changeset(%MemberApiKey{}, attrs)) do
-              {:ok, api_key} ->
-                conn |> put_status(:ok) |> json(%{api_key: api_key.api_key, name: api_key.name})
-
-              {:error, changeset} ->
-                conn
-                |> put_status(:bad_request)
-                |> json(%{error: inspect(changeset.errors)})
-            end
-        end
-    end
-  end
-
-  def delete_api_key(conn, %{"subdomain" => subdomain, "api_key" => api_key}) do
-    current_user = conn.assigns[:current_user]
-
-    case get_member_identity(current_user.email, subdomain) do
-      nil ->
-        conn |> put_status(:not_found) |> json(%{error: "Org member not found"})
-
-      %{org_id: org_id, user_id: user_id} ->
-        {deleted_count, _} =
-          from(mak in MemberApiKey,
-            where: mak.org_id == ^org_id and mak.user_id == ^user_id and mak.api_key == ^api_key
-          )
-          |> Repo.delete_all()
-
-        if deleted_count > 0 do
-          json(conn, %{success: true})
-        else
-          conn |> put_status(:not_found) |> json(%{error: "API key not found"})
-        end
-    end
   end
 
   defp get_member_identity(email, subdomain) do

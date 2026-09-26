@@ -92,11 +92,6 @@ defmodule ComcentWeb.Router do
     put("/voice-bots/:id", VoiceBotController, :update)
     delete("/voice-bots/:id", VoiceBotController, :delete)
 
-    # Org API Keys
-    get("/settings/api-keys", OrgApiKeyController, :get_api_keys)
-    post("/settings/api-keys", OrgApiKeyController, :create)
-    delete("/settings/api-keys/:api_key", OrgApiKeyController, :delete)
-
     # Webhooks
     get("/settings/webhooks", OrgWebhookController, :get_webhooks)
     post("/settings/webhooks", OrgWebhookController, :create)
@@ -135,8 +130,6 @@ defmodule ComcentWeb.Router do
     get("/members", MemberController, :get_all_members)
     post("/members/default-number", MemberController, :update_default_number)
     get("/me/context", MemberController, :get_app_context)
-    post("/me/api-keys", MemberController, :create_api_key)
-    delete("/me/api-keys/:api_key", MemberController, :delete_api_key)
     get("/dashboard/aggregate-presence", MemberController, :get_aggregate_presence)
     get("/calls/live", DashboardController, :get_live_calls)
     get("/promises", PromiseController, :get_promises)

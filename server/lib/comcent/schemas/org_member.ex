@@ -31,12 +31,6 @@ defmodule Comcent.Schemas.OrgMember do
 
     has_many(:queues, through: [:queue_memberships, :queue])
 
-    # has_many(:api_keys, Comcent.Schemas.MemberApiKey,
-    #   foreign_key: :user_id,
-    #   references: :user_id,
-    #   where: [org_id: {:parent, :org_id}]
-    # )
-
     # has_many(:presence_spans, Comcent.Schemas.PresenceSpan,
     #   foreign_key: :user_id,
     #   references: :user_id,

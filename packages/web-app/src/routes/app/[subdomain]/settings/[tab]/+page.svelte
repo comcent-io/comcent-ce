@@ -1,12 +1,10 @@
 <script lang="ts">
   import { page } from '$app/state';
   import WebhookSettings from './WebhookSettings.svelte';
-  import ApiKeysSettings from './ApiKeysSettings.svelte';
   import AiSettings from './AiSettings.svelte';
 
   const tabs = [
     { name: 'Webhooks', tab: 'webhooks', current: true },
-    { name: 'API Keys', tab: 'api-keys', current: false },
     { name: 'AI & Analysis', tab: 'ai-analysis', current: false },
   ];
 
@@ -34,8 +32,6 @@
 
 {#if currentTab === 'webhooks'}
   <WebhookSettings />
-{:else if currentTab === 'api-keys'}
-  <ApiKeysSettings />
 {:else if currentTab === 'ai-analysis'}
   <AiSettings />
 {/if}

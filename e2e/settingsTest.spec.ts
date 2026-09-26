@@ -3,40 +3,6 @@ import { expect } from '@playwright/test';
 
 test.describe.configure({ mode: 'serial' });
 
-async function gotToApiKeyPage(page) {
-  await page.goto('/app/acme');
-  await page.getByRole('link', { name: 'Settings' }).click();
-  await page.getByRole('link', { name: 'API Keys' }).click();
-}
-
-test('Settings page, add key successfully', async ({ page }) => {
-  await gotToApiKeyPage(page);
-  await page.getByRole('button', { name: 'New Key' }).click();
-  await page.getByPlaceholder('Friendly name').click();
-  await page.getByPlaceholder('Friendly name').fill('Staging Key');
-  await page.getByRole('button', { name: 'Create' }).click();
-  await expect(
-    page.getByRole('rowheader', { name: 'Staging Key' }),
-  ).toBeVisible();
-});
-
-test('Settings page, add key with invalid input', async ({ page }) => {
-  await gotToApiKeyPage(page);
-  await page.getByRole('button', { name: 'New Key' }).click();
-  await page.getByPlaceholder('Friendly name').click();
-  await page.getByPlaceholder('Friendly name').fill('a');
-  await page.getByRole('button', { name: 'Create' }).click();
-  await expect(page.getByText('Name must be at least 3')).toBeVisible();
-});
-
-test('Settings page, delete key successfully', async ({ page }) => {
-  await gotToApiKeyPage(page);
-  await page.getByRole('button', { name: 'Delete' }).click();
-  await expect(page.getByRole('status')).toContainText(
-    'API Key deleted successfully',
-  );
-});
-
 test('Settings page, add webhook successfully', async ({ page }) => {
   const webhookUrl = 'https://abc.efg/ccef';
   const webhookName = 'Staging Webhook';
