@@ -26,8 +26,6 @@ function createClient() {
   return new Client({ connectionString: process.env.DATABASE_URL });
 }
 
-
-
 function buildDialGraph(target: string) {
   const nodeId = 'dial-node-1';
 
@@ -188,7 +186,7 @@ function buildVoiceBotGraph(voiceBotId: string) {
         id: nodeId,
         type: 'VoiceBot',
         data: {
-          voice_bot_id: voiceBotId,
+          voiceBotId,
         },
         screen: {
           tx: 0,
@@ -535,7 +533,6 @@ export async function ensureDefaultOutboundRoute(params: {
   } finally {
     await client.end();
   }
-
 }
 
 export async function ensureMemberInOrg(params: {

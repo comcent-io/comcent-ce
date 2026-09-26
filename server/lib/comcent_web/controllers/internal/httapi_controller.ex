@@ -529,8 +529,7 @@ defmodule ComcentWeb.Internal.HttpapiController do
   end
 
   defp voice_bot_response(params, node, sip_number) do
-    # Get voice bot ID from the node data
-    voice_bot_id = get_in(node, ["data", "voice_bot_id"])
+    voice_bot_id = voice_bot_id_from_node(node)
 
     if is_nil(voice_bot_id) do
       Logger.error("No voice bot ID specified in node data")
@@ -573,6 +572,16 @@ defmodule ComcentWeb.Internal.HttpapiController do
             """
         end
       end
+    end
+  end
+
+  # The flow is a JSON document stored as the editor wrote it, so its keys are
+  # the editor's own camelCase: the bot is `voiceBotId`. (Only table columns
+  # are snake_case.)
+  defp voice_bot_id_from_node(node) do
+    case get_in(node, ["data", "voiceBotId"]) do
+      id when is_binary(id) and id != "" -> id
+      _ -> nil
     end
   end
 
