@@ -68,6 +68,9 @@
     <div class="flex items-center mb-2">
       <label for="callUpdate" class="block text-sm font-medium text-gray-900 dark:text-white mr-2">
         Call Update Event
+        <span class="font-normal text-gray-500 dark:text-gray-300">
+          (sends NEW_CALL_STORY when a call ends)
+        </span>
       </label>
       <input
         type="checkbox"
@@ -83,6 +86,7 @@
         class="block text-sm font-medium text-gray-900 dark:text-white mr-2"
       >
         Presence Update Event
+        <span class="font-normal text-gray-500 dark:text-gray-300">(not sent yet)</span>
       </label>
       <input
         type="checkbox"
