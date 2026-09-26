@@ -38,9 +38,6 @@
     "url": "git+https://github.com/comcent-io/comcent-ce.git"
   },
   "author": "",
-  "workspaces": [
-    "packages/tools"
-  ],
   "engines": {
     "node": ">=22.12.0",
     "npm": ">=10.2.4"
