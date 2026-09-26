@@ -1,5 +1,6 @@
-# Node 22 LTS: Vite 8 needs Node >= 20.19, and Node 20 reached end of life in April 2026.
-FROM node:22.19.0 as deps
+# Node 24, the active LTS (supported to April 2028). Its npm 11 installs the
+# web-app lockfile, which npm 10 cannot.
+FROM node:24.21.0 as deps
 
 # Accept build arguments for npm configuration
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
@@ -16,8 +17,6 @@ ENV NPM_CONFIG_REGISTRY=$NPM_CONFIG_REGISTRY \
   NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=$NPM_CONFIG_FETCH_RETRY_MINTIMEOUT \
   NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=$NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT \
   NPM_CONFIG_TIMEOUT=$NPM_CONFIG_TIMEOUT
-
-RUN npm i -g npm@10.2.5
 
 WORKDIR /usr/src/app/packages/web-app
 
@@ -45,7 +44,7 @@ WORKDIR /usr/src/app/packages/web-app
 COPY packages/web-app ./
 RUN npm run build
 
-FROM node:22.19.0-slim as runner
+FROM node:24.21.0-slim as runner
 
 # Accept build arguments for npm configuration
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
@@ -63,8 +62,6 @@ ENV NPM_CONFIG_REGISTRY=$NPM_CONFIG_REGISTRY \
   NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=$NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT \
   NPM_CONFIG_TIMEOUT=$NPM_CONFIG_TIMEOUT \
   NODE_ENV=production
-
-RUN npm i -g npm@10.2.5
 
 RUN apt-get update -y && apt-get install -y openssl dnsutils iputils-ping curl
 
