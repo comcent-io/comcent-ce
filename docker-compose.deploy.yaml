@@ -133,6 +133,9 @@ services:
       # non-local and ext-rtp-ip is used in SDP), and kamailio_rpc.ex uses
       # http://<IP>/rpc for control-plane calls.
       SBC_IP: ${SBC_IP:-172.20.0.10}
+      # The SBC's public address (the sbc service below advertises the same
+      # one). Shown on the SIP trunk page for customers to whitelist.
+      SBC_PUBLIC_IP: ${PUBLIC_IP}
       CLUSTER_STRATEGY: gossip
       POSTGRES_SSL_ENABLED: 'false'
     depends_on:
