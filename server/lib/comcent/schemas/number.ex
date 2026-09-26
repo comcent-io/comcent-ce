@@ -42,6 +42,18 @@ defmodule Comcent.Schemas.Number do
       :sip_trunk_id
     ])
     |> validate_required([:name, :number, :org_id, :sip_trunk_id])
+    |> validate_outbound_regex()
     |> unique_constraint(:number)
+  end
+
+  # A pattern that doesn't compile would refuse every outside call from this
+  # number (see Comcent.OutboundPattern), so it is turned away here instead.
+  defp validate_outbound_regex(changeset) do
+    validate_change(changeset, :allow_outbound_regex, fn field, pattern ->
+      case Comcent.OutboundPattern.validate(pattern) do
+        :ok -> []
+        {:error, message} -> [{field, message}]
+      end
+    end)
   end
 end

@@ -165,9 +165,13 @@
           id="allowOutboundRegex"
           name="allowOutboundRegex"
           class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
-          placeholder="^\\+1[0-9]{10}$"
+          placeholder={'^\\+1[0-9]{10}$'}
+          aria-describedby="allowOutboundRegexHelp"
           bind:value={formData.allowOutboundRegex}
         />
+        <p id="allowOutboundRegexHelp" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {`Outside calls from this number to a destination that doesn't match are refused. Destinations are checked in E.164 form (+14155550123), so ^\\+1[0-9]{10}$ allows only North American numbers. Leave empty to allow any destination.`}
+        </p>
       </div>
     </div>
   </section>

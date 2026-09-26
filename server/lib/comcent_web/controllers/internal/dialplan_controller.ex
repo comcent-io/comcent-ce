@@ -4,6 +4,7 @@ defmodule ComcentWeb.Internal.DialplanController do
   import Ecto.Query
   alias Comcent.Repo
   alias Comcent.DialUtils
+  alias Comcent.OutboundPattern
   alias Comcent.Repo.Queue
 
   def create(conn, params) do
@@ -150,8 +151,7 @@ defmodule ComcentWeb.Internal.DialplanController do
                 Logger.info("No number found")
                 {:not_found, not_allowed_response()}
               else
-                Logger.info("Dialing #{destination_number} via #{number.number}")
-                {:ok, dial_trunk_dialplan(number, destination_number, caller_subdomain, context)}
+                dial_trunk(number, destination_number, caller_subdomain, context)
               end
             end
           end
@@ -219,9 +219,7 @@ defmodule ComcentWeb.Internal.DialplanController do
                 else
                   # external redirect
                   Logger.info("External redirect found.")
-
-                  {:ok,
-                   dial_trunk_dialplan(number, destination_number, number.org.subdomain, context)}
+                  dial_trunk(number, destination_number, number.org.subdomain, context)
                 end
               end
             end
@@ -305,6 +303,7 @@ defmodule ComcentWeb.Internal.DialplanController do
           id: n.id,
           number: n.number,
           name: n.name,
+          allow_outbound_regex: n.allow_outbound_regex,
           org: %{
             id: o.id,
             subdomain: o.subdomain
@@ -333,6 +332,7 @@ defmodule ComcentWeb.Internal.DialplanController do
           id: n.id,
           number: n.number,
           name: n.name,
+          allow_outbound_regex: n.allow_outbound_regex,
           org: %{
             id: o.id,
             subdomain: o.subdomain
@@ -363,6 +363,7 @@ defmodule ComcentWeb.Internal.DialplanController do
           id: n.id,
           number: n.number,
           name: n.name,
+          allow_outbound_regex: n.allow_outbound_regex,
           org: %{
             id: o.id,
             subdomain: o.subdomain
@@ -392,6 +393,7 @@ defmodule ComcentWeb.Internal.DialplanController do
           id: n.id,
           number: n.number,
           name: n.name,
+          allow_outbound_regex: n.allow_outbound_regex,
           org: %{
             id: o.id,
             subdomain: o.subdomain
@@ -430,6 +432,38 @@ defmodule ComcentWeb.Internal.DialplanController do
     case Repo.one(query) do
       nil -> false
       org -> org.is_active
+    end
+  end
+
+  # Every outside call leaves through a number's trunk, so this is where that
+  # number's allowed-destination pattern is enforced - for calls an agent
+  # places and for inbound calls redirected to an outside number alike.
+  # Comcent.OutboundPattern documents what the pattern is matched against.
+  defp dial_trunk(number, destination_number, subdomain, context) do
+    case OutboundPattern.check(number.allow_outbound_regex, number.number, destination_number) do
+      :ok ->
+        Logger.info("Dialing #{destination_number} via #{number.number}")
+        {:ok, dial_trunk_dialplan(number, destination_number, subdomain, context)}
+
+      {:error, :destination_not_allowed} ->
+        Logger.info(
+          "Refusing call to #{destination_number} via #{number.number}: " <>
+            "destination does not match the number's allowed pattern #{inspect(number.allow_outbound_regex)}"
+        )
+
+        {:not_authorized, not_allowed_response(:destination_not_allowed)}
+
+      # The pattern was saved before patterns were validated. Refuse rather
+      # than ignore it, so a broken restriction never quietly allows every
+      # destination - and log it as an error, because every outside call from
+      # this number fails until someone fixes it in the number settings.
+      {:error, :invalid_pattern} ->
+        Logger.error(
+          "Refusing call to #{destination_number} via #{number.number} (number #{number.id}): " <>
+            "its allowed outbound pattern #{inspect(number.allow_outbound_regex)} is not a valid regular expression"
+        )
+
+        {:not_authorized, not_allowed_response(:invalid_outbound_pattern)}
     end
   end
 
@@ -577,13 +611,24 @@ defmodule ComcentWeb.Internal.DialplanController do
     """
   end
 
-  defp not_allowed_response do
+  # FreeSWITCH turns this into its own hangup; a reason, when there is one,
+  # rides along on the result so it shows up in the FreeSWITCH log next to the
+  # refused call.
+  defp not_allowed_response(reason \\ nil) do
     """
     <document type="freeswitch/xml">
       <section name="result">
-        <result status="not allowed" />
+        <result status="not allowed"#{reason_attribute(reason)} />
       </section>
     </document>
     """
   end
+
+  defp reason_attribute(nil), do: ""
+  defp reason_attribute(reason), do: ~s( reason="#{reason_message(reason)}")
+
+  defp reason_message(:destination_not_allowed), do: "destination not allowed from this number"
+
+  defp reason_message(:invalid_outbound_pattern),
+    do: "number's allowed outbound pattern is invalid"
 end
