@@ -1,16 +1,16 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { browser } from '$app/environment';
   import { Socket } from 'phoenix';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
   import LiveCalls from '$lib/components/LiveCalls.svelte';
 
-  let status: { name: string; value: number }[] = [];
+  let status: { name: string; value: number }[] = $state([]);
   let socket: Socket | undefined;
 
   async function fetchStatus() {
-    const response = await fetch(`/api/v2/${$page.params.subdomain}/dashboard/aggregate-presence`);
+    const response = await fetch(`/api/v2/${page.params.subdomain}/dashboard/aggregate-presence`);
     if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
     const data = await response.json();
     status = data.status;
@@ -27,22 +27,22 @@
 
     socket = new Socket(`/ws`, {
       params: {
-        subdomain: $page.params.subdomain,
+        subdomain: page.params.subdomain,
         token: idToken,
       },
     });
 
     socket.connect();
 
-    const channel = socket.channel(`presence:${$page.params.subdomain}`, {});
+    const channel = socket.channel(`presence:${page.params.subdomain}`, {});
 
     channel
       .join()
       .receive('ok', (resp: any) => {
-        console.log(`Joined channel presence:${$page.params.subdomain}`, resp);
+        console.log(`Joined channel presence:${page.params.subdomain}`, resp);
       })
       .receive('error', (resp: any) => {
-        console.log(`Unable to join channel presence:${$page.params.subdomain}`, resp);
+        console.log(`Unable to join channel presence:${page.params.subdomain}`, resp);
       });
 
     channel.on(`presence_update`, (payload: any) => {

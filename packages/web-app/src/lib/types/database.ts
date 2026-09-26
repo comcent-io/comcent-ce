@@ -1,10 +1,5 @@
 export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: JsonValue }
-  | JsonValue[];
+  string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
 
 export interface OrgWebhook {
   id: string;
@@ -42,4 +37,11 @@ export interface CallStory {
   id: string;
   orgId: string;
   customerNumber?: string | null;
+  startAt?: string;
+  caller?: string;
+  callee?: string;
+  direction?: string;
+  isTranscribed?: boolean;
+  isSummarized?: boolean;
+  isSentimentAnalyzed?: boolean;
 }

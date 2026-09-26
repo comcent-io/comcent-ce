@@ -6,7 +6,11 @@
       path: string[];
     }[];
   };
-  export let error: ErrorObject;
+  interface Props {
+    error: ErrorObject;
+  }
+
+  let { error }: Props = $props();
 </script>
 
 <div

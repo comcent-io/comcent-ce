@@ -1,5 +1,5 @@
 import { DialNode } from './DialNode';
-import type { FlowNode } from './FlowNode';
+import type { FlowNode } from './FlowNode.svelte';
 import type { InboundFlowGraphData } from '$lib/types/InboundFlowGraphData';
 import { WeekTimeNode } from './WeekTimeNode';
 import { PlayNode } from './PlayNode';
@@ -8,15 +8,15 @@ import { DialGroupNode } from './DialGroupNode';
 import { MenuNode } from './MenuNode';
 import { VoiceBotNode } from './VoiceBotNode';
 
+// Reactive (runes in a .svelte.ts module): adding, removing or relinking a
+// node updates the flow builder without any manual invalidation.
 export class InboundFlowGraph {
-  nodes: {
-    [key: string]: FlowNode;
-  };
-  start = '';
+  nodes: Record<string, FlowNode> = $state({});
+  start = $state('');
+
   constructor(inboundFlowGraph: string | object) {
     const data = this.parse(inboundFlowGraph);
     this.start = data.start;
-    this.nodes = {};
     for (const node of Object.values(data.nodes)) {
       switch (node.type) {
         case 'Dial':
@@ -57,9 +57,10 @@ export class InboundFlowGraph {
     }
 
     if (typeof inboundFlowGraph !== 'string') {
+      const graph = inboundFlowGraph as Partial<InboundFlowGraphData>;
       return {
-        start: inboundFlowGraph.start ?? '',
-        nodes: inboundFlowGraph.nodes ?? {},
+        start: graph.start ?? '',
+        nodes: graph.nodes ?? {},
       } as InboundFlowGraphData;
     }
 

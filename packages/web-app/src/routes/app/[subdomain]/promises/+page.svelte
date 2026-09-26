@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { page } from '$app/stores';
-  import { onMount } from 'svelte';
-  import toast from 'svelte-french-toast';
+  import { SvelteSet } from 'svelte/reactivity';
+  import { page } from '$app/state';
+  import { routeParam } from '$lib/routeParam';
+  import { onMount, untrack } from 'svelte';
+  import toast from '$lib/toast';
   import Spinner from '$lib/components/Icons/Spinner.svelte';
   import PromiseStatsCard from '$lib/components/promises/PromiseStatsCard.svelte';
   import PromiseTable from '$lib/components/promises/PromiseTable.svelte';
@@ -33,36 +35,27 @@
   }
 
   // State variables
-  let promises: Promise[] = [];
-  let orgMembers: OrgMember[] = [];
-  let loading = true;
-  let selectedStatuses: string[] = ['OPEN'];
-  let assignedToFilter: string = 'assignedToMe';
-  let selectedPromises: Set<string> = new Set();
-  let closingInProgress = false;
-  let stats = {
+  let promises: Promise[] = $state([]);
+  let orgMembers: OrgMember[] = $state([]);
+  let loading = $state(true);
+  let selectedStatuses: string[] = $state(['OPEN']);
+  let assignedToFilter: string = $state('assignedToMe');
+  let selectedPromises = $state(new SvelteSet<string>());
+  let closingInProgress = $state(false);
+  let stats = $state({
     completionRatio: 0,
     totalCreatedToday: 0,
     closedToday: 0,
-  };
+  });
 
   // Modal state
-  let showCallDetailsModal = false;
-  let currentCallStoryId: string = '';
+  let showCallDetailsModal = $state(false);
+  let currentCallStoryId: string = $state('');
 
   // Constants
-  const subdomain = $page.params.subdomain;
-  const currentUsername = $page.data.member.username;
-  const userRole = $page.data.member.role;
-
-  // Reactive statements
-  $: openPromises = promises.filter((p) => p.status === 'OPEN');
-  $: openPromisesCount = openPromises.length;
-
-  // Watch for filter changes
-  $: if (selectedStatuses || assignedToFilter) {
-    fetchPromises();
-  }
+  const subdomain = routeParam('subdomain');
+  const currentUsername = page.data.member.username;
+  const userRole = page.data.member.role;
 
   // LocalStorage functions
   function loadFilterState() {
@@ -173,7 +166,7 @@
       if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
 
       promises = promises.filter((p) => !selectedPromises.has(p.id));
-      selectedPromises = new Set();
+      selectedPromises = new SvelteSet();
 
       toast.success(`Successfully closed ${promiseIds.length} promise(s)`);
     } catch (error: any) {
@@ -203,7 +196,6 @@
     } else {
       selectedPromises.add(promiseId);
     }
-    selectedPromises = selectedPromises;
   }
 
   function selectAllPromises() {
@@ -215,7 +207,6 @@
     } else {
       openPromises.forEach((p) => selectedPromises.add(p.id));
     }
-    selectedPromises = selectedPromises;
   }
 
   // Modal functions
@@ -234,6 +225,15 @@
     loadFilterState();
     fetchPromises();
     fetchOrgMembers();
+  });
+  // Reactive statements
+  let openPromises = $derived(promises.filter((p) => p.status === 'OPEN'));
+  let openPromisesCount = $derived(openPromises.length);
+  // Refetch when a filter changes.
+  $effect(() => {
+    if (selectedStatuses || assignedToFilter) {
+      untrack(() => fetchPromises());
+    }
   });
 </script>
 
@@ -270,7 +270,7 @@
           <select
             class="mt-2 block w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
             value={assignedToFilter}
-            on:change={(e) => setAssignedToFilter(e.currentTarget.value)}
+            onchange={(e) => setAssignedToFilter(e.currentTarget.value)}
           >
             <option value="assignedToMe">Assigned to Me</option>
             <option value="all">All</option>
@@ -286,7 +286,7 @@
               type="checkbox"
               class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
               checked={selectedStatuses.includes('OPEN')}
-              on:change={() => toggleStatusFilter('OPEN')}
+              onchange={() => toggleStatusFilter('OPEN')}
             />
             <span class="ml-2 text-sm text-gray-900 dark:text-white">Open</span>
           </label>
@@ -295,7 +295,7 @@
               type="checkbox"
               class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
               checked={selectedStatuses.includes('CLOSED')}
-              on:change={() => toggleStatusFilter('CLOSED')}
+              onchange={() => toggleStatusFilter('CLOSED')}
             />
             <span class="ml-2 text-sm text-gray-900 dark:text-white">Closed</span>
           </label>
@@ -314,7 +314,7 @@
         <div class="flex items-center space-x-2">
           {#if selectedPromises.size > 0}
             <button
-              on:click={closeSelectedPromises}
+              onclick={closeSelectedPromises}
               disabled={closingInProgress}
               class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -340,11 +340,11 @@
       onUpdateAssignment={updatePromiseAssignment}
       onViewDetails={openCallDetailsModal}
     >
-      <svelte:fragment slot="empty-message">
+      {#snippet emptyMessage()}
         {selectedStatuses.length === 0
           ? 'Please select at least one status to view promises.'
           : 'There are no promises to display for the selected status(es).'}
-      </svelte:fragment>
+      {/snippet}
     </PromiseTable>
   {/if}
 </div>

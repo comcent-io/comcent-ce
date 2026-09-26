@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install Dependencies
@@ -39,6 +39,11 @@ jobs:
 
       - name: Run unit tests
         run: npm run test
+
+      # Type-checks every component and route; fails on errors, not on the
+      # accessibility warnings.
+      - name: Type-check the web app
+        run: npm run check --prefix packages/web-app
 
   # The Elixir tests boot the full OTP application, so they need the services
   # its supervision tree connects to: Postgres, Redis and RabbitMQ. They need

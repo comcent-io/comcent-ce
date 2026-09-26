@@ -11,6 +11,6 @@ export const load: PageLoad = async ({ fetch }) => {
   });
 
   if (!result.ok || !result.data.bootstrapMode) {
-    throw redirect(303, '/login');
+    redirect(303, '/login');
   }
 };

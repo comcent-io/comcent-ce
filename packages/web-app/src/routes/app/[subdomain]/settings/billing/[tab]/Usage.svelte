@@ -1,37 +1,26 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import moment from 'moment';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import Pagination from '$lib/components/Pagination.svelte';
   import { getJson } from '$lib/http';
-  import toast from 'svelte-french-toast';
+  import toast from '$lib/toast';
   import { goto } from '$app/navigation';
 
-  let callStoriesResponse: any = null;
-  $: callStories = callStoriesResponse?.callStories ?? [];
-  $: totalCount = callStoriesResponse?.totalCount ?? 0;
-  $: totalPages = Math.ceil(totalCount / itemsPerPage);
+  let callStoriesResponse: any = $state(null);
 
-  let currentPage = 1;
-  let itemsPerPage = 10;
-  const subdomain = $page.params.subdomain;
-  let expandedRowIndex: number | null = null;
-  let startDate = '';
-  let endDate = '';
-  let baseUrl = `/app/${subdomain}/settings/billing/usage`;
+  let currentPage = $state(1);
+  let itemsPerPage = $state(10);
+  const subdomain = page.params.subdomain;
+  let expandedRowIndex: number | null = $state(null);
+  let startDate = $state('');
+  let endDate = $state('');
+  let baseUrl = $derived(
+    startDate && endDate
+      ? `/app/${subdomain}/settings/billing/usage?startDate=${startDate}&endDate=${endDate}`
+      : `/app/${subdomain}/settings/billing/usage`,
+  );
   let latestRequestId = 0;
-
-  $: {
-    const searchParams = $page.url.searchParams;
-    currentPage = parseInt(searchParams.get('page') || '1', 10);
-    itemsPerPage = parseInt(searchParams.get('itemsPerPage') || '10', 10);
-    fetchData();
-  }
-
-  $: {
-    if (startDate && endDate) {
-      baseUrl = `/app/${subdomain}/settings/billing/usage?startDate=${startDate}&endDate=${endDate}`;
-    }
-  }
 
   const toggleRow = (index: number) => {
     expandedRowIndex = expandedRowIndex === index ? null : index;
@@ -76,7 +65,7 @@
   }
 
   async function updateUsageUrl(nextPage: number, nextItemsPerPage: number) {
-    const nextUrl = new URL(baseUrl, $page.url.origin);
+    const nextUrl = new URL(baseUrl, page.url.origin);
     nextUrl.searchParams.set('page', nextPage.toString());
     nextUrl.searchParams.set('itemsPerPage', nextItemsPerPage.toString());
     await goto(`${nextUrl.pathname}${nextUrl.search}`, {
@@ -109,11 +98,32 @@
     }
     await fetchData();
   }
+  let callStories = $derived(callStoriesResponse?.callStories ?? []);
+  let totalCount = $derived(callStoriesResponse?.totalCount ?? 0);
+  // The page and page size live in the URL; follow it and refetch.
+  $effect(() => {
+    const searchParams = page.url.searchParams;
+    const nextPage = parseInt(searchParams.get('page') || '1', 10);
+    const nextItemsPerPage = parseInt(searchParams.get('itemsPerPage') || '10', 10);
+    untrack(() => {
+      currentPage = nextPage;
+      itemsPerPage = nextItemsPerPage;
+      fetchData();
+    });
+  });
+  let totalPages = $derived(Math.ceil(totalCount / itemsPerPage));
 </script>
 
 <h3 class="text-3xl font-bold dark:text-white mb-4 mt-4">Wallet Usage</h3>
 
-<form method="POST" on:submit|preventDefault={handleSubmit} class="mt-4">
+<form
+  method="POST"
+  onsubmit={(e) => {
+    e.preventDefault();
+    handleSubmit(e);
+  }}
+  class="mt-4"
+>
   <div class="flex items-center mb-6">
     <div class="relative">
       <input
@@ -171,7 +181,7 @@
           <td class="px-6 py-4">
             <button
               type="button"
-              on:click={() => toggleRow(callStoryIndex)}
+              onclick={() => toggleRow(callStoryIndex)}
               class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
             >
               {expandedRowIndex === callStoryIndex ? 'Hide details' : 'View details'}

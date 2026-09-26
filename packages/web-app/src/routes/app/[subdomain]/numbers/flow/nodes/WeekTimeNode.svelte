@@ -1,27 +1,34 @@
 <script lang="ts">
-  import type { SelectedOutlet } from '../SelectedOutlet';
   import type { WeekTimeNode } from './WeekTimeNode';
+  import type { NodeProps } from './NodeProps';
   import Draggable from '../utils/Draggable.svelte';
   import Inlet from '../utils/Inlet.svelte';
   import Outlet from '../utils/Outlet.svelte';
   import CloseButton from '../utils/CloseButton.svelte';
   import EditButton from '../utils/EditButton.svelte';
   import moment from 'moment-timezone';
-  import { createEventDispatcher } from 'svelte';
   import ErrorMessage from '$lib/components/ErrorMessage.svelte';
   import CloseIcon from '$lib/components/Icons/CloseIcon.svelte';
   import PlusIcon from '$lib/components/Icons/PlusIcon.svelte';
   import MinusSignIcon from '$lib/components/Icons/MinusSignIcon.svelte';
 
-  const dispatch = createEventDispatcher();
+  let {
+    node,
+    selectedOutlet,
+    inletConnected = false,
+    inletConnectable = false,
+    onClose,
+    onOutletSelected,
+    onDisconnectOutlet,
+    onInletSelected,
+    onDisconnectInlet,
+    onDragEnd,
+  }: NodeProps<WeekTimeNode> = $props();
 
-  export let node: WeekTimeNode;
-  let editData = JSON.parse(JSON.stringify(node.data));
-  export let selectedOutlet: SelectedOutlet | null;
-  export let inletConnected = false;
-  export let inletConnectable = false;
-
-  let editing = false;
+  // A working copy for the edit form; saved into the node on Update.
+  // svelte-ignore state_referenced_locally
+  let editData = $state(JSON.parse(JSON.stringify(node.data)));
+  let editing = $state(false);
 
   const weekdays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const timezones = moment.tz.names();
@@ -29,9 +36,10 @@
     editing = true;
   }
 
-  let error = {
+  let error = $state({
     message: '',
-  };
+    formErrors: [] as { message: string; path: string[] }[],
+  });
   function onUpdate() {
     error.message = '';
     for (const weekday of weekdays) {
@@ -82,9 +90,8 @@
     }
 
     if (error.message.length === 0) {
-      node.data = editData;
+      node.data = $state.snapshot(editData);
       editing = false;
-      dispatch('updated', { node: node });
     }
   }
 
@@ -98,7 +105,6 @@
 
   // remove time slot
   function removeSlot(weekday: string, index: number) {
-    console.log(index);
     editData.data[weekday].timeSlots = [
       ...editData.data[weekday].timeSlots.slice(0, index),
       ...editData.data[weekday].timeSlots.slice(index + 1),
@@ -110,19 +116,18 @@
   {node}
   title={node.data.type}
   class="block w-[18.5rem] rounded-lg border-2 border-amber-400 bg-white shadow dark:border-amber-400 dark:bg-gray-800"
-  on:dragEnd
+  {onDragEnd}
 >
-  <svelte:fragment slot="headerActions">
-    <EditButton on:edit={onEdit} />
-    <CloseButton on:close />
-  </svelte:fragment>
+  {#snippet headerActions()}
+    <EditButton {onEdit} />
+    <CloseButton {onClose} />
+  {/snippet}
   <Inlet
     {node}
-    {selectedOutlet}
     connected={inletConnected}
     connectable={inletConnectable}
-    on:inletSelected
-    on:disconnectInlet
+    {onInletSelected}
+    {onDisconnectInlet}
   >
     <div class="space-y-2 p-3">
       <!-- eslint-disable-next-line @typescript-eslint/no-unused-vars -->
@@ -131,10 +136,10 @@
           {selectedOutlet}
           nodeId={node.data.id}
           outletId={key}
-          connected={Boolean(node.data.outlets[key])}
+          connected={Boolean(node.data.outlets[key as keyof typeof node.data.outlets])}
           class="w-full"
-          on:outletSelected
-          on:disconnectOutlet
+          {onOutletSelected}
+          {onDisconnectOutlet}
         >
           <p class="text-sm font-semibold dark:text-white">
             {key}
@@ -163,7 +168,7 @@
           <button
             type="button"
             class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
-            on:click={() => (editing = false)}
+            onclick={() => (editing = false)}
           >
             <CloseIcon />
           </button>
@@ -237,7 +242,7 @@
                           {#if editData.data[weekday].timeSlots.length > 1}
                             <button
                               type="button"
-                              on:click={() => removeSlot(weekday, idx)}
+                              onclick={() => removeSlot(weekday, idx)}
                               class="text-blue-700 hover:bg-blue-700 hover:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 font-bold rounded-full text-sm p-1 text-center inline-flex items-center dark:border-blue-500 dark:text-blue-500 dark:hover:text-white dark:focus:ring-blue-800 dark:hover:bg-blue-500 ml-1"
                             >
                               <MinusSignIcon />
@@ -246,7 +251,7 @@
                           {#if idx === editData.data[weekday].timeSlots.length - 1}
                             <button
                               type="button"
-                              on:click={() => addNewSlot(weekday)}
+                              onclick={() => addNewSlot(weekday)}
                               class="text-blue-700 hover:bg-blue-700 hover:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 font-bold rounded-full text-sm p-1 text-center inline-flex items-center dark:border-blue-500 dark:text-blue-500 dark:hover:text-white dark:focus:ring-blue-800 dark:hover:bg-blue-500 ml-1"
                             >
                               <PlusIcon />
@@ -268,7 +273,7 @@
           <button
             data-modal-hide="defaultModal"
             type="button"
-            on:click={onUpdate}
+            onclick={onUpdate}
             class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
           >
             Save
@@ -276,7 +281,7 @@
           <button
             data-modal-hide="defaultModal"
             type="button"
-            on:click={() => (editing = false)}
+            onclick={() => (editing = false)}
             class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600"
           >
             Cancel

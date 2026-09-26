@@ -1,10 +1,11 @@
-<script>
-  export let active = false;
+<script lang="ts">
+  let { active = false, onclick }: { active?: boolean; onclick?: (e: MouseEvent) => void } =
+    $props();
 </script>
 
 <button
   type="button"
-  on:click
+  {onclick}
   class="flex-1 rounded-lg border py-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
   class:active
   class:inactive={!active}

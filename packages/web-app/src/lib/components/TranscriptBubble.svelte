@@ -1,8 +1,15 @@
 <script lang="ts">
-  export let name = 'Elon Musk';
-  export let message = "That's awesome. I think our users will really appreciate the improvements.";
+  interface Props {
+    name?: string;
+    message?: string;
+  }
 
-  $: flexDirection = name?.startsWith('+') ? 'flex-row' : 'flex-row-reverse';
+  let {
+    name = 'Elon Musk',
+    message = "That's awesome. I think our users will really appreciate the improvements.",
+  }: Props = $props();
+
+  let flexDirection = $derived(name?.startsWith('+') ? 'flex-row' : 'flex-row-reverse');
 </script>
 
 <div class="flex {flexDirection}">

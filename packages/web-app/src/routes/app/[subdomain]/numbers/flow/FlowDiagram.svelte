@@ -1,114 +1,136 @@
 <script lang="ts">
   import StartNode from './nodes/StartNode.svelte';
-  import { createEventDispatcher, tick, onDestroy, afterUpdate } from 'svelte';
-  import LeaderLine from 'leader-line-new?client';
+  import { tick, onDestroy, onMount, untrack } from 'svelte';
+  import LeaderLine from 'leader-line-new';
   import type { SelectedOutlet } from './SelectedOutlet';
   import type { SelectedInlet } from './SelectedInlet';
+  import type { DragEnd } from './utils/Draggable.svelte';
+  import type { UploadStatus } from './nodes/NodeProps';
   import { browser } from '$app/environment';
   import { DialNode } from './nodes/DialNode';
   import { DialGroupNode } from './nodes/DialGroupNode';
-  import { InboundFlowGraph } from './nodes/InboundFlowGraph';
-  import type { FlowNode } from './nodes/FlowNode';
+  import { InboundFlowGraph } from './nodes/InboundFlowGraph.svelte';
+  import type { FlowNode } from './nodes/FlowNode.svelte';
   import { WeekTimeNode } from './nodes/WeekTimeNode';
   import { PlayNode } from './nodes/PlayNode';
   import { MenuNode } from './nodes/MenuNode';
   import { QueueNode } from './nodes/QueueNode';
   import { VoiceBotNode } from './nodes/VoiceBotNode';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
+  import { routeParam } from '$lib/routeParam';
   import { deleteS3Uploads } from './utils/DeleteUploads';
 
-  const dispatch = createEventDispatcher();
+  let {
+    inboundFlowGraph,
+    onUpdate,
+  }: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    inboundFlowGraph: any;
+    /** The graph as JSON, after every change. */
+    onUpdate?: (json: string) => void;
+  } = $props();
 
-  export let inboundFlowGraph: any;
-  let hideAddDropdown = true;
-  let selectedOutlet: SelectedOutlet | null = null;
+  let hideAddDropdown = $state(true);
+  let selectedOutlet: SelectedOutlet | null = $state(null);
 
-  let graphJson = new InboundFlowGraph(inboundFlowGraph);
+  // The graph and its nodes are reactive classes (see InboundFlowGraph and
+  // FlowNode): editing them anywhere updates this view. It is built once from
+  // the initial prop; the flow builder owns it after that.
+  // svelte-ignore state_referenced_locally
+  const graph = new InboundFlowGraph(inboundFlowGraph);
 
-  let nodesComponents = {};
+  // Node components, for their triggerUpload() before the number is saved.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nodesComponents: Record<string, any> = {};
 
-  let deletedNodes: FlowNode[] = [];
-  let flowCanvas: HTMLDivElement | null = null;
+  const deletedNodes: FlowNode[] = [];
   let lineRefreshFrame: number | null = null;
 
-  $: dispatch('update', graphJson.json());
+  // Report the graph after every change, however deep.
+  $effect(() => {
+    const json = graph.json();
+    untrack(() => onUpdate?.(json));
+  });
 
-  const promises: any[] = [];
+  // Redraw the connector lines whenever a link or node changes.
+  $effect(() => {
+    graph.json();
+    untrack(() => drawLines());
+  });
+
+  // Anything that can move a block (a banner appearing, an upload row, a
+  // block growing while it is edited) needs the lines re-positioned once the
+  // DOM has updated. This replaces Svelte 4's afterUpdate.
+  $effect(() => {
+    graph.json();
+    void selectedOutlet;
+    void statusArray.length;
+    scheduleLineRefresh();
+  });
+
+  const promises: Promise<unknown>[] = [];
   export async function triggerUploads() {
     for (const component of Object.values(nodesComponents)) {
       if (component && component.triggerUpload) {
-        const promise = component.triggerUpload();
-        promises.push(promise);
+        promises.push(component.triggerUpload());
       }
     }
     await Promise.all(promises).catch((e) => `Error in uploading ${e}`);
   }
 
   export async function cleanupUploads() {
-    deleteS3Uploads($page.params.subdomain, deletedNodes);
+    deleteS3Uploads(routeParam('subdomain'), deletedNodes);
   }
 
   function newNode(node: FlowNode) {
-    graphJson.addNode(node);
-    graphJson = graphJson;
+    graph.addNode(node);
   }
 
   function deleteNode(node: FlowNode) {
-    graphJson.removeNode(node.data.id);
+    graph.removeNode(node.data.id);
     deletedNodes.push(node);
-    graphJson = graphJson;
   }
 
-  function onOutletSelected(e: CustomEvent) {
+  function onOutletSelected(outlet: SelectedOutlet) {
     // Unselect option if already selected
-    if (
-      selectedOutlet?.nodeId === e.detail.nodeId &&
-      selectedOutlet?.outletId === e.detail.outletId
-    ) {
+    if (selectedOutlet?.nodeId === outlet.nodeId && selectedOutlet?.outletId === outlet.outletId) {
       selectedOutlet = null;
       return;
     }
-    selectedOutlet = e.detail;
+    selectedOutlet = outlet;
   }
 
-  function onInletIdSelected(e: CustomEvent) {
-    const selectedInlet = e.detail as SelectedInlet;
+  function onInletIdSelected(selectedInlet: SelectedInlet) {
     if (!selectedOutlet) {
       return;
     }
     if (selectedOutlet.nodeId === '_start') {
-      graphJson.start = selectedInlet.nodeId;
+      graph.start = selectedInlet.nodeId;
     } else {
-      graphJson.nodes[selectedOutlet.nodeId].linkOutletToInlet(
+      graph.nodes[selectedOutlet.nodeId].linkOutletToInlet(
         selectedOutlet.outletId,
         selectedInlet.nodeId,
       );
     }
-    graphJson = graphJson;
     selectedOutlet = null;
-    drawLines();
   }
 
-  function onDisconnectOutlet(e: CustomEvent) {
-    const { nodeId, outletId } = e.detail;
+  function onDisconnectOutlet({ nodeId, outletId }: SelectedOutlet) {
     if (nodeId === '_start') {
-      graphJson.start = '';
-    } else if (graphJson.nodes[nodeId]?.data?.outlets) {
-      graphJson.nodes[nodeId].data.outlets[outletId] = '';
+      graph.start = '';
+    } else if (graph.nodes[nodeId]?.data?.outlets) {
+      graph.nodes[nodeId].data.outlets[outletId] = '';
     }
-    graphJson = graphJson;
     if (selectedOutlet?.nodeId === nodeId && selectedOutlet?.outletId === outletId) {
       selectedOutlet = null;
     }
-    drawLines();
   }
 
-  function onDisconnectInlet(e: CustomEvent) {
-    const { nodeId } = e.detail;
-    if (graphJson.start === nodeId) {
-      graphJson.start = '';
+  function onDisconnectInlet({ nodeId }: SelectedInlet) {
+    if (graph.start === nodeId) {
+      graph.start = '';
     }
-    for (const node of Object.values(graphJson.nodes)) {
+    for (const node of Object.values(graph.nodes)) {
       if (!node.data.outlets) {
         continue;
       }
@@ -121,11 +143,7 @@
         }
       }
     }
-    graphJson = graphJson;
-    drawLines();
   }
-
-  $: graphJson && drawLines();
 
   let lines: LeaderLine[] = [];
   function connectorAnchor(element: HTMLElement) {
@@ -169,10 +187,10 @@
   }
 
   function isInletConnected(nodeId: string) {
-    if (graphJson.start === nodeId) {
+    if (graph.start === nodeId) {
       return true;
     }
-    for (const node of Object.values(graphJson.nodes)) {
+    for (const node of Object.values(graph.nodes)) {
       if (!node.data.outlets) {
         continue;
       }
@@ -199,27 +217,27 @@
     if (!browser) {
       return;
     }
-    console.log('drawLines', lines.length);
     await tick();
     for (const line of lines) {
       line.remove();
     }
     lines = [];
-    if (graphJson.nodes[graphJson.start]) {
+    if (graph.nodes[graph.start]) {
       const startAnchor = document.getElementById('_start-default__outlet');
-      const startTarget = document.getElementById(`${graphJson.start}__inlet`);
+      const startTarget = document.getElementById(`${graph.start}__inlet`);
 
       if (startAnchor && startTarget) {
         lines.push(createConnectorLine(startAnchor, startTarget));
       }
     }
-    for (const node of Object.values(graphJson.nodes)) {
+    for (const node of Object.values(graph.nodes)) {
       if (!node.data.outlets) {
         continue;
       }
       for (const [outletId, inletNodeId] of Object.entries(node.data.outlets) as [
-        [string, string | null],
-      ]) {
+        string,
+        string | null,
+      ][]) {
         if (inletNodeId) {
           const outletAnchor = document.getElementById(`${node.data.id}-${outletId}__outlet`);
           const inletAnchor = document.getElementById(`${inletNodeId}__inlet`);
@@ -231,17 +249,13 @@
     }
   }
 
-  function onDragEnded(e) {
-    const { node, tx, ty } = e.detail;
-    graphJson.nodes[node.data.id].updatePosition(tx, ty);
-    graphJson = graphJson;
-    drawLines();
+  function onDragEnded({ node, tx, ty }: DragEnd) {
+    graph.nodes[node.data.id].updatePosition(tx, ty);
   }
 
-  function onUpdated() {
-    graphJson = graphJson;
-    console.log('updated', graphJson.json());
-  }
+  onMount(() => {
+    drawLines();
+  });
 
   onDestroy(() => {
     if (lineRefreshFrame !== null) {
@@ -252,20 +266,15 @@
     }
   });
 
-  afterUpdate(() => {
-    scheduleLineRefresh();
-  });
-
-  let statusArray: any[] = [];
-  let isUploading = false;
-  function onStatusChanged(e: any) {
-    if (e.detail.status === 'uploading') {
-      statusArray.push({ nodeId: e.detail.nodeId, status: e.detail.status });
-    } else if (e.detail.status === 'completed') {
-      const index = statusArray.findIndex((item) => item.nodeId === e.detail.nodeId);
-      statusArray[index].status = e.detail.status;
+  let statusArray: UploadStatus[] = $state([]);
+  let isUploading = $state(false);
+  function onStatusChanged({ nodeId, status }: UploadStatus) {
+    if (status === 'uploading') {
+      statusArray.push({ nodeId, status });
+    } else if (status === 'completed') {
+      const index = statusArray.findIndex((item) => item.nodeId === nodeId);
+      statusArray[index].status = status;
     }
-    statusArray = statusArray;
     isUploading = true;
   }
 
@@ -278,7 +287,7 @@
       return 'Start';
     }
 
-    const node = graphJson.nodes[selectedOutlet.nodeId];
+    const node = graph.nodes[selectedOutlet.nodeId];
     if (!node) {
       return 'selected node';
     }
@@ -298,7 +307,7 @@
   }
 </script>
 
-<svelte:window on:resize={scheduleLineRefresh} />
+<svelte:window onresize={scheduleLineRefresh} />
 
 <div>
   <div
@@ -335,7 +344,7 @@
           id="add"
           class="inline-flex items-center rounded-lg bg-blue-700 px-5 py-2.5 text-center text-sm font-medium text-white focus:outline-none focus:ring-4 focus:ring-blue-300 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
           type="button"
-          on:click={() => (hideAddDropdown = !hideAddDropdown)}
+          onclick={() => (hideAddDropdown = !hideAddDropdown)}
         >
           Add step
           <svg
@@ -366,7 +375,7 @@
             <li>
               <button
                 type="button"
-                on:click={() => {
+                onclick={() => {
                   newNode(new DialNode());
                   hideAddDropdown = true;
                 }}
@@ -379,7 +388,7 @@
             <li>
               <button
                 type="button"
-                on:click={() => {
+                onclick={() => {
                   newNode(new DialGroupNode());
                   hideAddDropdown = true;
                 }}
@@ -392,7 +401,7 @@
             <li>
               <button
                 type="button"
-                on:click={() => {
+                onclick={() => {
                   newNode(new QueueNode());
                   hideAddDropdown = true;
                 }}
@@ -405,7 +414,7 @@
             <li>
               <button
                 type="button"
-                on:click={() => {
+                onclick={() => {
                   newNode(new VoiceBotNode());
                   hideAddDropdown = true;
                 }}
@@ -418,7 +427,7 @@
             <li>
               <button
                 type="button"
-                on:click={() => {
+                onclick={() => {
                   newNode(new WeekTimeNode());
                   hideAddDropdown = true;
                 }}
@@ -430,7 +439,7 @@
             <li>
               <button
                 type="button"
-                on:click={() => {
+                onclick={() => {
                   newNode(new PlayNode());
                   hideAddDropdown = true;
                 }}
@@ -442,7 +451,7 @@
             <li>
               <button
                 type="button"
-                on:click={() => {
+                onclick={() => {
                   newNode(new MenuNode());
                   hideAddDropdown = true;
                 }}
@@ -467,7 +476,7 @@
     </div>
   {/if}
 
-  {#if graphJson}
+  {#if graph}
     <div
       class="mb-2 flex items-center justify-between gap-3 px-1 text-xs text-slate-500 dark:text-slate-400"
     >
@@ -479,32 +488,29 @@
       </span>
     </div>
     <div
-      bind:this={flowCanvas}
       class="flow-canvas relative flex min-h-[28rem] flex-row flex-wrap content-start items-start gap-6 overflow-auto rounded-2xl border border-dashed border-slate-300 p-4 dark:border-slate-700"
-      on:scroll={scheduleLineRefresh}
+      onscroll={scheduleLineRefresh}
     >
       <StartNode
         {selectedOutlet}
-        connected={Boolean(graphJson.start)}
-        on:outletSelected={onOutletSelected}
-        on:disconnectOutlet={onDisconnectOutlet}
+        connected={Boolean(graph.start)}
+        {onOutletSelected}
+        {onDisconnectOutlet}
       />
-      {#each Object.entries(graphJson?.nodes ?? {}) as [key, node]}
-        <svelte:component
-          this={node.component}
+      {#each Object.entries(graph.nodes) as [key, node] (key)}
+        <node.component
           bind:this={nodesComponents[key]}
           {selectedOutlet}
           inletConnected={isInletConnected(node.data.id)}
           inletConnectable={isInletConnectable(node.data.id)}
           {node}
-          on:close={() => deleteNode(node)}
-          on:outletSelected={onOutletSelected}
-          on:disconnectOutlet={onDisconnectOutlet}
-          on:disconnectInlet={onDisconnectInlet}
-          on:inletSelected={onInletIdSelected}
-          on:dragEnd={onDragEnded}
-          on:updated={onUpdated}
-          on:statusChanged={onStatusChanged}
+          onClose={() => deleteNode(node)}
+          {onOutletSelected}
+          {onDisconnectOutlet}
+          {onDisconnectInlet}
+          onInletSelected={onInletIdSelected}
+          onDragEnd={onDragEnded}
+          {onStatusChanged}
         />
       {/each}
     </div>

@@ -1,10 +1,18 @@
-<script>
-  export let hold = false;
+<script lang="ts">
+  // `hold` mirrors the call's state for display; `onchange` fires only when
+  // the agent clicks, never when the parent syncs `hold` from the session.
+  let {
+    hold = $bindable(false),
+    onchange,
+  }: { hold?: boolean; onchange?: (hold: boolean) => void } = $props();
 </script>
 
 <button
   type="button"
-  on:click={() => (hold = !hold)}
+  onclick={() => {
+    hold = !hold;
+    onchange?.(hold);
+  }}
   class="flex-1 rounded-lg border py-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
   class:active={hold}
   class:inactive={!hold}

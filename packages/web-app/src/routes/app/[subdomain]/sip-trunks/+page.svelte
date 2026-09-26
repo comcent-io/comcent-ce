@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { deleteJson, getJson } from '$lib/http';
   import { goto } from '$app/navigation';
-  import toast from 'svelte-french-toast';
+  import toast from '$lib/toast';
 
-  export let data;
+  let { data } = $props();
 
   interface sipTrunkToBeDeletedType {
     id: string;
@@ -18,13 +18,13 @@
     name: string;
   }
 
-  let sipTrunkToBeDeleted: sipTrunkToBeDeletedType | null = null;
+  let sipTrunkToBeDeleted: sipTrunkToBeDeletedType | null = $state(null);
 
-  let isDeletePopUp = false;
-  let errorMessage = '';
-  const subdomain = $page.params.subdomain;
-  let sipTrunks: SipTrunk[] = [];
-  let loading = false;
+  let isDeletePopUp = $state(false);
+  let errorMessage = $state('');
+  const subdomain = page.params.subdomain;
+  let sipTrunks: SipTrunk[] = $state([]);
+  let loading = $state(false);
 
   async function loadSipTrunks() {
     loading = true;
@@ -80,8 +80,8 @@
 {#if isDeletePopUp}
   <ConfirmDialog
     message={`Are you sure you want to delete the ${sipTrunkToBeDeleted?.name}?`}
-    on:cancel={toggleDeletePopUp}
-    on:confirm={handleSubmit}
+    onCancel={toggleDeletePopUp}
+    onConfirm={handleSubmit}
   />
 {/if}
 
@@ -116,7 +116,7 @@
               </a>
               <button
                 type="button"
-                on:click={() => {
+                onclick={() => {
                   toggleDeletePopUp();
                   sipTrunkToBeDeleted = trunk;
                 }}

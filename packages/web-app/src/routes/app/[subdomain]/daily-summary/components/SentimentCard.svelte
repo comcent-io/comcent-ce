@@ -2,11 +2,17 @@
   import type { SentimentCounts } from './types';
   import { calculatePercentage } from './utils';
 
-  export let sentimentCounts: SentimentCounts | null = null;
+  interface Props {
+    sentimentCounts?: SentimentCounts | null;
+  }
 
-  $: totalSentiment = sentimentCounts
-    ? sentimentCounts.positive + sentimentCounts.negative + sentimentCounts.neutral
-    : 0;
+  let { sentimentCounts = null }: Props = $props();
+
+  let totalSentiment = $derived(
+    sentimentCounts
+      ? sentimentCounts.positive + sentimentCounts.negative + sentimentCounts.neutral
+      : 0,
+  );
 </script>
 
 <div

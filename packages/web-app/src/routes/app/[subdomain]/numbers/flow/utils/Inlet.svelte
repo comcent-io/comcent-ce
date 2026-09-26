@@ -1,28 +1,45 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import type { SelectedOutlet } from '../SelectedOutlet';
-  import type { FlowNode } from '../nodes/FlowNode';
-  const dispatch = createEventDispatcher();
+  import type { Snippet } from 'svelte';
+  import type { SelectedInlet } from '../SelectedInlet';
+  import type { FlowNode } from '../nodes/FlowNode.svelte';
 
-  export let selectedOutlet: SelectedOutlet | null;
-  export let node: FlowNode;
-  export let connected = false;
-  export let connectable = false;
+  interface Props {
+    node: FlowNode;
+    connected?: boolean;
+    connectable?: boolean;
+    class?: string;
+    onInletSelected?: (inlet: SelectedInlet) => void;
+    onDisconnectInlet?: (inlet: SelectedInlet) => void;
+    children?: Snippet;
+  }
+
+  let {
+    node,
+    connected = false,
+    connectable = false,
+    class: className = '',
+    onInletSelected,
+    onDisconnectInlet,
+    children,
+  }: Props = $props();
 
   function onDisconnectClick(e: MouseEvent) {
     e.stopPropagation();
-    dispatch('disconnectInlet', { nodeId: node.data.id });
+    onDisconnectInlet?.({ nodeId: node.data.id });
   }
 </script>
 
 <div
-  class={`relative pl-10 transition-all duration-150 ${$$restProps.class ?? ''}`}
+  class={`relative pl-10 transition-all duration-150 ${className}`}
   class:inlet-hover={connectable}
   class:inlet-active={connectable}
 >
   <div class="absolute left-0 top-1/2 -translate-x-[40%] -translate-y-1/2">
-    <button
-      type="button"
+    <!-- A div, not a <button>: it holds the disconnect <button>, and HTML
+         does not allow a button inside a button. -->
+    <div
+      role="button"
+      tabindex="0"
       data-inlet-node-id={node.data.id}
       class="group pointer-events-auto relative flex items-center gap-2 rounded-full border bg-white px-2.5 py-1 shadow-sm transition-all duration-150 dark:bg-slate-900"
       class:border-sky-300={!connected}
@@ -31,10 +48,10 @@
       class:border-emerald-300={connected}
       class:text-emerald-700={connected}
       class:border-sky-700={!connected}
-      on:click={() => dispatch('inletSelected', { nodeId: node.data.id })}
-      on:keydown={(e) => {
+      onclick={() => onInletSelected?.({ nodeId: node.data.id })}
+      onkeydown={(e) => {
         if (e.key === 'Enter') {
-          dispatch('inletSelected', { nodeId: node.data.id });
+          onInletSelected?.({ nodeId: node.data.id });
         }
       }}
     >
@@ -62,14 +79,14 @@
         <button
           type="button"
           class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-emerald-400 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:text-emerald-300 dark:hover:bg-slate-800"
-          on:click={onDisconnectClick}
+          onclick={onDisconnectClick}
         >
           <span class="text-[10px] leading-none">x</span>
         </button>
       {/if}
-    </button>
+    </div>
   </div>
-  <slot />
+  {@render children?.()}
 </div>
 
 <style lang="postcss">

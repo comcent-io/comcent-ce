@@ -1,10 +1,10 @@
 <script lang="ts">
   import { postJson } from '$lib/http';
 
-  let email = '';
-  let message = '';
-  let error = '';
-  let isSubmitting = false;
+  let email = $state('');
+  let message = $state('');
+  let error = $state('');
+  let isSubmitting = $state(false);
 
   async function requestReset() {
     isSubmitting = true;
@@ -42,7 +42,14 @@
           Enter the email you sign in with and we'll send you a link to choose a new password.
         </p>
 
-        <form method="POST" class="mt-6 space-y-4" on:submit|preventDefault={requestReset}>
+        <form
+          method="POST"
+          class="mt-6 space-y-4"
+          onsubmit={(e) => {
+            e.preventDefault();
+            requestReset();
+          }}
+        >
           <div>
             <label
               for="forgot-email"

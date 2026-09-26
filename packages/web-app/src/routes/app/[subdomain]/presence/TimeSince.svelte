@@ -2,10 +2,14 @@
   import { onDestroy, onMount } from 'svelte';
   import moment from 'moment-timezone';
 
-  export let startAt: Date;
+  interface Props {
+    startAt: Date;
+  }
+
+  let { startAt }: Props = $props();
 
   let timer: any = null;
-  let renderedText = '';
+  let renderedText = $state('');
 
   onMount(() => {
     timer = setInterval(() => {

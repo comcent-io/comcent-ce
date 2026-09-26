@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
-  import { page } from '$app/stores';
+  import { untrack } from 'svelte';
+  import { page } from '$app/state';
   import { getJson } from '$lib/http';
   import NumberForm from '../../NumberForm.svelte';
 
@@ -10,28 +10,28 @@
     outlets: {},
   });
 
-  let sipTrunks: any[] = [];
-  let isLoading = true;
-  let number: any = {
+  let sipTrunks: any[] = $state([]);
+  let isLoading = $state(true);
+  let number: any = $state({
     id: '',
     number: '',
     name: '',
     sipTrunkId: '',
     allowOutboundRegex: '',
     inboundFlowGraph: defaultInboundFlow,
-  };
+  });
   let lastFetchKey = '';
 
   async function fetchData() {
     isLoading = true;
     const [sipTrunksResult, numbersResult] = await Promise.all([
-      getJson<{ sipTrunks?: any[] }>(`/api/v2/${$page.params.subdomain}/sip-trunks`),
-      getJson<{ numbers?: any[] }>(`/api/v2/${$page.params.subdomain}/numbers`),
+      getJson<{ sipTrunks?: any[] }>(`/api/v2/${page.params.subdomain}/sip-trunks`),
+      getJson<{ numbers?: any[] }>(`/api/v2/${page.params.subdomain}/numbers`),
     ]);
 
     sipTrunks = sipTrunksResult.ok ? (sipTrunksResult.data.sipTrunks ?? []) : [];
     const allNumbers = numbersResult.ok ? (numbersResult.data.numbers ?? []) : [];
-    number = allNumbers.find((n: any) => n.id === $page.params.id) ?? {
+    number = allNumbers.find((n: any) => n.id === page.params.id) ?? {
       id: '',
       number: '',
       name: '',
@@ -42,13 +42,15 @@
     isLoading = false;
   }
 
-  $: if (browser) {
-    const nextFetchKey = `${$page.params.subdomain}|${$page.params.id}`;
+  // Refetch when the URL or the org changes. The fetch itself is untracked,
+  // so the state it reads and writes does not re-run this.
+  $effect(() => {
+    const nextFetchKey = `${page.params.subdomain}|${page.params.id}`;
     if (nextFetchKey !== lastFetchKey) {
       lastFetchKey = nextFetchKey;
-      fetchData();
+      untrack(() => fetchData());
     }
-  }
+  });
 </script>
 
 <h3 class="text-3xl font-bold dark:text-white">Numbers Edit</h3>

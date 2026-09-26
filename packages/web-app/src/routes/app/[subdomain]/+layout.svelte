@@ -3,11 +3,12 @@
   import DialerWidget from '$lib/components/DialerWidget/DialerWidget.svelte';
   import { browser } from '$app/environment';
   import { publicAppBaseUrl, publicSipUserRootDomain, publicSipWsUrl } from '$lib/publicConfig';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
+  import { routeParam } from '$lib/routeParam';
   import PieIcon from '$lib/components/Icons/PieIcon.svelte';
   import SteerIcon from '$lib/components/Icons/SteerIcon.svelte';
   import SideBarLink from './SideBarLink.svelte';
-  import { Toaster } from 'svelte-french-toast';
+  import { Toaster } from '$lib/toast';
   import DollarIcon from '$lib/components/Icons/DollarIcon.svelte';
   import CloseMenuIcon from '$lib/components/Icons/CloseMenuIcon.svelte';
   import MenuBurgerIcon from '$lib/components/Icons/MenuBurgerIcon.svelte';
@@ -20,21 +21,26 @@
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
   import { logout } from '$lib/session';
 
-  export let data: LayoutData;
+  interface Props {
+    data: LayoutData;
+    children?: import('svelte').Snippet;
+  }
 
-  let isUserMenuOpen = false;
-  let isMinScreenSidebarOpen = false;
+  let { data, children }: Props = $props();
+
+  let isUserMenuOpen = $state(false);
+  let isMinScreenSidebarOpen = $state(false);
   let walletBalance = 0;
   let fetchingBalance = false;
   let showWalletBalance = false;
-  const subdomain = $page.params.subdomain;
-  let selectedOrganization = subdomain;
+  const subdomain = routeParam('subdomain');
+  let selectedOrganization = $state(subdomain);
+  // svelte-ignore state_referenced_locally
   let showLowBalanceAlert = data.showLowBalanceAlert;
-  let showSwitchOrgMenu = false;
+  let showSwitchOrgMenu = $state(false);
   let showCampaignGroups = false;
-  let dialerWidget: any = null;
-  let authToken = '';
-  $: authToken = browser ? getIdTokenFromCookie() || '' : '';
+  let dialerWidget: any = $state(null);
+  const authToken = browser ? getIdTokenFromCookie() || '' : '';
 
   onMount(async () => {
     await tick();
@@ -55,7 +61,7 @@
   async function getWalletBalance() {
     try {
       fetchingBalance = true;
-      const response = await fetch(`/api/v2/${$page.params.subdomain}/billing/balance`);
+      const response = await fetch(`/api/v2/${page.params.subdomain}/billing/balance`);
       if (!response.ok) {
         console.error('Failed to get wallet balance.');
         return 0;
@@ -76,7 +82,7 @@
     localStorage.setItem('selectedSubdomain', selectedOrganization);
   }
 
-  let origin: string | null = null;
+  let origin: string | null = $state(null);
   if (browser) {
     origin = window.location.origin;
   }
@@ -92,7 +98,7 @@
       <div class="flex justify-start items-center">
         <button
           class="p-2 mr-2 text-gray-600 rounded-lg cursor-pointer md:hidden hover:text-gray-900 hover:bg-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700 focus:ring-2 focus:ring-gray-100 dark:focus:ring-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
-          on:click={() => (isMinScreenSidebarOpen = !isMinScreenSidebarOpen)}
+          onclick={() => (isMinScreenSidebarOpen = !isMinScreenSidebarOpen)}
         >
           {#if isMinScreenSidebarOpen}
             <CloseMenuIcon />
@@ -126,7 +132,7 @@
             type="button"
             class="flex mx-3 text-sm bg-gray-800 rounded-full md:mr-0 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600"
             aria-expanded="false"
-            on:click={() => (isUserMenuOpen = !isUserMenuOpen)}
+            onclick={() => (isUserMenuOpen = !isUserMenuOpen)}
           >
             <span class="sr-only">Open user menu</span>
             <img class="w-8 h-8 rounded-full" src={data.user.picture} alt="user profile" />
@@ -159,7 +165,7 @@
               <li>
                 <button
                   type="button"
-                  on:click={logout}
+                  onclick={logout}
                   class="block w-full text-left py-2 px-4 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
                 >
                   Logout
@@ -209,7 +215,7 @@
           <hr class="dark:border-gray-700" />
           <button
             class="flex w-full items-center p-2 text-base font-medium text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group mt-4"
-            on:click={() => {
+            onclick={() => {
               showSwitchOrgMenu = !showSwitchOrgMenu;
             }}
           >
@@ -225,7 +231,7 @@
                 name="switchOrganization"
                 id="switchOrganization"
                 bind:value={selectedOrganization}
-                on:change={handleSelectChange}
+                onchange={handleSelectChange}
               >
                 {#each data.organizations as organization}
                   <option value={organization.subdomain}>
@@ -251,7 +257,7 @@
        widget docked in the bottom-right corner; without it the widget covers
        that row's action buttons and they cannot be clicked. -->
   <main class="p-4 md:ml-64 h-auto pt-20 pb-24">
-    <slot />
+    {@render children?.()}
   </main>
 
   <DialerWidget

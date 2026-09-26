@@ -1,20 +1,20 @@
 <script lang="ts">
   import Button from '$lib/components/Button.svelte';
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { deleteJson, getJson, postJson } from '$lib/http';
   import Dialog from '$lib/components/Dialog.svelte';
   import SkeletonLoadingList from '$lib/components/SkeletonLoadingList.svelte';
-  import toast from 'svelte-french-toast';
+  import toast from '$lib/toast';
   import CopyIcon from '$lib/components/Icons/CopyIcon.svelte';
 
-  let loading = false;
-  let apiKeys: { apiKey: string; name: string }[] = [];
+  let loading = $state(false);
+  let apiKeys: { apiKey: string; name: string }[] = $state([]);
 
   onMount(async () => {
     loading = true;
     const result = await getJson<{ apiKeys?: { apiKey: string; name: string }[] }>(
-      `/api/v2/${$page.params.subdomain}/settings/api-keys`,
+      `/api/v2/${page.params.subdomain}/settings/api-keys`,
     );
     if (result.ok) {
       apiKeys = Array.isArray(result.data) ? result.data : (result.data.apiKeys ?? []);
@@ -30,15 +30,15 @@
     };
   }
 
-  let formData = newApiKeyForm();
+  let formData = $state(newApiKeyForm());
 
-  let showNewKeyModal = false;
+  let showNewKeyModal = $state(false);
 
-  let createLoading = false;
+  let createLoading = $state(false);
   async function onCreateApiKey() {
     createLoading = true;
     const result = await postJson<{ apiKey: string; name: string }>(
-      `/api/v2/${$page.params.subdomain}/settings/api-keys`,
+      `/api/v2/${page.params.subdomain}/settings/api-keys`,
       formData,
     );
     if (!result.ok) {
@@ -53,11 +53,11 @@
     createLoading = false;
   }
 
-  let onDeleteProgress = false;
+  let onDeleteProgress = $state(false);
   async function onDeleteApiKey(apiKey: { apiKey: string }) {
     onDeleteProgress = true;
     const key = apiKey.apiKey;
-    const result = await deleteJson(`/api/v2/${$page.params.subdomain}/settings/api-keys/${key}`);
+    const result = await deleteJson(`/api/v2/${page.params.subdomain}/settings/api-keys/${key}`);
     if (!result.ok) {
       toast.error(result.error);
       onDeleteProgress = false;
@@ -75,7 +75,7 @@
 {:else}
   <div class="relative overflow-x-auto shadow-md sm:rounded-lg mt-4">
     <div>
-      <Button type="button" on:click={() => (showNewKeyModal = true)}>New Key</Button>
+      <Button type="button" onclick={() => (showNewKeyModal = true)}>New Key</Button>
     </div>
     <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
       <caption>API Keys</caption>
@@ -110,7 +110,7 @@
                   value={apiKey.apiKey}
                 />
                 <button
-                  on:click={() => navigator.clipboard.writeText(apiKey.apiKey)}
+                  onclick={() => navigator.clipboard.writeText(apiKey.apiKey)}
                   class="dark:text-gray-400 dark:border-gray-600 border border-l-0 border-gray-300 rounded-r-md px-3 text-gray-900 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
                 >
                   <CopyIcon />
@@ -123,7 +123,7 @@
                 progress={onDeleteProgress}
                 color="danger"
                 className="px-2.5"
-                on:click={() => onDeleteApiKey(apiKey)}
+                onclick={() => onDeleteApiKey(apiKey)}
               >
                 Delete
               </Button>
@@ -135,7 +135,7 @@
   </div>
 {/if}
 
-<Dialog title="New Api Key" showDialog={showNewKeyModal} on:close={() => (showNewKeyModal = false)}>
+<Dialog title="New Api Key" showDialog={showNewKeyModal} onClose={() => (showNewKeyModal = false)}>
   <div class="px-6 py-6 lg:px-8">
     <form class="space-y-6">
       <div>
@@ -151,7 +151,7 @@
           bind:value={formData.name}
         />
       </div>
-      <Button type="submit" progress={createLoading} on:click={onCreateApiKey}>Create</Button>
+      <Button type="submit" progress={createLoading} onclick={onCreateApiKey}>Create</Button>
     </form>
   </div>
 </Dialog>

@@ -1,25 +1,32 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher } from 'svelte';
+  import { onMount } from 'svelte';
 
-  export let subdomain: string;
-  export let initialSelectedLabels: any[] = [];
-  export let appliedCount: number = 0;
-
-  const dispatch = createEventDispatcher();
-
-  let allLabels: any[] = [];
-  let selectedLabels: any[] = [...initialSelectedLabels];
-  let labelSearchText = '';
-  let showLabelDropdown = false;
-  let loadingLabels = false;
-  let filteredLabels: any[] = [];
-
-  $: {
-    filteredLabels = allLabels.filter((label) => {
-      const matchesSearch = label.name.toLowerCase().includes(labelSearchText.toLowerCase());
-      return matchesSearch;
-    });
+  interface Props {
+    subdomain: string;
+    initialSelectedLabels?: any[];
+    appliedCount?: number;
+    onApply?: (labels: any[]) => void;
+    onClear?: () => void;
   }
+
+  let {
+    subdomain,
+    initialSelectedLabels = [],
+    appliedCount = 0,
+    onApply,
+    onClear,
+  }: Props = $props();
+
+  let allLabels: any[] = $state([]);
+  // Seeded once from the prop; the component owns the selection after that.
+  // svelte-ignore state_referenced_locally
+  let selectedLabels: any[] = $state([...initialSelectedLabels]);
+  let labelSearchText = $state('');
+  let showLabelDropdown = $state(false);
+  let loadingLabels = $state(false);
+  let filteredLabels: any[] = $derived(
+    allLabels.filter((label) => label.name.toLowerCase().includes(labelSearchText.toLowerCase())),
+  );
 
   // Fetch organization labels
   async function fetchOrgLabels() {
@@ -77,14 +84,14 @@
   // Apply label filters - send to parent
   function applyLabelFilters() {
     showLabelDropdown = false;
-    dispatch('apply', selectedLabels);
+    onApply?.(selectedLabels);
   }
 
   // Clear all label filters
   function clearLabelFilters() {
     selectedLabels = [];
     showLabelDropdown = false;
-    dispatch('clear');
+    onClear?.();
   }
 
   // Handle clicking outside to close dropdown
@@ -120,7 +127,7 @@
 <div class="label-filter-container relative">
   <button
     type="button"
-    on:click={toggleLabelDropdown}
+    onclick={toggleLabelDropdown}
     class="relative inline-flex items-center justify-center p-3 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600 dark:focus:ring-gray-700"
     aria-label="Filter by labels"
   >
@@ -207,7 +214,7 @@
                   <input
                     type="checkbox"
                     checked={isLabelSelected(label)}
-                    on:change={() => toggleLabel(label)}
+                    onchange={() => toggleLabel(label)}
                     class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                   />
                   <span class="ml-3 text-sm text-gray-900 dark:text-white">{label.name}</span>
@@ -229,7 +236,7 @@
           {#if selectedLabels.length > 0}
             <button
               type="button"
-              on:click={clearLabelFilters}
+              onclick={clearLabelFilters}
               class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
             >
               Clear
@@ -237,7 +244,7 @@
           {/if}
           <button
             type="button"
-            on:click={applyLabelFilters}
+            onclick={applyLabelFilters}
             disabled={selectedLabels.length === 0}
             class="px-3 py-1.5 text-xs font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed dark:bg-blue-600 dark:hover:bg-blue-700"
           >

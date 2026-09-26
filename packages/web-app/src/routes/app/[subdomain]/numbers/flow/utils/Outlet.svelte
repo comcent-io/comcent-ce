@@ -1,27 +1,45 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import type { Snippet } from 'svelte';
   import type { SelectedOutlet } from '../SelectedOutlet';
 
-  const dispatch = createEventDispatcher();
-  export let selectedOutlet: SelectedOutlet | null;
-
-  export let nodeId: string;
-  export let outletId = 'default';
-
-  export let isDeletable = false;
-  export let connected = false;
-
-  function onOutLetClick(e) {
-    e.stopPropagation();
-    dispatch('outletSelected', { nodeId, outletId });
+  interface Props {
+    selectedOutlet: SelectedOutlet | null;
+    nodeId: string;
+    outletId?: string;
+    isDeletable?: boolean;
+    connected?: boolean;
+    class?: string;
+    onOutletSelected?: (outlet: SelectedOutlet) => void;
+    onDisconnectOutlet?: (outlet: SelectedOutlet) => void;
+    onDeleteOutlet?: (outlet: SelectedOutlet) => void;
+    children?: Snippet;
   }
 
-  function onDeleteClick(e) {
+  let {
+    selectedOutlet,
+    nodeId,
+    outletId = 'default',
+    isDeletable = false,
+    connected = false,
+    class: className = '',
+    onOutletSelected,
+    onDisconnectOutlet,
+    onDeleteOutlet,
+    children,
+  }: Props = $props();
+
+  function onOutLetClick(e: Event) {
     e.stopPropagation();
-    dispatch('deleteOutlet', { nodeId, outletId });
+    onOutletSelected?.({ nodeId, outletId });
   }
 
-  function onKeyDown(e) {
+  function onDeleteClick(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    onDeleteOutlet?.({ nodeId, outletId });
+  }
+
+  function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Enter') {
       onOutLetClick(e);
     }
@@ -29,19 +47,21 @@
 </script>
 
 <div
-  class="relative mt-2.5 w-full rounded-lg border border-emerald-300 bg-emerald-50/70 p-2.5 pr-24 transition-all duration-150 dark:border-emerald-800 dark:bg-slate-900/95 {$$restProps.class ||
-    ''}"
+  class="relative mt-2.5 w-full rounded-lg border border-emerald-300 bg-emerald-50/70 p-2.5 pr-24 transition-all duration-150 dark:border-emerald-800 dark:bg-slate-900/95 {className}"
   class:outlet-hover={!selectedOutlet}
   class:outlet-selected={selectedOutlet?.nodeId === nodeId && selectedOutlet?.outletId === outletId}
   id={`${nodeId}-${outletId}`}
   role="button"
   tabindex="0"
-  on:click={onOutLetClick}
-  on:keydown={onKeyDown}
+  onclick={onOutLetClick}
+  onkeydown={onKeyDown}
 >
   <div class="absolute right-0 top-[58%] translate-x-[40%] -translate-y-1/2">
-    <button
-      type="button"
+    <!-- A div, not a <button>: it holds the disconnect <button>, and HTML
+         does not allow a button inside a button. -->
+    <div
+      role="button"
+      tabindex="0"
       class="group flex items-center gap-2 rounded-full border px-2.5 py-1 shadow-sm transition-all duration-150"
       class:border-emerald-300={!selectedOutlet ||
         selectedOutlet?.nodeId !== nodeId ||
@@ -63,8 +83,8 @@
       class:bg-emerald-600={selectedOutlet?.nodeId === nodeId &&
         selectedOutlet?.outletId === outletId}
       class:text-white={selectedOutlet?.nodeId === nodeId && selectedOutlet?.outletId === outletId}
-      on:click={onOutLetClick}
-      on:keydown={onKeyDown}
+      onclick={onOutLetClick}
+      onkeydown={onKeyDown}
     >
       <span class="text-[10px] font-semibold uppercase tracking-wide">
         {#if selectedOutlet?.nodeId === nodeId && selectedOutlet?.outletId === outletId}
@@ -79,9 +99,9 @@
         <button
           type="button"
           class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-emerald-400 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-600 dark:text-emerald-300 dark:hover:bg-slate-800"
-          on:click={(e) => {
+          onclick={(e) => {
             e.stopPropagation();
-            dispatch('disconnectOutlet', { nodeId, outletId });
+            onDisconnectOutlet?.({ nodeId, outletId });
           }}
         >
           <span class="text-[10px] leading-none">x</span>
@@ -91,13 +111,13 @@
         id={`${nodeId}-${outletId}__outlet`}
         class="h-3.5 w-3.5 rounded-full border-2 border-emerald-500 bg-white shadow-sm ring-2 ring-white transition-transform duration-150 group-hover:scale-110 dark:ring-slate-900"
       ></div>
-    </button>
+    </div>
   </div>
-  <slot />
+  {@render children?.()}
   {#if isDeletable}
     <button
       type="button"
-      on:click|preventDefault={onDeleteClick}
+      onclick={onDeleteClick}
       class="text-red-700 hover:bg-red-700 hover:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 absolute top-0 rounded-full right-0 font-bold p-1 text-xs dark:text-red-300 dark:hover:bg-red-600"
       style="margin-top: 0.25rem; margin-right: 0.25rem;"
     >

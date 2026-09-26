@@ -7,23 +7,22 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Sentiment from './Sentiment.svelte';
 
-  export let callStory: CallStoryFromServer;
-
-  let showDropdown = false;
-
-  let modalContent = '';
-  let modelTitle = '';
-  $: {
-    if (modalContent === 'CALL_GRAPH') {
-      modelTitle = 'Call Graph';
-    } else if (modalContent === 'SHOW_TRANSCRIPTION') {
-      modelTitle = 'Transcription';
-    } else if (modalContent === 'SHOW_SUMMARY') {
-      modelTitle = 'Summary';
-    } else if (modalContent === 'SHOW_SENTIMENT') {
-      modelTitle = 'Sentiment';
-    }
+  interface Props {
+    callStory: CallStoryFromServer;
   }
+
+  let { callStory }: Props = $props();
+
+  let showDropdown = $state(false);
+
+  let modalContent = $state('');
+  const modalTitles: Record<string, string> = {
+    CALL_GRAPH: 'Call Graph',
+    SHOW_TRANSCRIPTION: 'Transcription',
+    SHOW_SUMMARY: 'Summary',
+    SHOW_SENTIMENT: 'Sentiment',
+  };
+  let modelTitle = $derived(modalTitles[modalContent] ?? '');
 </script>
 
 <tr
@@ -37,7 +36,7 @@
     <button
       class="inline-flex items-center p-2 text-sm font-medium text-center text-gray-900 bg-white rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none dark:text-white focus:ring-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700 dark:focus:ring-gray-600"
       type="button"
-      on:click={() => (showDropdown = !showDropdown)}
+      onclick={() => (showDropdown = !showDropdown)}
     >
       <svg
         class="w-5 h-5"
@@ -64,7 +63,7 @@
           <li>
             <button
               class="block w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-              on:click={() => {
+              onclick={() => {
                 modalContent = 'CALL_GRAPH';
                 showDropdown = false;
               }}
@@ -76,7 +75,7 @@
           {#if callStory.isTranscribed}
             <button
               class="block w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-              on:click={() => {
+              onclick={() => {
                 modalContent = 'SHOW_TRANSCRIPTION';
                 showDropdown = false;
               }}
@@ -87,7 +86,7 @@
           {#if callStory.isSummarized}
             <button
               class="block w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-              on:click={() => {
+              onclick={() => {
                 modalContent = 'SHOW_SUMMARY';
                 showDropdown = false;
               }}
@@ -98,7 +97,7 @@
           {#if callStory.isSentimentAnalyzed}
             <button
               class="block w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-              on:click={() => {
+              onclick={() => {
                 modalContent = 'SHOW_SENTIMENT';
                 showDropdown = false;
               }}
@@ -115,28 +114,28 @@
 {#if modalContent === 'CALL_GRAPH'}
   <Dialog
     title={modelTitle}
-    on:close={() => (modalContent = '')}
+    onClose={() => (modalContent = '')}
     showDialog={!!modalContent}
     className="w-full"
   >
     <CallStory {callStory} />
   </Dialog>
 {:else if modalContent === 'SHOW_TRANSCRIPTION'}
-  <Dialog title={modelTitle} on:close={() => (modalContent = '')} showDialog={!!modalContent}>
+  <Dialog title={modelTitle} onClose={() => (modalContent = '')} showDialog={!!modalContent}>
     <Transcript callStoryId={callStory.id} />
   </Dialog>
 {:else if modalContent === 'SHOW_SUMMARY'}
-  <Dialog title={modelTitle} on:close={() => (modalContent = '')} showDialog={!!modalContent}>
+  <Dialog title={modelTitle} onClose={() => (modalContent = '')} showDialog={!!modalContent}>
     <Summary callStoryId={callStory.id} />
   </Dialog>
 {:else if modalContent === 'SHOW_SENTIMENT'}
-  <Dialog title={modelTitle} on:close={() => (modalContent = '')} showDialog={!!modalContent}>
+  <Dialog title={modelTitle} onClose={() => (modalContent = '')} showDialog={!!modalContent}>
     <Sentiment callStoryId={callStory.id} />
   </Dialog>
 {:else}
   <Dialog
     title="Something went wrong"
-    on:close={() => (modalContent = '')}
+    onClose={() => (modalContent = '')}
     showDialog={!!modalContent}
   >
     Something went wrong

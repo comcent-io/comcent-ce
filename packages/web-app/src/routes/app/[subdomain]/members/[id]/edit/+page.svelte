@@ -1,21 +1,21 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
-  import { page } from '$app/stores';
+  import { untrack } from 'svelte';
+  import { page } from '$app/state';
   import { getJson, postJson, putJson } from '$lib/http';
   import ErrorMessage from '$lib/components/ErrorMessage.svelte';
   import ClipBoardCopyIcon from '$lib/components/Icons/ClipBoardCopyIcon.svelte';
   import type { Roles } from '../../roleSchema';
 
   type PageError = { message: string; formErrors: { message: string; path: string[] }[] };
-  let member: any = null;
-  let role: Roles = 'MEMBER';
-  let error: PageError | null = null;
-  let isLoading = false;
+  let member: any = $state(null);
+  let role: Roles = $state('MEMBER');
+  let error: PageError | null = $state(null);
+  let isLoading = $state(false);
   let lastFetchKey = '';
 
   async function fetchMember() {
     const result = await getJson<any>(
-      `/api/v2/${$page.params.subdomain}/admin/members/${$page.params.id}`,
+      `/api/v2/${page.params.subdomain}/admin/members/${page.params.id}`,
     );
     if (!result.ok) {
       error = { message: result.error, formErrors: [] };
@@ -31,7 +31,7 @@
   async function regeneratePassword() {
     isLoading = true;
     const result = await postJson<any>(
-      `/api/v2/${$page.params.subdomain}/admin/members/${$page.params.id}/regenerate-password`,
+      `/api/v2/${page.params.subdomain}/admin/members/${page.params.id}/regenerate-password`,
       {},
     );
 
@@ -49,7 +49,7 @@
   async function updateRole() {
     isLoading = true;
     const result = await putJson<any>(
-      `/api/v2/${$page.params.subdomain}/admin/members/${$page.params.id}/role`,
+      `/api/v2/${page.params.subdomain}/admin/members/${page.params.id}/role`,
       { role },
     );
 
@@ -64,13 +64,15 @@
     isLoading = false;
   }
 
-  $: if (browser) {
-    const nextFetchKey = `${$page.params.subdomain}|${$page.params.id}`;
+  // Refetch when the URL or the org changes. The fetch itself is untracked,
+  // so the state it reads and writes does not re-run this.
+  $effect(() => {
+    const nextFetchKey = `${page.params.subdomain}|${page.params.id}`;
     if (nextFetchKey !== lastFetchKey) {
       lastFetchKey = nextFetchKey;
-      fetchMember();
+      untrack(() => fetchMember());
     }
-  }
+  });
 </script>
 
 <h3 class="text-3xl font-bold dark:text-white">Edit Member</h3>
@@ -100,14 +102,19 @@
           value={member.sipPassword}
         />
         <button
-          on:click={() => navigator.clipboard.writeText(member.sipPassword)}
+          onclick={() => navigator.clipboard.writeText(member.sipPassword)}
           class="dark:text-gray-400 dark:border-gray-600 border border-l-0 border-gray-300 rounded-r-md px-3 text-gray-900 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
         >
           <ClipBoardCopyIcon />
         </button>
       </div>
     </div>
-    <form on:submit|preventDefault={regeneratePassword}>
+    <form
+      onsubmit={(e) => {
+        e.preventDefault();
+        regeneratePassword();
+      }}
+    >
       <button
         type="submit"
         disabled={isLoading}
@@ -119,7 +126,12 @@
   {/if}
 </div>
 {#if member}
-  <form on:submit|preventDefault={updateRole}>
+  <form
+    onsubmit={(e) => {
+      e.preventDefault();
+      updateRole();
+    }}
+  >
     <label for="role" class="mb-2 text-sm font-medium text-gray-900 dark:text-white">
       Edit Role
     </label>

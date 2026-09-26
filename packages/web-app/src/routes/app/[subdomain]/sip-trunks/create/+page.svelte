@@ -3,7 +3,7 @@
   import SipTrunkForm from '../SipTrunkForm.svelte';
 
   type PageError = { message: string; formErrors: { message: string; path: string[] }[] };
-  let error: PageError | null = null;
+  let error: PageError | null = $state(null);
 </script>
 
 <h3 class="text-3xl font-bold dark:text-white">Create Sip Trunks</h3>

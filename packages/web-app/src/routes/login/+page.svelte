@@ -3,14 +3,14 @@
   import { postJson } from '$lib/http';
   import { clearSessionToken, setSessionToken } from '$lib/session';
 
-  export let data;
+  let { data } = $props();
 
-  let mode: 'login' | 'register' = 'login';
-  let name = '';
-  let email = '';
-  let password = '';
-  let loginError = '';
-  let registerError = '';
+  let mode: 'login' | 'register' = $state('login');
+  let name = $state('');
+  let email = $state('');
+  let password = $state('');
+  let loginError = $state('');
+  let registerError = $state('');
 
   function pendingVerificationUrl() {
     return `/auth/verify-email/pending?email=${encodeURIComponent(email)}`;
@@ -70,7 +70,7 @@
                 ? 'bg-white text-slate-900 shadow dark:bg-slate-700 dark:text-white'
                 : 'text-slate-500 dark:text-slate-300'
             }`}
-            on:click={() => (mode = 'login')}
+            onclick={() => (mode = 'login')}
           >
             Sign in
           </button>
@@ -81,14 +81,21 @@
                 ? 'bg-white text-slate-900 shadow dark:bg-slate-700 dark:text-white'
                 : 'text-slate-500 dark:text-slate-300'
             }`}
-            on:click={() => (mode = 'register')}
+            onclick={() => (mode = 'register')}
           >
             Create account
           </button>
         </div>
 
         {#if mode === 'login'}
-          <form method="POST" class="space-y-4" on:submit|preventDefault={login}>
+          <form
+            method="POST"
+            class="space-y-4"
+            onsubmit={(e) => {
+              e.preventDefault();
+              login();
+            }}
+          >
             <div>
               <label
                 for="login-email"
@@ -140,7 +147,14 @@
             </button>
           </form>
         {:else if data.authConfig.passwordEnabled}
-          <form method="POST" class="space-y-4" on:submit|preventDefault={register}>
+          <form
+            method="POST"
+            class="space-y-4"
+            onsubmit={(e) => {
+              e.preventDefault();
+              register();
+            }}
+          >
             <div>
               <label
                 for="register-name"

@@ -1,32 +1,28 @@
-<script>
+<script lang="ts">
   import '../tailwind.css';
   import '../app.css';
 
   import NProgress from 'nprogress';
-  import { navigating } from '$app/stores';
-
   import 'nprogress/nprogress.css';
-  import { browser } from '$app/environment';
-  import { onMount } from 'svelte';
+  import type { Snippet } from 'svelte';
+  import { navigating } from '$app/state';
+
+  let { children }: { children?: Snippet } = $props();
 
   NProgress.configure({
     minimum: 0.16,
   });
 
-  onMount(() => {
-    if (browser) {
-      navigating.subscribe((value) => {
-        if (value) {
-          NProgress.start();
-        }
-        if (!value) {
-          NProgress.done();
-        }
-      });
+  // The progress bar runs for as long as a navigation is in flight.
+  $effect(() => {
+    if (navigating.to) {
+      NProgress.start();
+    } else {
+      NProgress.done();
     }
   });
 </script>
 
 <div class="bg-gray-50 dark:bg-gray-900" style="min-height: 100%;">
-  <slot />
+  {@render children?.()}
 </div>

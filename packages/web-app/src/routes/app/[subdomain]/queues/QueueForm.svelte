@@ -1,19 +1,27 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
-  import toast from 'svelte-french-toast';
+  import { page } from '$app/state';
+  import toast from '$lib/toast';
 
-  export let isUpdate = false;
-  export let queueId = '';
-  export let formData = {
-    name: '',
-    extension: '',
-    wrapUpTime: 30,
-    rejectDelayTime: 30,
-    maxNoAnswers: 2,
-  };
+  interface Props {
+    isUpdate?: boolean;
+    queueId?: string;
+    formData?: any;
+  }
 
-  const subdomain = $page.params.subdomain;
+  let {
+    isUpdate = false,
+    queueId = '',
+    formData = $bindable({
+      name: '',
+      extension: '',
+      wrapUpTime: 30,
+      rejectDelayTime: 30,
+      maxNoAnswers: 2,
+    }),
+  }: Props = $props();
+
+  const subdomain = page.params.subdomain;
 
   async function handleSubmit(event: any) {
     event.preventDefault();
@@ -60,7 +68,7 @@
   }
 </script>
 
-<form method="POST" on:submit={handleSubmit}>
+<form method="POST" onsubmit={handleSubmit}>
   <div class="mb-6">
     <label for="name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
       Name

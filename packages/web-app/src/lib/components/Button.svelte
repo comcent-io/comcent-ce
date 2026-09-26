@@ -1,8 +1,7 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+  import type { HTMLButtonAttributes } from 'svelte/elements';
   import Spinner from './Icons/Spinner.svelte';
-  export let progress = false;
-  export let type: 'button' | 'submit' = 'button';
-  export let className = '';
 
   const buttonColor = {
     default:
@@ -11,18 +10,27 @@
       'relative focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900',
   };
 
-  export let color: keyof typeof buttonColor = 'default';
+  interface Props extends Omit<HTMLButtonAttributes, 'type' | 'color'> {
+    progress?: boolean;
+    type?: 'button' | 'submit';
+    className?: string;
+    color?: keyof typeof buttonColor;
+    children?: Snippet;
+  }
+
+  let {
+    progress = false,
+    type = 'button',
+    className = '',
+    color = 'default',
+    children,
+    ...rest
+  }: Props = $props();
 </script>
 
-<button
-  {type}
-  disabled={progress}
-  class="{buttonColor[color]} {className}"
-  {...$$restProps}
-  on:click
->
+<button {type} disabled={progress} class="{buttonColor[color]} {className}" {...rest}>
   <span class={progress ? 'opacity-30' : ''}>
-    <slot />
+    {@render children?.()}
   </span>
   {#if progress}
     <span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">

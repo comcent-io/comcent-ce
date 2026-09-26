@@ -1,10 +1,14 @@
 <script lang="ts">
   import moment from 'moment-timezone';
 
-  export let caller: string;
-  export let callee: string;
-  export let direction: string;
-  export let startAt: string;
+  interface Props {
+    caller: string;
+    callee: string;
+    direction: string;
+    startAt: string;
+  }
+
+  let { caller, callee, direction, startAt }: Props = $props();
 
   function getDisplayName(currentParty: string): string {
     if (currentParty.startsWith('+')) return currentParty;

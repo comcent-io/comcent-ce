@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { getJson } from '$lib/http';
 
   onMount(async () => {
-    const { origin } = $page.url;
-    const provider = $page.params.provider;
+    const { origin } = page.url;
+    const provider = page.params.provider;
     const redirectUri = `${origin}/auth/callback/${provider}`;
 
     const result = await getJson<{ authUrl: string }>(

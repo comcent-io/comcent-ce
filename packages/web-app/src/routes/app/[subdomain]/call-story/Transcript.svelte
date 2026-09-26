@@ -1,17 +1,21 @@
 <script lang="ts">
   import TranscriptBubble from '$lib/components/TranscriptBubble.svelte';
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
-  export let callStoryId: string;
+  interface Props {
+    callStoryId: string;
+  }
 
-  let transcriptData: any;
-  let loading = true;
-  let error: string | null = null;
+  let { callStoryId }: Props = $props();
+
+  let transcriptData: any = $state();
+  let loading = $state(true);
+  let error: string | null = $state(null);
 
   async function fetchTranscript(callStoryId: string) {
     const response = await fetch(
-      `/api/v2/${$page.params.subdomain}/call-story/${callStoryId}/transcript`,
+      `/api/v2/${page.params.subdomain}/call-story/${callStoryId}/transcript`,
     );
     if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
     return response.json();

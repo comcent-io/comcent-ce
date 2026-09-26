@@ -1,20 +1,20 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { onMount } from 'svelte';
   import type { DailySummary, SentimentCounts } from './components/types';
   import DailySummaryList from './components/DailySummaryList.svelte';
   import DailySummaryDetail from './components/DailySummaryDetail.svelte';
 
-  let dailySummaries: DailySummary[] = [];
-  let selectedDate: string | null = null;
-  let loading = false;
-  let loadingDetails = false;
-  let executiveSummary: string = '';
-  let sentimentCounts: SentimentCounts | null = null;
-  let totalPromisesCreated: number = 0;
-  let totalPromisesClosed: number = 0;
+  let dailySummaries: DailySummary[] = $state([]);
+  let selectedDate: string | null = $state(null);
+  let loading = $state(false);
+  let loadingDetails = $state(false);
+  let executiveSummary: string = $state('');
+  let sentimentCounts: SentimentCounts | null = $state(null);
+  let totalPromisesCreated: number = $state(0);
+  let totalPromisesClosed: number = $state(0);
 
-  const subdomain = $page.params.subdomain;
+  const subdomain = page.params.subdomain;
 
   async function fetchDailySummaries() {
     loading = true;

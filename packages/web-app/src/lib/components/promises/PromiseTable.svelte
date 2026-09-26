@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import moment from 'moment-timezone';
 
   interface Promise {
@@ -24,13 +25,28 @@
     };
   }
 
-  export let promises: Promise[] = [];
-  export let orgMembers: OrgMember[] = [];
-  export let selectedPromises: Set<string> = new Set();
-  export let onToggleSelection: (promiseId: string) => void;
-  export let onSelectAll: () => void;
-  export let onUpdateAssignment: (promiseId: string, newAssignedTo: string) => void;
-  export let onViewDetails: (callStoryId: string) => void;
+  interface Props {
+    promises?: Promise[];
+    orgMembers?: OrgMember[];
+    selectedPromises?: Set<string>;
+    onToggleSelection: (promiseId: string) => void;
+    onSelectAll: () => void;
+    onUpdateAssignment: (promiseId: string, newAssignedTo: string) => void;
+    onViewDetails: (callStoryId: string) => void;
+    /** Shown instead of the table when there are no promises. */
+    emptyMessage?: Snippet;
+  }
+
+  let {
+    promises = [],
+    orgMembers = [],
+    selectedPromises = new Set(),
+    onToggleSelection,
+    onSelectAll,
+    onUpdateAssignment,
+    onViewDetails,
+    emptyMessage,
+  }: Props = $props();
 
   function formatDate(dateString: string): string {
     return moment(dateString).format('YYYY/MM/DD');
@@ -40,9 +56,10 @@
     return moment(dateString).format('YYYY/MM/DD hh:mm A');
   }
 
-  $: openPromises = promises.filter((p) => p.status === 'OPEN');
-  $: allOpenSelected =
-    openPromises.length > 0 && openPromises.every((p) => selectedPromises.has(p.id));
+  let openPromises = $derived(promises.filter((p) => p.status === 'OPEN'));
+  let allOpenSelected = $derived(
+    openPromises.length > 0 && openPromises.every((p) => selectedPromises.has(p.id)),
+  );
 </script>
 
 <div
@@ -60,7 +77,7 @@
                 type="checkbox"
                 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                 checked={allOpenSelected}
-                on:change={onSelectAll}
+                onchange={onSelectAll}
               />
             </th>
             <th scope="col" class="px-6 py-3 font-medium">CREATED DATE</th>
@@ -83,7 +100,7 @@
                   class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   checked={selectedPromises.has(promise.id)}
                   disabled={promise.status === 'CLOSED'}
-                  on:change={() => onToggleSelection(promise.id)}
+                  onchange={() => onToggleSelection(promise.id)}
                 />
               </td>
               <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
@@ -102,7 +119,7 @@
                   class="block w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                   value={promise.assignedTo}
                   disabled={promise.status === 'CLOSED'}
-                  on:change={(e) => onUpdateAssignment(promise.id, e.currentTarget.value)}
+                  onchange={(e) => onUpdateAssignment(promise.id, e.currentTarget.value)}
                 >
                   {#each orgMembers as member}
                     <option value={member.username}>
@@ -126,7 +143,7 @@
               </td>
               <td class="px-6 py-4">
                 <button
-                  on:click={() => onViewDetails(promise.callStoryId)}
+                  onclick={() => onViewDetails(promise.callStoryId)}
                   disabled={!promise.callStoryId}
                   class="font-medium text-blue-600 dark:text-blue-500 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed disabled:no-underline"
                 >
@@ -155,7 +172,11 @@
       </svg>
       <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No promises found</h3>
       <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        <slot name="empty-message">There are no promises to display.</slot>
+        {#if emptyMessage}
+          {@render emptyMessage()}
+        {:else}
+          There are no promises to display.
+        {/if}
       </p>
     </div>
   {/if}

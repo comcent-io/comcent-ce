@@ -6,72 +6,67 @@
   import MuteButton from '$lib/components/DialerWidget/buttons/MuteButton.svelte';
   import DialPad from '$lib/components/DialerWidget/DialPad.svelte';
   import { slide } from 'svelte/transition';
-  import { createEventDispatcher, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import TransferButton from '$lib/components/DialerWidget/buttons/TransferButton.svelte';
   import type { Session } from 'sip.js';
   import type { SessionManager } from 'sip.js/lib/platform/web';
   import { isValidPhoneNumber } from 'libphonenumber-js';
   import type { MemberSearchResult } from '$lib/types/MemberSearchResult';
 
-  const dispatch = createEventDispatcher<{
-    hangup: void;
-    hold: void;
-    unhold: void;
-    mute: void;
-    unmute: void;
-    dtmfNumberPress: { number: string };
-    blindTransfer: { transferAddress: string };
-    attendedTransfer: { transferAddress: string };
-    confirmAttendedTransfer: void;
-    cancelAttendedTransfer: void;
-    newCall: void;
-  }>();
-
-  export let sessionManager: SessionManager;
-  export let startTime: Date | undefined;
-  export let session: Session;
-  export let heldForAttendedTransfer: Session | undefined | null;
-  export let search: ((text: string) => Promise<MemberSearchResult[]>) | undefined = undefined;
-
-  let showDialPad = false;
-
-  let hold = false;
-  $: {
-    if (hold) {
-      dispatch('hold');
-    } else {
-      dispatch('unhold');
-    }
+  interface Props {
+    sessionManager: SessionManager;
+    startTime: Date | undefined;
+    session: Session;
+    heldForAttendedTransfer: Session | undefined | null;
+    search?: ((text: string) => Promise<MemberSearchResult[]>) | undefined;
+    onHangup?: () => void;
+    onHold?: () => void;
+    onUnhold?: () => void;
+    onMute?: () => void;
+    onUnmute?: () => void;
+    onDtmfNumberPress?: (number: string) => void;
+    onBlindTransfer?: (transferAddress: string) => void;
+    onAttendedTransfer?: (transferAddress: string) => void;
+    onConfirmAttendedTransfer?: () => void;
+    onCancelAttendedTransfer?: () => void;
+    onNewCall?: () => void;
   }
 
-  let muted = false;
-  $: {
-    if (muted) {
-      dispatch('mute');
-    } else {
-      dispatch('unmute');
-    }
-  }
+  let {
+    sessionManager,
+    startTime,
+    session,
+    heldForAttendedTransfer,
+    search = undefined,
+    onHangup,
+    onHold,
+    onUnhold,
+    onMute,
+    onUnmute,
+    onDtmfNumberPress,
+    onBlindTransfer,
+    onAttendedTransfer,
+    onConfirmAttendedTransfer,
+    onCancelAttendedTransfer,
+    onNewCall,
+  }: Props = $props();
 
-  let dtmfSentNumbers = '';
-  function onDialKeyPress(e) {
-    const dtmfNumber = e.detail.number;
-    dispatch('dtmfNumberPress', { number: dtmfNumber });
+  let showDialPad = $state(false);
+
+  // Synced from the session on mount; the buttons report the agent's clicks.
+  let hold = $state(false);
+  let muted = $state(false);
+
+  let dtmfSentNumbers = $state('');
+  function onDialKeyPress(dtmfNumber: string) {
+    onDtmfNumberPress?.(dtmfNumber);
     dtmfSentNumbers += dtmfNumber;
   }
 
-  function onConfirmAttendedTransfer() {
-    dispatch('confirmAttendedTransfer');
-  }
-
-  function onCancelAttendedTransfer() {
-    dispatch('cancelAttendedTransfer');
-  }
-
-  let showTransferMenu = false;
-  let transferMode: 'blind' | 'attended' = 'blind';
-  let transferAddress = '';
-  let transferSearchResults: MemberSearchResult[] = [];
+  let showTransferMenu = $state(false);
+  let transferMode: 'blind' | 'attended' = $state('blind');
+  let transferAddress = $state('');
+  let transferSearchResults: MemberSearchResult[] = $state([]);
 
   function closeTransferMenu() {
     showTransferMenu = false;
@@ -99,9 +94,9 @@
     const address = transferAddress;
     closeTransferMenu();
     if (transferMode === 'blind') {
-      dispatch('blindTransfer', { transferAddress: address });
+      onBlindTransfer?.(address);
     } else {
-      dispatch('attendedTransfer', { transferAddress: address });
+      onAttendedTransfer?.(address);
     }
   }
 
@@ -143,12 +138,12 @@
 
   <div class="mt-3 flex gap-1.5">
     {#if startTime}
-      <MuteButton bind:muted />
+      <MuteButton bind:muted onchange={(m) => (m ? onMute?.() : onUnmute?.())} />
       {#if !heldForAttendedTransfer}
-        <HoldButton bind:hold />
+        <HoldButton bind:hold onchange={(h) => (h ? onHold?.() : onUnhold?.())} />
         <TransferButton
           active={showTransferMenu}
-          on:click={() => {
+          onclick={() => {
             if (showTransferMenu) {
               closeTransferMenu();
             } else {
@@ -159,13 +154,13 @@
       {/if}
     {/if}
     <DialPadButton bind:showDialPad />
-    <HangupButton on:click={() => dispatch('hangup')} />
+    <HangupButton onclick={() => onHangup?.()} />
   </div>
 
   {#if startTime && !heldForAttendedTransfer}
     <button
       type="button"
-      on:click={() => dispatch('newCall')}
+      onclick={() => onNewCall?.()}
       class="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
     >
       + New Call
@@ -180,7 +175,7 @@
       <div class="mb-2 flex gap-2">
         <button
           type="button"
-          on:click={() => (transferMode = 'blind')}
+          onclick={() => (transferMode = 'blind')}
           class="flex-1 rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors"
           class:transfer-mode-active={transferMode === 'blind'}
           class:transfer-mode-inactive={transferMode !== 'blind'}
@@ -189,7 +184,7 @@
         </button>
         <button
           type="button"
-          on:click={() => (transferMode = 'attended')}
+          onclick={() => (transferMode = 'attended')}
           class="flex-1 rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors"
           class:transfer-mode-active={transferMode === 'attended'}
           class:transfer-mode-inactive={transferMode !== 'attended'}
@@ -209,7 +204,7 @@
           placeholder="Name or number"
           class="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
           bind:value={transferAddress}
-          on:input={onTransferAddressInput}
+          oninput={onTransferAddressInput}
         />
         {#if transferSearchResults.length > 0}
           <div
@@ -220,7 +215,10 @@
                 <li>
                   <button
                     type="button"
-                    on:click|preventDefault={() => selectTransferMember(member)}
+                    onclick={(e) => {
+                      e.preventDefault();
+                      selectTransferMember(member);
+                    }}
                     class="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600"
                   >
                     {member.username} [{member.presence}]
@@ -235,14 +233,14 @@
       <div class="mt-2 flex justify-end gap-2">
         <button
           type="button"
-          on:click={closeTransferMenu}
+          onclick={closeTransferMenu}
           class="rounded-lg px-3 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
         >
           Cancel
         </button>
         <button
           type="button"
-          on:click={onConfirmTransfer}
+          onclick={onConfirmTransfer}
           disabled={transferAddress === ''}
           class="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-600"
         >
@@ -273,14 +271,14 @@
       <div class="mt-2 flex gap-2">
         <button
           type="button"
-          on:click={onConfirmAttendedTransfer}
+          onclick={() => onConfirmAttendedTransfer?.()}
           class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
         >
           Complete Transfer
         </button>
         <button
           type="button"
-          on:click={onCancelAttendedTransfer}
+          onclick={() => onCancelAttendedTransfer?.()}
           class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
         >
           Resume Call
@@ -297,7 +295,7 @@
         value={dtmfSentNumbers}
         disabled
       />
-      <DialPad on:dialKeyPress={onDialKeyPress} />
+      <DialPad {onDialKeyPress} />
     </div>
   {/if}
 </div>

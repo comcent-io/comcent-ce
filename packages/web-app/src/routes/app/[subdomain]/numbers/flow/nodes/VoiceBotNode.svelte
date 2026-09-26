@@ -1,33 +1,36 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import type { SelectedOutlet } from '../SelectedOutlet';
   import type { VoiceBotNode } from './VoiceBotNode';
+  import type { NodeProps } from './NodeProps';
   import Draggable from '../utils/Draggable.svelte';
   import Inlet from '../utils/Inlet.svelte';
   import CloseButton from '../utils/CloseButton.svelte';
-  import { createEventDispatcher } from 'svelte';
   import EditIcon from '$lib/components/Icons/EditIcon.svelte';
   import RefreshIcon from '$lib/components/Icons/RefreshIcon.svelte';
-
-  const dispatch = createEventDispatcher();
-  export let node: VoiceBotNode;
-  export let selectedOutlet: SelectedOutlet | null;
-  export let inletConnected = false;
-  export let inletConnectable = false;
 
   interface VoiceBotType {
     id: string;
     name: string;
   }
 
-  let selectedVoiceBotId = node.data.data.voiceBotId ?? '';
+  let {
+    node,
+    inletConnected = false,
+    inletConnectable = false,
+    onClose,
+    onInletSelected,
+    onDisconnectInlet,
+    onDragEnd,
+  }: NodeProps<VoiceBotNode> = $props();
 
-  export let voiceBots: VoiceBotType[] = [];
-  let isRefreshing = false;
+  // svelte-ignore state_referenced_locally
+  let selectedVoiceBotId = $state(node.data.data.voiceBotId ?? '');
+  let voiceBots: VoiceBotType[] = $state([]);
+  let isRefreshing = $state(false);
 
   async function fetchVoiceBots() {
-    const response = await fetch(`/api/v2/${$page.params.subdomain}/voice-bots`);
+    const response = await fetch(`/api/v2/${page.params.subdomain}/voice-bots`);
     const data = await response.json();
     voiceBots = data.voiceBots ?? [];
     if (!selectedVoiceBotId && node.data.data.voiceBotId) {
@@ -55,28 +58,26 @@
     }
     node.data.data.voiceBotName = selectedVoiceBot.name;
     node.data.data.voiceBotId = selectedVoiceBot.id;
-    dispatch('updated', { node });
   }
 
-  $: selectedVoiceBot = voiceBots.find((voiceBot) => voiceBot.id === selectedVoiceBotId);
+  let selectedVoiceBot = $derived(voiceBots.find((voiceBot) => voiceBot.id === selectedVoiceBotId));
 </script>
 
 <Draggable
   {node}
   title={node.data.type}
   class="block w-[17rem] rounded-lg border-2 border-amber-400 bg-white shadow dark:border-amber-400 dark:bg-gray-800"
-  on:dragEnd
+  {onDragEnd}
 >
-  <svelte:fragment slot="headerActions">
-    <CloseButton on:close />
-  </svelte:fragment>
+  {#snippet headerActions()}
+    <CloseButton {onClose} />
+  {/snippet}
   <Inlet
-    {selectedOutlet}
     {node}
     connected={inletConnected}
     connectable={inletConnectable}
-    on:inletSelected
-    on:disconnectInlet
+    {onInletSelected}
+    {onDisconnectInlet}
   >
     <div class="space-y-2 p-3">
       <label
@@ -90,7 +91,7 @@
           id={`voice-bot-${node.data.id}`}
           class="block min-w-0 flex-1 rounded-md border border-slate-300 bg-white p-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
           bind:value={selectedVoiceBotId}
-          on:change={onVoiceBotChange}
+          onchange={onVoiceBotChange}
         >
           <option value="" disabled>Select a voice bot</option>
           {#each voiceBots as voiceBot}
@@ -99,7 +100,7 @@
         </select>
         <button
           type="button"
-          on:click={refreshVoiceBots}
+          onclick={refreshVoiceBots}
           disabled={isRefreshing}
           class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 text-blue-700 hover:bg-blue-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-blue-400 dark:hover:text-white"
           title="Refresh Voice Bots"
@@ -108,7 +109,7 @@
         </button>
         {#if selectedVoiceBot}
           <a
-            href={`/app/${$page.params.subdomain}/voice-bots/${selectedVoiceBot.id}/edit`}
+            href={`/app/${page.params.subdomain}/voice-bots/${selectedVoiceBot.id}/edit`}
             class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-300 text-blue-700 hover:bg-blue-700 hover:text-white dark:border-slate-600 dark:text-blue-400 dark:hover:text-white"
             target="_blank"
             title="Edit Voice Bot"
@@ -118,7 +119,7 @@
         {/if}
       </div>
       <a
-        href={`/app/${$page.params.subdomain}/voice-bots/create`}
+        href={`/app/${page.params.subdomain}/voice-bots/create`}
         class="inline-flex text-xs font-semibold text-blue-700 hover:underline dark:text-blue-400"
         target="_blank"
       >

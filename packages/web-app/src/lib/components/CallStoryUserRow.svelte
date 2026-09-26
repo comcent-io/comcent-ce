@@ -3,14 +3,19 @@
   import Span from '$lib/components/Span.svelte';
   import CallPlayer from '$lib/components/CallPlayer.svelte';
 
-  export let userName;
-  export let spans;
+  interface Props {
+    userName: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    spans: any[];
+  }
+
+  let { userName, spans }: Props = $props();
 </script>
 
 <div class="text-gray-500 dark:text-gray-400 break-words">{userName}</div>
 <div class="isolate">
   <div class="relative flex items-center" style="height: 30px">
-    {#each _.sortBy( spans.filter((s) => s.type !== 'RECORDING'), 'relativeStartAt', ) as span}
+    {#each _.sortBy( spans.filter((s) => s.type !== 'RECORDING'), 'relativeStartAt' ) as span}
       <Span {span} />
     {/each}
   </div>

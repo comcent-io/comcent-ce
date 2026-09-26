@@ -2,9 +2,13 @@
   import { marked } from 'marked';
   import { processContent } from './utils';
 
-  export let executiveSummary: string;
+  interface Props {
+    executiveSummary: string;
+  }
 
-  $: processedContent = processContent(executiveSummary);
+  let { executiveSummary }: Props = $props();
+
+  let processedContent = $derived(processContent(executiveSummary));
 </script>
 
 <div

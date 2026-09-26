@@ -1,13 +1,13 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { postJson } from '$lib/http';
   import { setSessionToken } from '$lib/session';
 
-  let password = '';
-  let confirmPassword = '';
-  let error = '';
-  let isSubmitting = false;
+  let password = $state('');
+  let confirmPassword = $state('');
+  let error = $state('');
+  let isSubmitting = $state(false);
 
   async function resetPassword() {
     error = '';
@@ -18,7 +18,7 @@
 
     isSubmitting = true;
     const result = await postJson<{ token: string }>('/api/v2/auth/reset-password', {
-      token: $page.params.token,
+      token: page.params.token,
       password,
     });
     if (!result.ok) {
@@ -45,7 +45,14 @@
         After this, you'll be signed out everywhere else.
       </p>
 
-      <form method="POST" class="mt-6 space-y-4" on:submit|preventDefault={resetPassword}>
+      <form
+        method="POST"
+        class="mt-6 space-y-4"
+        onsubmit={(e) => {
+          e.preventDefault();
+          resetPassword();
+        }}
+      >
         <div>
           <label
             for="reset-password"

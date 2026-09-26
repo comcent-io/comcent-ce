@@ -7,7 +7,11 @@
     currentParty: string;
   }
 
-  export let recordings: AudioRecording[] = [];
+  interface Props {
+    recordings?: AudioRecording[];
+  }
+
+  let { recordings = [] }: Props = $props();
 </script>
 
 <div

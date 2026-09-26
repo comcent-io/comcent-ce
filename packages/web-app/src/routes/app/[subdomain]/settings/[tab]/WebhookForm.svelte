@@ -1,22 +1,38 @@
-<script>
+<script lang="ts">
   import Button from '$lib/components/Button.svelte';
-  import { createEventDispatcher } from 'svelte';
 
-  const dispatch = createEventDispatcher();
-
-  export let formData = {
-    name: '',
-    webhookUrl: '',
-    callUpdate: false,
-    presenceUpdate: false,
+  type WebhookFormData = {
+    name: string;
+    webhookUrl: string;
+    callUpdate: boolean;
+    presenceUpdate: boolean;
   };
 
-  export let isProgress = false;
-
-  export let buttonText = 'Create';
+  let {
+    formData = $bindable({
+      name: '',
+      webhookUrl: '',
+      callUpdate: false,
+      presenceUpdate: false,
+    }),
+    isProgress = false,
+    buttonText = 'Create',
+    onSubmit,
+  }: {
+    formData?: WebhookFormData;
+    isProgress?: boolean;
+    buttonText?: string;
+    onSubmit?: (formData: WebhookFormData) => void;
+  } = $props();
 </script>
 
-<form class="space-y-6" on:submit|preventDefault={() => dispatch('submit', formData)}>
+<form
+  class="space-y-6"
+  onsubmit={(e) => {
+    e.preventDefault();
+    onSubmit?.(formData);
+  }}
+>
   <div>
     <label for="name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
       Name

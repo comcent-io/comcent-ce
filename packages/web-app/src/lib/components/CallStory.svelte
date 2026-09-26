@@ -10,33 +10,38 @@
   import moment from 'moment-timezone';
   import { scale } from '$lib/scaleStore';
 
-  let localScale = 1;
-  $: {
+  let localScale = $state(1);
+  // Other components read the zoom from the shared store.
+  $effect(() => {
     scale.set(localScale);
+  });
+
+  interface Props {
+    callStory: CallStoryFromServer;
   }
 
-  export let callStory: CallStoryFromServer;
-  let channelGroup: any; // For Debug
-  let spansByUsers = {};
-
-  // Timeline calculations
-  let callDuration = 0;
+  let { callStory }: Props = $props();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let channelGroup: Record<string, any[]> | undefined; // For Debug
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let spansByUsers: Record<string, any[]> = $state({});
 
   // Mouse tracking for vertical line
-  let callStoryContainer: HTMLElement;
-  let mousePosition = 0;
-  let currentTime = 0;
-  let isHovering = false;
+  let callStoryContainer: HTMLElement | undefined = $state();
+  let mousePosition = $state(0);
+  let currentTime = $state(0);
+  let isHovering = $state(false);
 
-  $: {
-    if (callStory?.callSpans?.length > 0) {
-      const sortedSpans = _.sortBy(callStory.callSpans, 'startAt');
-      const startTime = new Date(sortedSpans[0].startAt).getTime();
-      const lastSpan = sortedSpans[sortedSpans.length - 1];
-      const endTime = lastSpan.endAt ? new Date(lastSpan.endAt).getTime() : new Date().getTime();
-      callDuration = Math.ceil((endTime - startTime) / 1000); // Duration in seconds
+  let callDuration = $derived.by(() => {
+    if (!(callStory?.callSpans?.length > 0)) {
+      return 0;
     }
-  }
+    const sortedSpans = _.sortBy(callStory.callSpans, 'startAt');
+    const startTime = new Date(sortedSpans[0].startAt).getTime();
+    const lastSpan = sortedSpans[sortedSpans.length - 1];
+    const endTime = lastSpan.endAt ? new Date(lastSpan.endAt).getTime() : new Date().getTime();
+    return Math.ceil((endTime - startTime) / 1000); // Duration in seconds
+  });
 
   onMount(() => {
     const enhancedSpans = setSpanRelativeTime(callStory.callSpans);
@@ -106,8 +111,8 @@
     isHovering = false;
   }
 
-  let debug = false;
-  let showJson = false;
+  let debug = $state(false);
+  let showJson = $state(false);
 
   let counter = 1;
   function onHeadingClick() {
@@ -121,7 +126,7 @@
 >
   <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
     Call
-    <button on:click={onHeadingClick} class="text-transparent">:</button>
+    <button onclick={onHeadingClick} class="text-transparent">:</button>
     <span class="text-xs">{callStory.id}</span>
   </h5>
 
@@ -153,9 +158,9 @@
         <div
           class="mb-5 call-story pt-5 relative"
           bind:this={callStoryContainer}
-          on:mousemove={handleMouseMove}
-          on:mouseenter={handleMouseEnter}
-          on:mouseleave={handleMouseLeave}
+          onmousemove={handleMouseMove}
+          onmouseenter={handleMouseEnter}
+          onmouseleave={handleMouseLeave}
           role="slider"
           tabindex="0"
           aria-label="Call timeline"
@@ -211,7 +216,7 @@
             <!--suppress HtmlUnknownTag -->
             <div
               class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
-            />
+            ></div>
             <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">
               Debug: Show JSON
             </span>

@@ -1,11 +1,11 @@
 import type { DialNodeData } from '$lib/types/DialNodeData';
 
 import DialNodeComponent from './DialNode.svelte';
-import { FlowNode } from './FlowNode';
+import { FlowNode } from './FlowNode.svelte';
 import { v4 as uuidv4 } from 'uuid';
 
 export class DialNode extends FlowNode {
-  data: DialNodeData;
+  declare data: DialNodeData;
   component = DialNodeComponent;
   constructor(data?: DialNodeData) {
     super();

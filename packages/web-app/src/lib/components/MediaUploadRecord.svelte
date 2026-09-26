@@ -1,17 +1,28 @@
+<script lang="ts" module>
+  export type AudioChange = {
+    audioUrl: string;
+    audioBlob: Blob;
+    mimeType: string;
+    fileName: string;
+  };
+</script>
+
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  const dispatch = createEventDispatcher();
+  interface Props {
+    audioUrl?: string;
+    nodeId?: string;
+    onAudioChange?: (audio: AudioChange) => void;
+  }
 
-  export let audioUrl = '';
-  export let nodeId = '';
+  let { audioUrl = '', nodeId = '', onAudioChange }: Props = $props();
 
-  let fileInput: HTMLInputElement | null = null;
+  let fileInput: HTMLInputElement | null = $state(null);
   let mimeType = '';
-  let changedAudioUrl = '';
-  let recording = false;
+  let changedAudioUrl = $state('');
+  let recording = $state(false);
   let mediaRecorder: MediaRecorder | null = null;
   let audioChunks: Blob[] = [];
-  let recordingDuration = 0;
+  let recordingDuration = $state(0);
   let durationInterval: ReturnType<typeof setInterval>;
 
   const formatDuration = (duration: number) =>
@@ -25,7 +36,7 @@
     audioChunks = [];
     mediaRecorder = null;
     changedAudioUrl = URL.createObjectURL(audioBlob);
-    dispatch('audioChange', {
+    onAudioChange?.({
       audioUrl: changedAudioUrl,
       audioBlob,
       mimeType,
@@ -85,7 +96,7 @@
     reader.onload = (e) => {
       const audioBlob = new Blob([e.target!.result as ArrayBuffer], { type: mimeType });
       changedAudioUrl = URL.createObjectURL(audioBlob);
-      dispatch('audioChange', {
+      onAudioChange?.({
         audioUrl: changedAudioUrl,
         audioBlob,
         mimeType: input.files![0].type,
@@ -98,10 +109,13 @@
 
 <div class="flex items-center justify-between">
   <audio src={changedAudioUrl || audioUrl} controls></audio>
-  <input type="file" bind:this={fileInput} on:change={fileChanged} accept="audio/*" hidden />
+  <input type="file" bind:this={fileInput} onchange={fileChanged} accept="audio/*" hidden />
   <button
     class="ml-2 text-white bg-blue-500 hover:bg-blue-600 p-2 rounded"
-    on:click|preventDefault={() => fileInput?.click()}
+    onclick={(e) => {
+      e.preventDefault();
+      fileInput?.click();
+    }}
     title="Select audio file from your computer"
   >
     Browse📂
@@ -109,7 +123,11 @@
   </button>
   <button
     class="ml-2 text-white bg-red-500 hover:bg-red-600 p-2 rounded min-w-23 flex items-center justify-center"
-    on:click|preventDefault={recording ? stopRecording : startRecording}
+    onclick={(e) => {
+      e.preventDefault();
+      if (recording) stopRecording();
+      else startRecording();
+    }}
     title={recording ? 'Stop recording' : 'Start recording'}
   >
     {recording ? 'Stop   ⏹️' : 'Record ⏺️'}

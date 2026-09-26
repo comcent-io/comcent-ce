@@ -1,22 +1,22 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
+  import { untrack } from 'svelte';
   import Pagination from '$lib/components/Pagination.svelte';
   import { getJson } from '$lib/http';
   import moment from 'moment';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
-  const subdomain = $page.params.subdomain;
-  let transactions: any[] = [];
-  let totalPages = 0;
-  let currentPage = 1;
-  let itemsPerPage = 10;
-  let totalCount = 0;
+  const subdomain = page.params.subdomain;
+  let transactions: any[] = $state([]);
+  let totalPages = $state(0);
+  let currentPage = $state(1);
+  let itemsPerPage = $state(10);
+  let totalCount = $state(0);
   let latestRequestId = 0;
   let lastFetchKey = '';
 
   async function fetchTransactions() {
     const requestId = ++latestRequestId;
-    const searchParams = $page.url.searchParams;
+    const searchParams = page.url.searchParams;
     const requestedCurrentPage = parseInt(searchParams.get('page') || '1', 10);
     const requestedItemsPerPage = parseInt(searchParams.get('itemsPerPage') || '10', 10);
     const result = await getJson<{
@@ -48,13 +48,15 @@
     itemsPerPage = result.data.itemsPerPage ?? requestedItemsPerPage;
   }
 
-  $: if (browser) {
-    const nextFetchKey = `${$page.url.search}|${$page.params.subdomain}`;
+  // Refetch when the URL or the org changes. The fetch itself is untracked,
+  // so the state it reads and writes does not re-run this.
+  $effect(() => {
+    const nextFetchKey = `${page.url.search}|${page.params.subdomain}`;
     if (nextFetchKey !== lastFetchKey) {
       lastFetchKey = nextFetchKey;
-      fetchTransactions();
+      untrack(() => fetchTransactions());
     }
-  }
+  });
 </script>
 
 <h3 class="text-3xl font-bold dark:text-white mb-4 mt-4">Transactions</h3>

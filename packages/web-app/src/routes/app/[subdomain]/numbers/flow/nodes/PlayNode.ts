@@ -1,10 +1,10 @@
 import PlayNodeComponent from './PlayNode.svelte';
 import { v4 as uuidv4 } from 'uuid';
-import { FlowNode } from './FlowNode';
+import { FlowNode } from './FlowNode.svelte';
 import type { PlayNodeData } from '$lib/types/PlayNodeData';
 
 export class PlayNode extends FlowNode {
-  data: PlayNodeData;
+  declare data: PlayNodeData;
   component = PlayNodeComponent;
   constructor(data?: PlayNodeData) {
     super();

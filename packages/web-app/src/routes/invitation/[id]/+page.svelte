@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import ErrorMessage from '$lib/components/ErrorMessage.svelte';
   import { getJson, postJson } from '$lib/http';
 
@@ -15,11 +15,12 @@
     };
   };
 
-  let invitation: InvitationData | null = null;
-  let error: { message: string; formErrors: { message: string; path: string[] }[] } | null = null;
-  let username = '';
-  let loading = false;
-  let saving = false;
+  let invitation: InvitationData | null = $state(null);
+  let error: { message: string; formErrors: { message: string; path: string[] }[] } | null =
+    $state(null);
+  let username = $state('');
+  let loading = $state(false);
+  let saving = $state(false);
 
   onMount(() => {
     void loadInvitation();
@@ -30,7 +31,7 @@
     error = null;
 
     const result = await getJson<{ invitation: InvitationData; suggestedUsername: string }>(
-      `/api/v2/user/invitations/${$page.params.id}`,
+      `/api/v2/user/invitations/${page.params.id}`,
     );
 
     if (!result.ok) {
@@ -53,7 +54,7 @@
     saving = true;
     error = null;
 
-    const result = await postJson(`/api/v2/user/invitations/${$page.params.id}/accept`, {
+    const result = await postJson(`/api/v2/user/invitations/${page.params.id}/accept`, {
       username,
     });
 
@@ -91,7 +92,7 @@
     <p class="mb-3 font-normal text-gray-700 dark:text-gray-400">
       You have been invited to join the team {invitation.org.name}.
     </p>
-    <form method="POST" on:submit={acceptInvitation}>
+    <form method="POST" onsubmit={acceptInvitation}>
       <label
         for="username"
         class="block w-full mb-2 text-sm font-medium text-gray-900 dark:text-white"

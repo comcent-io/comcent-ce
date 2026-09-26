@@ -1,10 +1,10 @@
-<script>
-  export let showDialPad = false;
+<script lang="ts">
+  let { showDialPad = $bindable(false) }: { showDialPad?: boolean } = $props();
 </script>
 
 <button
   type="button"
-  on:click={() => (showDialPad = !showDialPad)}
+  onclick={() => (showDialPad = !showDialPad)}
   class="flex-1 rounded-lg border py-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-800"
   class:active={showDialPad}
   class:inactive={!showDialPad}

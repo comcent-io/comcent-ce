@@ -1,41 +1,48 @@
 <script lang="ts">
-  import type { SelectedOutlet } from '../SelectedOutlet';
   import Draggable from '../utils/Draggable.svelte';
   import Inlet from '../utils/Inlet.svelte';
   import CloseButton from '../utils/CloseButton.svelte';
-  import { createEventDispatcher } from 'svelte';
   import EditButton from '../utils/EditButton.svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
   import { isValidPhoneNumber } from 'libphonenumber-js';
   import Outlet from '../utils/Outlet.svelte';
   import type { DialGroupNode } from './DialGroupNode';
+  import type { NodeProps } from './NodeProps';
 
-  const dispatch = createEventDispatcher();
-  export let node: DialGroupNode;
-  let editData = {
+  let {
+    node,
+    selectedOutlet,
+    inletConnected = false,
+    inletConnectable = false,
+    onClose,
+    onOutletSelected,
+    onDisconnectOutlet,
+    onInletSelected,
+    onDisconnectInlet,
+    onDragEnd,
+  }: NodeProps<DialGroupNode> = $props();
+
+  // A working copy for the edit form; saved into the node on Update.
+  // svelte-ignore state_referenced_locally
+  let editData = $state({
     ...node.data,
     data: {
       to: [...node.data.data.to],
       shouldSpoof: node.data.data.shouldSpoof ?? false,
       timeout: node.data.data.timeout,
     },
-  };
-  export let selectedOutlet: SelectedOutlet | null;
-  export let inletConnected = false;
-  export let inletConnectable = false;
+  });
+  let editing = $state(false);
+  let currentInput = $state('');
 
-  let editing = false;
-  let currentInput = '';
-
-  let searchResults: any[] = [];
-  let searchProgress = false;
-  let inputError = '';
+  let searchResults: any[] = $state([]);
+  let inputError = $state('');
 
   async function searchUser(searchText: string) {
     try {
       const encodedSearchText = encodeURIComponent(searchText);
       const response = await fetch(
-        `/api/v2/${$page.params.subdomain}/members?search=${encodedSearchText}`,
+        `/api/v2/${page.params.subdomain}/members?search=${encodedSearchText}`,
       );
       if (!response.ok) {
         throw new Error('Network response was not ok');
@@ -85,12 +92,10 @@
       if (userInput.length < 3) {
         searchResults = [];
       } else {
-        searchProgress = true;
         let tempSearchResults = await searchUser(userInput);
         searchResults = tempSearchResults.filter(
           (item: any) => !editData.data.to.includes(item.username),
         );
-        searchProgress = false;
       }
     }
   }
@@ -107,9 +112,8 @@
     if (editData.data.timeout > 60) {
       editData.data.timeout = 60;
     }
-    node.data = editData;
+    node.data = $state.snapshot(editData);
     editing = false;
-    dispatch('updated', { node: node });
   }
 </script>
 
@@ -117,19 +121,18 @@
   {node}
   title={node.data.type}
   class="block w-[17rem] rounded-lg border-2 border-amber-400 bg-white shadow dark:border-amber-400 dark:bg-gray-800"
-  on:dragEnd
+  {onDragEnd}
 >
-  <svelte:fragment slot="headerActions">
-    <EditButton on:edit={() => (editing = true)} />
-    <CloseButton on:close />
-  </svelte:fragment>
+  {#snippet headerActions()}
+    <EditButton onEdit={() => (editing = true)} />
+    <CloseButton {onClose} />
+  {/snippet}
   <Inlet
-    {selectedOutlet}
     {node}
     connected={inletConnected}
     connectable={inletConnectable}
-    on:inletSelected
-    on:disconnectInlet
+    {onInletSelected}
+    {onDisconnectInlet}
   >
     <div class="space-y-1 p-3">
       <p class="truncate text-sm font-medium text-slate-800 dark:text-white">
@@ -147,8 +150,8 @@
         outletId={'timeout'}
         connected={Boolean(node.data.outlets.timeout)}
         class="w-full"
-        on:outletSelected
-        on:disconnectOutlet
+        {onOutletSelected}
+        {onDisconnectOutlet}
       >
         <p class="text-sm font-semibold dark:text-white">Timeout</p>
       </Outlet>
@@ -170,7 +173,7 @@
           <button
             type="button"
             class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
-            on:click={() => (editing = false)}
+            onclick={() => (editing = false)}
           >
             <svg
               class="w-3 h-3"
@@ -239,7 +242,7 @@
                 <button
                   class="ml-2 shrink-0 h-full text-blue-500 hover:text-blue-600 dark:text-blue-600 dark:hover:text-blue-700"
                   type="button"
-                  on:click={() => removeUsernameOrNumber(index)}
+                  onclick={() => removeUsernameOrNumber(index)}
                 >
                   <svg
                     class="w-4 h-4"
@@ -268,8 +271,8 @@
             placeholder="Type a username/number and press Enter to add it to the list."
             required
             bind:value={currentInput}
-            on:keydown={handleInputKeydown}
-            on:input={fetchSuggestions}
+            onkeydown={handleInputKeydown}
+            oninput={fetchSuggestions}
           />
           {#if inputError}
             <p class="text-red-500 text-xs italic">{inputError}</p>
@@ -285,7 +288,10 @@
                 {#each searchResults as member}
                   <li>
                     <button
-                      on:click|preventDefault={() => selectUser(member)}
+                      onclick={(e) => {
+                        e.preventDefault();
+                        selectUser(member);
+                      }}
                       class=" w-full block px-2 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white text-left"
                     >
                       <div class="flex-1 min-w-0">
@@ -342,7 +348,7 @@
           <button
             data-modal-hide="defaultModal"
             type="button"
-            on:click={onUpdate}
+            onclick={onUpdate}
             class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
           >
             Save
@@ -350,7 +356,7 @@
           <button
             data-modal-hide="defaultModal"
             type="button"
-            on:click={() => (editing = false)}
+            onclick={() => (editing = false)}
             class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600"
           >
             Cancel

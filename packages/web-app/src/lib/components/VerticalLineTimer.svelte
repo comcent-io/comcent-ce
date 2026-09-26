@@ -1,9 +1,13 @@
 <script lang="ts">
   import moment from 'moment-timezone';
 
-  export let isVisible: boolean;
-  export let position: number;
-  export let currentTime: number;
+  interface Props {
+    isVisible: boolean;
+    position: number;
+    currentTime: number;
+  }
+
+  let { isVisible, position, currentTime }: Props = $props();
 
   function formatTime(seconds: number): string {
     const duration = moment.duration(seconds, 'seconds');

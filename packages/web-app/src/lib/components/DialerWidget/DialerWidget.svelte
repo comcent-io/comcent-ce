@@ -1,6 +1,6 @@
-<svelte:options accessors={true} />
-
 <script lang="ts">
+  import { SvelteSet } from 'svelte/reactivity';
+
   import '../../../tailwind.css';
   import MinusIcon from '$lib/components/Icons/MinusIcon.svelte';
   import ExpandIcon from '$lib/components/Icons/ExpandIcon.svelte';
@@ -19,64 +19,87 @@
   import { isValidPhoneNumber } from 'libphonenumber-js';
   import type { MemberSearchResult } from '$lib/types/MemberSearchResult';
   import Spinner from '../Icons/Spinner.svelte';
-  import toast from 'svelte-french-toast';
+  import toast from '$lib/toast';
   import { Socket } from 'phoenix';
 
-  export let subdomain = '';
-  export let username: string;
-  export let password: string;
-  export let displayName: string;
-
-  export let origin: string | null = null;
-  export let appBaseUrl: string | null = null;
-  export let sipWsUrl: string | null = null;
-  export let sipDomain: string | null = null;
-
-  export let authToken: string | undefined;
-
-  export let numbers: {
-    id: string;
-    name: string;
-    number: string;
-    sipTrunk: {
-      id: string;
-      name: string;
-    };
-  }[] = [];
-
-  let selectedOutboundInfo = '';
+  let selectedOutboundInfo = $state('');
   let selectedOutboundNumber = '';
   let userId = '';
+  interface Props {
+    subdomain?: string;
+    username: string;
+    password: string;
+    displayName: string;
+    origin?: string | null;
+    appBaseUrl?: string | null;
+    sipWsUrl?: string | null;
+    sipDomain?: string | null;
+    authToken: string | undefined;
+    numbers?: {
+      id: string;
+      name: string;
+      number: string;
+      sipTrunk: {
+        id: string;
+        name: string;
+      };
+    }[];
+  }
+
+  let {
+    subdomain = '',
+    username,
+    password,
+    displayName,
+    origin = null,
+    appBaseUrl = null,
+    sipWsUrl = null,
+    sipDomain = null,
+    authToken,
+    numbers = [],
+  }: Props = $props();
+
+  let currentCall = $state<Session | null>(null);
+
+  // sip.js's web transport keeps its WebSocket on `ws`, which its Transport
+  // type does not declare.
+  function wsOf(manager: SessionManager): WebSocket {
+    return (manager.userAgent.transport as unknown as { ws: WebSocket }).ws;
+  }
+
   // This variable is required as widget may be hosted in different website.
   // Widget embedders MUST provide appBaseUrl, sipWsUrl, and sipDomain props;
   // example.com fallbacks exist only to prevent crashes during development.
-  let resolvedAppBaseUrl = appBaseUrl || origin || 'https://app.example.com';
-  let domainName = `${subdomain}.${sipDomain || 'example.com'}`;
-  const ringSoundUrl = `${resolvedAppBaseUrl}/sounds/phone_ringing.mp3`;
-  let wsUrl = sipWsUrl || 'wss://sip-ws.example.com/';
-  let invitations: Invitation[] = [];
-  export let currentCall: Session | null = null;
-  let heldForAttendedTransfer: Session | null = null;
-  let heldCalls: { session: Session; heldSince: Date }[] = [];
-  let startTimeForSession: Record<string, Date> = {};
+  let resolvedAppBaseUrl = $derived(appBaseUrl || origin || 'https://app.example.com');
+  let domainName = $derived(`${subdomain}.${sipDomain || 'example.com'}`);
+  let ringSoundUrl = $derived(`${resolvedAppBaseUrl}/sounds/phone_ringing.mp3`);
+  let wsUrl = $derived(sipWsUrl || 'wss://sip-ws.example.com/');
+  let invitations: Invitation[] = $state([]);
+  let heldForAttendedTransfer: Session | null = $state(null);
+  let heldCalls: { session: Session; heldSince: Date }[] = $state([]);
+  let startTimeForSession: Record<string, Date> = $state({});
 
   // Incoming calls the agent has soft-dismissed (not SIP-rejected — just
   // demoted out of the primary overlay into the "Also Waiting" list) until
   // answered, declined, or the caller hangs up.
-  let ignoredInvitationIds: Set<string> = new Set();
-  $: primaryInvitation = invitations.find((i) => !ignoredInvitationIds.has(i.id)) ?? invitations[0];
-  $: waitingInvitations = invitations.filter((i) => i !== primaryInvitation);
+  const ignoredInvitationIds = new SvelteSet<string>();
+  let primaryInvitation = $derived(
+    invitations.find((i) => !ignoredInvitationIds.has(i.id)) ?? invitations[0],
+  );
+  let waitingInvitations = $derived(invitations.filter((i) => i !== primaryInvitation));
   // True when the primary card is itself an ignored call shown only because
   // there's nothing else to promote — lets the UI show it's been silenced
   // instead of looking unchanged and identical to a fresh, un-ignored call.
-  $: primaryIsIgnored = primaryInvitation ? ignoredInvitationIds.has(primaryInvitation.id) : false;
+  let primaryIsIgnored = $derived(
+    primaryInvitation ? ignoredInvitationIds.has(primaryInvitation.id) : false,
+  );
 
-  let remoteAudio: HTMLAudioElement;
-  let ringSound: HTMLAudioElement;
+  let remoteAudio: HTMLAudioElement | undefined = $state();
+  let ringSound: HTMLAudioElement | undefined = $state();
 
-  let searchResults: MemberSearchResult[] = [];
-  let errorMessage = '';
-  let isDialing = false;
+  let searchResults: MemberSearchResult[] = $state([]);
+  let errorMessage = $state('');
+  let isDialing = $state(false);
 
   let socket: Socket | undefined;
   let presenceChannel: any;
@@ -147,6 +170,7 @@
   }
 
   function playRing() {
+    if (!ringSound) return;
     ringSound.currentTime = 0;
     ringSound.play().catch(() => {});
   }
@@ -177,7 +201,6 @@
       playRing();
       newCallNotification(invitation as Invitation);
       invitations.push(invitation as Invitation);
-      invitations = invitations;
     },
     onServerConnect() {
       uaStatus = 'Connected';
@@ -205,7 +228,6 @@
       });
       delete startTimeForSession[session.id];
       ignoredInvitationIds.delete(session.id);
-      ignoredInvitationIds = ignoredInvitationIds;
 
       if (currentCall === session) {
         if (heldCalls.length > 0) {
@@ -234,7 +256,8 @@
     },
   };
 
-  let sessionManager: SessionManager;
+  // Created in onMount, before anything can use it.
+  let sessionManager: SessionManager = $state(undefined!);
   onMount(async () => {
     getCurrentPresence();
     // Initialize WebSocket connection for presence updates
@@ -302,8 +325,8 @@
     if (!sessionManager.userAgent.transport.onMessage) {
       sessionManager.userAgent.transport.onMessage = onMessageReceived;
     } else {
-      sessionManager.userAgent.transport.ws.addEventListener('message', (ev: MessageEvent) =>
-        onWebSocketMessageReceived(ev, sessionManager.userAgent.transport.ws),
+      wsOf(sessionManager).addEventListener('message', (ev: MessageEvent) =>
+        onWebSocketMessageReceived(ev, wsOf(sessionManager)),
       );
     }
   }
@@ -332,11 +355,9 @@
     socket?.disconnect();
   });
 
-  async function onAnswer(event: CustomEvent<Invitation>) {
-    const invitation = event.detail;
+  async function onAnswer(invitation: Invitation) {
     if (!invitation) return;
     ignoredInvitationIds.delete(invitation.id);
-    ignoredInvitationIds = ignoredInvitationIds;
     if (currentCall) {
       await sessionManager.hold(currentCall);
       heldCalls = [...heldCalls, { session: currentCall, heldSince: new Date() }];
@@ -348,17 +369,14 @@
     await sessionManager.answer(invitation);
   }
 
-  function onDecline(event: CustomEvent<Invitation>) {
-    const invitation = event.detail;
+  function onDecline(invitation: Invitation) {
     if (!invitation) return;
     sessionManager.decline(invitation);
   }
 
-  function onIgnore(event: CustomEvent<Invitation>) {
-    const invitation = event.detail;
+  function onIgnore(invitation: Invitation) {
     if (!invitation) return;
     ignoredInvitationIds.add(invitation.id);
-    ignoredInvitationIds = ignoredInvitationIds;
     // Ignore silences the audible alert without touching the SIP session —
     // the call keeps ringing on the network and stays visible (demoted into
     // the waiting list), it just stops making noise.
@@ -390,9 +408,9 @@
     currentCall = null;
   }
 
-  function onDtmf(event: CustomEvent<{ number: string }>) {
+  function onDtmf(number: string) {
     if (!currentCall) return;
-    sessionManager.sendDTMF(currentCall, event.detail.number);
+    sessionManager.sendDTMF(currentCall, number);
   }
 
   export async function dial(fromNumber: number, toNumber: number) {
@@ -414,8 +432,7 @@
     isDialing = false;
   }
 
-  async function onBlindTransfer(e: CustomEvent<{ transferAddress: string }>) {
-    const transferAddress = e.detail.transferAddress;
+  async function onBlindTransfer(transferAddress: string) {
     if (!currentCall || !transferAddress) {
       return;
     }
@@ -429,8 +446,7 @@
     });
   }
 
-  async function onAttendedTransfer(e: CustomEvent<{ transferAddress: string }>) {
-    const transferAddress = e.detail.transferAddress;
+  async function onAttendedTransfer(transferAddress: string) {
     if (!currentCall || !transferAddress) {
       return;
     }
@@ -499,16 +515,16 @@
     sessionManager.unmute(currentCall);
   }
 
-  let expanded = false;
-  let showDialPad = false;
-  let toAddress = '';
-  let uaStatus = 'Connecting...';
+  let expanded = $state(false);
+  let showDialPad = $state(false);
+  let toAddress = $state('');
+  let uaStatus = $state('Connecting...');
 
   let availableStatus = ['Logged Out', 'Available', 'On Break', 'On Call', 'Wrap Up', 'Busy'];
-  let status = 'Available';
-  let statusMenuOpen = false;
-  let statusMenuDropUp = false;
-  let statusButtonEl: HTMLButtonElement;
+  let status = $state('Available');
+  let statusMenuOpen = $state(false);
+  let statusMenuDropUp = $state(false);
+  let statusButtonEl: HTMLButtonElement | undefined = $state();
 
   function toggleStatusMenu() {
     if (!statusMenuOpen && statusButtonEl) {
@@ -530,7 +546,7 @@
     Busy: 'bg-red-500',
   };
 
-  $: showExpanded = expanded || !!currentCall || heldCalls.length > 0;
+  let showExpanded = $derived(expanded || !!currentCall || heldCalls.length > 0);
 
   function toggleExpanded() {
     expanded = !expanded;
@@ -545,13 +561,13 @@
   // native `bottom`-anchored content, instead of pushing the header down
   // and then having it clamped back up once the content shrinks again.
   let widgetEl: HTMLDivElement;
-  let anchorX: 'left' | 'right' = 'right';
-  let anchorY: 'top' | 'bottom' = 'bottom';
-  let offsetX: number | null = null; // px from the anchorX edge
-  let offsetY: number | null = null; // px from the anchorY edge
-  let dragging = false;
-  let dragLeft = 0; // live top-left px while actively dragging
-  let dragTop = 0;
+  let anchorX: 'left' | 'right' = $state('right');
+  let anchorY: 'top' | 'bottom' = $state('bottom');
+  let offsetX: number | null = $state(null); // px from the anchorX edge
+  let offsetY: number | null = $state(null); // px from the anchorY edge
+  let dragging = $state(false);
+  let dragLeft = $state(0); // live top-left px while actively dragging
+  let dragTop = $state(0);
   let dragOffsetX = 0;
   let dragOffsetY = 0;
   const EDGE_MARGIN = 8;
@@ -713,12 +729,14 @@
     }
   }
 
-  let showNumbers = false;
+  let showNumbers = $state(false);
   function showOrHideNumbers() {
     showNumbers = !showNumbers;
   }
 
-  let filteredNumbers: any[] = numbers;
+  // Starts as every number; the search box narrows it.
+  // svelte-ignore state_referenced_locally
+  let filteredNumbers: any[] = $state(numbers);
   function fetchNumbers(event: Event) {
     const target = event.target as HTMLInputElement;
     const userInput = target.value.toLowerCase();
@@ -759,9 +777,9 @@
       waiting={waitingInvitations}
       isIgnored={primaryIsIgnored}
       currentCallerName={currentCall ? sessionLabel(currentCall) : undefined}
-      on:answer={onAnswer}
-      on:decline={onDecline}
-      on:ignore={onIgnore}
+      {onAnswer}
+      {onDecline}
+      {onIgnore}
     />
   {/if}
   <div
@@ -769,7 +787,7 @@
   >
     <div
       class="flex items-center justify-between rounded-t-xl bg-gray-900 py-2.5 px-4 cursor-move touch-none select-none dark:bg-gray-950"
-      on:pointerdown={onDragHandlePointerDown}
+      onpointerdown={onDragHandlePointerDown}
     >
       <div class="relative">
         {#if uaStatus !== 'Registered'}
@@ -778,10 +796,10 @@
           <button
             type="button"
             bind:this={statusButtonEl}
-            on:click={toggleStatusMenu}
+            onclick={toggleStatusMenu}
             class="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-sm font-medium text-gray-100 hover:bg-gray-700"
           >
-            <span class="h-2 w-2 rounded-full {statusDotColors[status] ?? 'bg-gray-400'}" />
+            <span class="h-2 w-2 rounded-full {statusDotColors[status] ?? 'bg-gray-400'}"></span>
             {status}
             <svg
               class="h-3 w-3 text-gray-400"
@@ -804,10 +822,10 @@
               {#each availableStatus as s}
                 <button
                   type="button"
-                  on:click={() => selectStatus(s)}
+                  onclick={() => selectStatus(s)}
                   class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
-                  <span class="h-2 w-2 rounded-full {statusDotColors[s] ?? 'bg-gray-400'}" />
+                  <span class="h-2 w-2 rounded-full {statusDotColors[s] ?? 'bg-gray-400'}"></span>
                   {s}
                 </button>
               {/each}
@@ -816,7 +834,7 @@
         {/if}
       </div>
       <button
-        on:click={toggleExpanded}
+        onclick={toggleExpanded}
         class="rounded-md p-1 text-gray-400 hover:bg-gray-800 hover:text-white"
       >
         {#if expanded}
@@ -857,14 +875,14 @@
                   </div>
                   <button
                     type="button"
-                    on:click={() => resumeHeldCall(h.session)}
+                    onclick={() => resumeHeldCall(h.session)}
                     class="whitespace-nowrap rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
                   >
                     Resume
                   </button>
                   <button
                     type="button"
-                    on:click={() => dropHeldCall(h.session)}
+                    onclick={() => dropHeldCall(h.session)}
                     class="whitespace-nowrap rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                   >
                     End
@@ -882,17 +900,17 @@
             session={currentCall}
             {heldForAttendedTransfer}
             search={searchUser}
-            on:hangup={onHangup}
-            on:mute={onMute}
-            on:unmute={onUnmute}
-            on:hold={onHold}
-            on:unhold={onUnhold}
-            on:blindTransfer={onBlindTransfer}
-            on:attendedTransfer={onAttendedTransfer}
-            on:confirmAttendedTransfer={onAttendedTransferComplete}
-            on:cancelAttendedTransfer={onAttendedTransferReject}
-            on:newCall={onNewCall}
-            on:dtmfNumberPress={onDtmf}
+            {onHangup}
+            {onMute}
+            {onUnmute}
+            {onHold}
+            {onUnhold}
+            {onBlindTransfer}
+            {onAttendedTransfer}
+            onConfirmAttendedTransfer={onAttendedTransferComplete}
+            onCancelAttendedTransfer={onAttendedTransferReject}
+            {onNewCall}
+            onDtmfNumberPress={onDtmf}
           />
         {:else}
           <div>
@@ -912,8 +930,8 @@
                 placeholder="Search.."
                 required
                 bind:value={selectedOutboundInfo}
-                on:input={fetchNumbers}
-                on:click={showOrHideNumbers}
+                oninput={fetchNumbers}
+                onclick={showOrHideNumbers}
               />
               <svg
                 class="absolute inset-y-0 right-0 mr-3 mt-3 h-4 w-4 text-gray-500 dark:text-gray-400"
@@ -940,7 +958,10 @@
                   {#each filteredNumbers as number}
                     <li>
                       <button
-                        on:click|preventDefault={() => selectNumber(number)}
+                        onclick={(e) => {
+                          e.preventDefault();
+                          selectNumber(number);
+                        }}
                         class="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700"
                       >
                         <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
@@ -971,7 +992,7 @@
                 placeholder="Destination number"
                 required
                 bind:value={toAddress}
-                on:input={fetchSuggestions}
+                oninput={fetchSuggestions}
               />
               {#if searchResults.length > 0}
                 <div
@@ -981,7 +1002,10 @@
                     {#each searchResults as member}
                       <li>
                         <button
-                          on:click|preventDefault={() => selectUser(member)}
+                          onclick={(e) => {
+                            e.preventDefault();
+                            selectUser(member);
+                          }}
                           class="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700"
                         >
                           <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
@@ -996,7 +1020,7 @@
             </div>
             <button
               type="button"
-              on:click={() => (toAddress = '')}
+              onclick={() => (toAddress = '')}
               class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
             >
               <ClearLeftIcon />
@@ -1005,7 +1029,7 @@
 
             <button
               type="button"
-              on:click={onDial}
+              onclick={onDial}
               disabled={isDialing}
               class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-60 dark:focus:ring-blue-800"
             >
@@ -1020,7 +1044,7 @@
 
           <button
             type="button"
-            on:click={() => (showDialPad = !showDialPad)}
+            onclick={() => (showDialPad = !showDialPad)}
             class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-300 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
           >
             {showDialPad ? 'Hide Dial Pad' : 'Show Dial Pad'}
@@ -1029,9 +1053,9 @@
           {#if showDialPad}
             <div transition:slide={{ delay: 250, duration: 300 }} class="mt-3">
               <DialPad
-                on:dialKeyPress={(e) => {
+                onDialKeyPress={(number) => {
                   if (!toAddress) toAddress = '';
-                  toAddress += e.detail.number;
+                  toAddress += number;
                 }}
               />
             </div>
@@ -1048,7 +1072,7 @@
         Your browser doesn't support HTML5 audio.
       </div>
     </audio>
-    <audio id="ringSound" bind:this={ringSound} loop src={ringSoundUrl} />
+    <audio id="ringSound" bind:this={ringSound} loop src={ringSoundUrl}></audio>
   </div>
 </div>
 

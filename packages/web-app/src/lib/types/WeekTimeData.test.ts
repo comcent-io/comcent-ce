@@ -1,4 +1,4 @@
-import { weekTimeSchema, WeekTimeData } from './WeekTimeData.js';
+import { weekTimeSchema, type WeekTimeData } from './WeekTimeData.js';
 
 type WeekTime = 'WeekTime';
 
