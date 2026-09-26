@@ -3,12 +3,11 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "dev:sip-test-tools-ui": "dotenv -- npm run dev --prefix packages/sip-test-tools-ui -- --host 0.0.0.0 --port 5175",
     "build:web-app": "npm run build --prefix packages/web-app",
     "start:web-app": "dotenv -- node packages/web-app/build/index.js",
     "prepare": "if [ \"$NODE_ENV\" != \"production\" ]; then husky install; fi",
     "lint": "eslint . --ext .vue,.svelte,.html,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
-    "stage-format": "node tools/stage-format.mjs",
+    "stage-format": "prettier --write",
     "lint-staged": "lint-staged",
     "eslint-fix": "eslint --fix",
     "test:e2e": "dotenvx run --env-file=.env.e2e -- npm run test --prefix e2e",
@@ -20,7 +19,7 @@
     "test:e2e:stack:down": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e down --remove-orphans -v",
     "test:e2e:stack:logs": "docker compose -f docker-compose-e2e.yaml --env-file .env.e2e -p comcent-e2e logs --tail=3000",
     "test:vscode": "code e2e",
-    "test": "npm run test --prefix packages/web-app && npm run test --prefix packages/sip-test-tools-ui",
+    "test": "npm run test --prefix packages/web-app",
     "docker:db:migrate": "docker compose exec -w /app server mix ecto.migrate",
     "check:elixir": "cd server && mix compile --warnings-as-errors && cd ..",
     "install:rollup-platform": "./tools/install-rollup-platform.sh"
@@ -40,7 +39,6 @@
   },
   "author": "",
   "workspaces": [
-    "packages/sip-test-tools-ui",
     "packages/tools"
   ],
   "engines": {
@@ -59,6 +57,9 @@
     "husky": "^8.0.3",
     "lint-staged": "^15.2.0",
     "natural-compare-lite": "^1.4.0",
+    "prettier": "^3.6.2",
+    "prettier-plugin-svelte": "^3.5.2",
+    "svelte": "^5.57.1",
     "typescript": "^5.3.3"
   },
   "dependencies": {
