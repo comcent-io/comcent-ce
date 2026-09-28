@@ -34,8 +34,8 @@ test('Password signup, email verification, and login flow works', async ({
     waitUntil: 'networkidle',
   });
 
-  // CE has no terms-and-conditions gate after signup — email verification
-  // lands straight on the org picker.
+  // The terms step is off unless TERMS_URL is set, and the e2e env leaves it
+  // unset, so email verification lands straight on the org picker.
   await page.waitForURL('/org');
 
   await clearSession(page);

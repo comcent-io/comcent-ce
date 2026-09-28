@@ -61,13 +61,22 @@ export async function seedBaselineData() {
         is_email_verified,
         has_agreed_to_tos,
         agreed_to_tos_at,
+        accepted_terms_version,
         is_super_admin,
         created_at,
         updated_at
       )
-      VALUES ($1, $2, $3, true, true, $4, true, $4, $4)
+      VALUES ($1, $2, $3, true, true, $4, $5, true, $4, $4)
     `,
-      [userId, 'Test Admin', 'test.admin@example.com', now],
+      // The current TERMS_VERSION, if .env.e2e turns terms on, so the terms
+      // page doesn't stand between the seeded admin and the app.
+      [
+        userId,
+        'Test Admin',
+        'test.admin@example.com',
+        now,
+        process.env.TERMS_VERSION ?? null,
+      ],
     );
 
     await client.query(

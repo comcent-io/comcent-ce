@@ -49,7 +49,7 @@ async function createOrgForTest(testInfo: TestInfo): Promise<TestOrg> {
   try {
     await client.query('BEGIN');
     const adminResult = await client.query<{ id: string }>(
-      `SELECT id FROM users WHERE email = 'test.admin@example.com'`,
+      "SELECT id FROM users WHERE email = 'test.admin@example.com'",
     );
 
     const adminId = adminResult.rows[0]?.id;
@@ -115,7 +115,11 @@ async function createOrgForTest(testInfo: TestInfo): Promise<TestOrg> {
   }
 }
 
-async function seedMember(org: TestOrg, email: string, role: MemberRole = 'MEMBER') {
+async function seedMember(
+  org: TestOrg,
+  email: string,
+  role: MemberRole = 'MEMBER',
+) {
   const client = createClient();
   await client.connect();
 
@@ -123,7 +127,7 @@ async function seedMember(org: TestOrg, email: string, role: MemberRole = 'MEMBE
     await client.query('BEGIN');
 
     const userResult = await client.query<{ id: string }>(
-      `SELECT id FROM users WHERE email = $1`,
+      'SELECT id FROM users WHERE email = $1',
       [email],
     );
 
@@ -138,12 +142,13 @@ async function seedMember(org: TestOrg, email: string, role: MemberRole = 'MEMBE
             email,
             is_email_verified,
             has_agreed_to_tos,
+            accepted_terms_version,
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3, true, true, NOW(), NOW())
+          VALUES ($1, $2, $3, true, true, $4, NOW(), NOW())
         `,
-        [userId, email, email],
+        [userId, email, email, process.env.TERMS_VERSION ?? null],
       );
     }
 
@@ -161,7 +166,13 @@ async function seedMember(org: TestOrg, email: string, role: MemberRole = 'MEMBE
         VALUES ($1, $2, $3, $4, $5, NULL, 'Logged Out')
         ON CONFLICT DO NOTHING
       `,
-      [userId, org.id, role, memberUsername(org.subdomain, email.split('@')[0]), 'ytgJ6sp9xcvofYT8UlKlr'],
+      [
+        userId,
+        org.id,
+        role,
+        memberUsername(org.subdomain, email.split('@')[0]),
+        'ytgJ6sp9xcvofYT8UlKlr',
+      ],
     );
 
     await client.query('COMMIT');
@@ -189,7 +200,12 @@ async function openInviteForm(page: Page) {
   await expect(page.locator('#email')).toBeVisible();
 }
 
-async function sendInvite(page: Page, subdomain: string, email: string, role: MemberRole) {
+async function sendInvite(
+  page: Page,
+  subdomain: string,
+  email: string,
+  role: MemberRole,
+) {
   await gotoMembersPage(page, subdomain);
   await openInviteForm(page);
   await page.locator('#email').fill(email);
@@ -205,12 +221,18 @@ async function expectInviteRow(page: Page, email: string) {
   await expect(page.getByRole('cell', { name: email })).toBeVisible();
 }
 
-async function openMemberEditPage(page: Page, subdomain: string, email: string) {
+async function openMemberEditPage(
+  page: Page,
+  subdomain: string,
+  email: string,
+) {
   await gotoMembersPage(page, subdomain);
   const row = page.locator('tbody tr').filter({ hasText: email }).first();
   await expect(row).toBeVisible();
   await row.getByRole('link', { name: 'Edit' }).click();
-  await expect(page.getByRole('heading', { name: 'Edit Member' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Edit Member' }),
+  ).toBeVisible();
 }
 
 test('Member list page, send invitation successfully and show it in pending invites', async ({
@@ -223,7 +245,7 @@ test('Member list page, send invitation successfully and show it in pending invi
   await expect(page.getByText('Invite Sent Successfully')).toBeVisible();
 
   const invitationLink = await waitForInvitationLink(page.request, inviteEmail);
-  expect(invitationLink).toContain(`/invitation/`);
+  expect(invitationLink).toContain('/invitation/');
   expect(invitationLink).toContain('http://localhost:4173');
 
   await openPendingInvitesTab(page);
@@ -234,7 +256,9 @@ test('Member list page, send invitation successfully and show it in pending invi
   await expect(row.getByRole('cell', { name: '0', exact: true })).toBeVisible();
 });
 
-test('Member list page, send invitation to already invited user', async ({ page }, testInfo) => {
+test('Member list page, send invitation to already invited user', async ({
+  page,
+}, testInfo) => {
   const org = await createOrgForTest(testInfo);
   const inviteEmail = memberEmail(org.subdomain, 'already-invited');
 
@@ -242,16 +266,22 @@ test('Member list page, send invitation to already invited user', async ({ page 
   await expect(page.getByText('Invite Sent Successfully')).toBeVisible();
 
   await sendInvite(page, org.subdomain, inviteEmail, 'ADMIN');
-  await expect(page.getByText('User is already invited to this organization')).toBeVisible();
+  await expect(
+    page.getByText('User is already invited to this organization'),
+  ).toBeVisible();
 });
 
-test('Member list page, send invitation to existing member', async ({ page }, testInfo) => {
+test('Member list page, send invitation to existing member', async ({
+  page,
+}, testInfo) => {
   const org = await createOrgForTest(testInfo);
   const email = memberEmail(org.subdomain, 'existing-member');
   await seedMember(org, email);
 
   await sendInvite(page, org.subdomain, email, 'ADMIN');
-  await expect(page.getByText('User is already a member of this organization')).toBeVisible();
+  await expect(
+    page.getByText('User is already a member of this organization'),
+  ).toBeVisible();
 });
 
 test('Member list page, edit role successfully', async ({ page }, testInfo) => {
@@ -266,7 +296,9 @@ test('Member list page, edit role successfully', async ({ page }, testInfo) => {
   await expect(page.locator('h5')).toContainText(`${email} (ADMIN)`);
 });
 
-test('Member list page, regenerate password successfully', async ({ page }, testInfo) => {
+test('Member list page, regenerate password successfully', async ({
+  page,
+}, testInfo) => {
   const org = await createOrgForTest(testInfo);
   const email = memberEmail(org.subdomain, 'regen-password');
   await seedMember(org, email);
@@ -299,11 +331,18 @@ test('Member list page, resend invite is limited to 3 times per day', async ({
   for (let attempt = 1; attempt <= 3; attempt++) {
     await ageInviteEmailCooldown(org.subdomain, inviteEmail);
 
-    const row = page.locator('tbody tr').filter({ hasText: inviteEmail }).first();
+    const row = page
+      .locator('tbody tr')
+      .filter({ hasText: inviteEmail })
+      .first();
     await row.getByRole('button', { name: 'Resend' }).click();
-    await expect(page.getByText('Invite resent successfully').first()).toBeVisible();
+    await expect(
+      page.getByText('Invite resent successfully').first(),
+    ).toBeVisible();
     await waitForMessageCount(page.request, inviteEmail, attempt + 1);
-    await expect(row.getByRole('cell', { name: String(attempt), exact: true })).toBeVisible();
+    await expect(
+      row.getByRole('cell', { name: String(attempt), exact: true }),
+    ).toBeVisible();
   }
 
   await ageInviteEmailCooldown(org.subdomain, inviteEmail);
@@ -316,22 +355,36 @@ test('Member list page, resend invite is limited to 3 times per day', async ({
   await expect(row.getByRole('cell', { name: '3', exact: true })).toBeVisible();
 });
 
-test('Members list page, pagination works correctly', async ({ page }, testInfo) => {
+test('Members list page, pagination works correctly', async ({
+  page,
+}, testInfo) => {
   const org = await createOrgForTest(testInfo);
-  const emails = Array.from({ length: 10 }, (_, index) =>
-    `member-${String(index + 1).padStart(2, '0')}@${org.subdomain}.example.com`,
+  const emails = Array.from(
+    { length: 10 },
+    (_, index) =>
+      `member-${String(index + 1).padStart(2, '0')}@${org.subdomain}.example.com`,
   );
   await seedMembers(org, emails);
 
   await gotoMembersPage(page, org.subdomain);
   await page.locator('#itemsPerPage').selectOption('5');
 
-  await expect(page.locator('tbody tr').filter({ hasText: emails[0] })).toBeVisible();
-  await expect(page.locator('tbody tr').filter({ hasText: emails[4] })).toBeVisible();
-  await expect(page.locator('tbody tr').filter({ hasText: emails[5] })).toHaveCount(0);
+  await expect(
+    page.locator('tbody tr').filter({ hasText: emails[0] }),
+  ).toBeVisible();
+  await expect(
+    page.locator('tbody tr').filter({ hasText: emails[4] }),
+  ).toBeVisible();
+  await expect(
+    page.locator('tbody tr').filter({ hasText: emails[5] }),
+  ).toHaveCount(0);
 
   await page.locator('nav li').filter({ hasText: '2' }).click();
 
-  await expect(page.locator('tbody tr').filter({ hasText: emails[5] })).toBeVisible();
-  await expect(page.locator('tbody tr').filter({ hasText: emails[9] })).toBeVisible();
+  await expect(
+    page.locator('tbody tr').filter({ hasText: emails[5] }),
+  ).toBeVisible();
+  await expect(
+    page.locator('tbody tr').filter({ hasText: emails[9] }),
+  ).toBeVisible();
 });

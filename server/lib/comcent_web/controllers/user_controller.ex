@@ -2,7 +2,7 @@ defmodule ComcentWeb.UserController do
   use ComcentWeb, :controller
   import Ecto.Query
 
-  alias Comcent.Repo
+  alias Comcent.{Repo, Terms}
   alias Ecto.Multi
   alias Comcent.Schemas.{Country, Org, OrgBillingAddress, OrgInvite, OrgMember, State, User}
 
@@ -19,7 +19,8 @@ defmodule ComcentWeb.UserController do
         name: current_user.name,
         picture: current_user.picture,
         has_agreed_to_tos: current_user.has_agreed_to_tos
-      }
+      },
+      terms: Terms.for_user(current_user)
     })
   end
 
@@ -171,7 +172,13 @@ defmodule ComcentWeb.UserController do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     from(u in User, where: u.id == ^current_user.id)
-    |> Repo.update_all(set: [has_agreed_to_tos: true, agreed_to_tos_at: now])
+    |> Repo.update_all(
+      set: [
+        has_agreed_to_tos: true,
+        agreed_to_tos_at: now,
+        accepted_terms_version: Terms.current_version()
+      ]
+    )
 
     json(conn, %{success: true})
   end
