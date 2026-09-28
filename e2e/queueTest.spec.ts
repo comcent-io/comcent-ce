@@ -185,12 +185,13 @@ async function seedOrgMemberForQueue(
           is_email_verified,
           has_agreed_to_tos,
           agreed_to_tos_at,
+          accepted_terms_version,
           created_at,
           updated_at
         )
-        VALUES ($1, $2, $3, true, true, NOW(), NOW(), NOW())
+        VALUES ($1, $2, $3, true, true, NOW(), $4, NOW(), NOW())
       `,
-      [userId, name, email],
+      [userId, name, email, process.env.TERMS_VERSION ?? null],
     );
 
     await client.query(

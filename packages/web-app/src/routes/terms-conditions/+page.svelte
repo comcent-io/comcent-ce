@@ -2,6 +2,8 @@
   import { goto } from '$app/navigation';
   import { postJson } from '$lib/http';
 
+  let { data } = $props();
+
   let saving = $state(false);
   let errorMessage = $state('');
 
@@ -28,23 +30,32 @@
         class="max-w-lg p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
       >
         <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Terms of Service and Privacy Policy
+          Terms of Use and Privacy Policy
         </h5>
+        {#if data.terms.previouslyAccepted}
+          <p class="mb-3 font-normal text-gray-700 dark:text-gray-400">
+            We've updated our Terms of Use and Privacy Policy. Please review and accept them to
+            continue.
+          </p>
+        {/if}
         <p class="mb-3 font-normal text-gray-700 dark:text-gray-400">
           I accept the <a
-            href="https://www.example.com/terms-of-use"
+            href={data.terms.termsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
           >
-            terms and conditions
+            Terms of Use
           </a>
           and
           <a
-            href="https://www.example.com/privacy-policy"
+            href={data.terms.privacyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
           >
-            privacy policy
+            Privacy Policy
           </a>
-          of the company
         </p>
 
         {#if errorMessage}

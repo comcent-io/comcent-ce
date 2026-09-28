@@ -724,14 +724,17 @@ export async function ensureUserAcceptedTerms(email: string) {
   await client.connect();
 
   try {
+    // Accepted the current TERMS_VERSION, if .env.e2e turns terms on; any
+    // other version, or none, would send the user to the terms page.
     await client.query(
       `
         UPDATE users
         SET has_agreed_to_tos = true,
-            agreed_to_tos_at = COALESCE(agreed_to_tos_at, NOW())
+            agreed_to_tos_at = COALESCE(agreed_to_tos_at, NOW()),
+            accepted_terms_version = $2
         WHERE email = $1
       `,
-      [email],
+      [email, process.env.TERMS_VERSION ?? null],
     );
   } finally {
     await client.end();

@@ -302,6 +302,37 @@ config :comcent, :auth,
   oidc_providers: oidc_providers,
   allowed_signup_domains: allowed_signup_domains
 
+# Terms of Use and Privacy Policy users accept before using the app
+# (Comcent.Terms). Optional and off by default: with TERMS_URL unset no one is
+# asked. Set, all three are needed. TERMS_VERSION names the wording in force
+# (e.g. 2026-09-28); changing it asks every user to accept again.
+terms_env = fn name ->
+  case System.get_env(name, "") |> String.trim() do
+    "" -> nil
+    value -> value
+  end
+end
+
+terms_url = terms_env.("TERMS_URL")
+privacy_url = terms_env.("PRIVACY_URL")
+terms_version = terms_env.("TERMS_VERSION")
+
+if terms_url && !(privacy_url && terms_version) do
+  raise """
+  TERMS_URL is set, so PRIVACY_URL and TERMS_VERSION must be set too.
+  For example:
+      TERMS_URL=https://example.com/terms-of-use
+      PRIVACY_URL=https://example.com/privacy-policy
+      TERMS_VERSION=2026-09-28
+  Unset TERMS_URL to not ask users to accept any terms.
+  """
+end
+
+config :comcent, :terms,
+  terms_url: terms_url,
+  privacy_url: privacy_url,
+  version: terms_version
+
 # Email Configuration
 # The test suite keeps config/test.exs's Swoosh.Adapters.Test: runtime.exs
 # runs after it on every boot, so an unconditional SMTP adapter here would

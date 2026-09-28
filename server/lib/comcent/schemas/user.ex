@@ -22,6 +22,7 @@ defmodule Comcent.Schemas.User do
     field(:has_agreed_to_tos, :boolean, default: false)
     field(:is_super_admin, :boolean, default: false)
     field(:agreed_to_tos_at, :utc_datetime)
+    field(:accepted_terms_version, :string)
 
     has_many(:identities, Comcent.Schemas.UserIdentity, foreign_key: :user_id)
     has_many(:org_members, Comcent.Schemas.OrgMember, foreign_key: :user_id)
@@ -49,7 +50,8 @@ defmodule Comcent.Schemas.User do
       :picture,
       :has_agreed_to_tos,
       :is_super_admin,
-      :agreed_to_tos_at
+      :agreed_to_tos_at,
+      :accepted_terms_version
     ])
     |> validate_required([:name, :email])
     |> unique_constraint(:email)
