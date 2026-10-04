@@ -87,7 +87,8 @@ defmodule Comcent.Schemas.Org do
       :low_balance_alert_count
     ])
     |> validate_required([:name, :subdomain])
-    |> unique_constraint(:subdomain)
+    # The index kept its original name, not Ecto's default `orgs_subdomain_index`.
+    |> unique_constraint(:subdomain, name: :orgs_subdomain_key, message: "is taken")
     |> unique_constraint(:custom_domain)
   end
 end

@@ -286,6 +286,9 @@ defmodule ComcentWeb.UserController do
       {:ok, %{org: org}} ->
         {:ok, org}
 
+      {:error, :org, %{errors: [{:subdomain, {"is taken", _}} | _]}, _changes_so_far} ->
+        {:error, "The subdomain #{org_attrs["subdomain"]} is taken. Choose another."}
+
       {:error, _step, changeset, _changes_so_far} ->
         {:error, format_changeset_error(changeset)}
     end
