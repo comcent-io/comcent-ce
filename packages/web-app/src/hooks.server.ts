@@ -5,6 +5,8 @@ import { env } from '$env/dynamic/public';
 
 Sentry.init({
   dsn: env.PUBLIC_SENTRY_DSN,
+  // The image's tag, set in docker/Dockerfile-web-app.
+  release: env.PUBLIC_APP_VERSION || undefined,
   tracesSampleRate: 1,
 });
 

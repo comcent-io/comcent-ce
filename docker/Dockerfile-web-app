@@ -71,5 +71,11 @@ COPY --from=builder /usr/src/app/packages/web-app/package*.json ./packages/web-a
 COPY --from=prod-deps /usr/src/app/packages/web-app/node_modules ./packages/web-app/node_modules
 COPY --from=builder /usr/src/app/packages/web-app ./packages/web-app/
 
+# The image's tag, reported to Sentry as the release. Public so the browser
+# reports it too. Declared after the copies so a new version does not
+# invalidate the layers above.
+ARG APP_VERSION=""
+ENV PUBLIC_APP_VERSION=$APP_VERSION
+
 EXPOSE 3000
 CMD [ "node", "packages/web-app/build/index.js" ]

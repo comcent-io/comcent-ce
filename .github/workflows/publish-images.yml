@@ -33,6 +33,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # The same value as the image's sha- tag (see the merge job); the server
+      # and web-app report it to Sentry as the release.
+      - name: Set the app version
+        run: echo "APP_VERSION=sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v5
@@ -40,6 +45,8 @@ jobs:
           context: .
           file: ${{ matrix.service.dockerfile }}
           platforms: ${{ matrix.platform.name }}
+          build-args: |
+            APP_VERSION=${{ env.APP_VERSION }}
           outputs: type=image,name=ghcr.io/comcent-io/${{ matrix.service.image }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.service.name }}-${{ matrix.platform.suffix }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}-${{ matrix.platform.suffix }}

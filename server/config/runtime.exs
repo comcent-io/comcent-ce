@@ -16,6 +16,14 @@ sentry_dsn = System.get_env("SERVER_SENTRY_DSN")
 
 if config_env() == :prod and sentry_dsn not in [nil, ""] do
   config :sentry, dsn: sentry_dsn
+
+  # The image's tag, baked in at build (see docker/Dockerfile-server). With a
+  # release on each event, an issue can be resolved "in the next release" and
+  # only reopens when a newer build still has it.
+  case System.get_env("APP_VERSION") do
+    version when is_binary(version) and version != "" -> config :sentry, release: version
+    _ -> :ok
+  end
 end
 
 # Deepgram API key — optional. Real-time transcription / voice-bot features
