@@ -737,8 +737,10 @@ defmodule Comcent.NewCallStoryProcessor do
     total_duration = get_total_duration(transcriptions)
     minutes = ceil(total_duration / 60)
     price = Plans.active().prices.summary * minutes
-    input_tokens = get_in(summary, ["metadata", "summary_info", "input_tokens"])
-    output_tokens = get_in(summary, ["metadata", "summary_info", "output_tokens"])
+    # A summary can come back without token counts; nil here raised an
+    # ArithmeticError outside the rescue below and killed the processing task.
+    input_tokens = get_in(summary, ["metadata", "summary_info", "input_tokens"]) || 0
+    output_tokens = get_in(summary, ["metadata", "summary_info", "output_tokens"]) || 0
     input_token_cost = Plans.active().costs.audio_intelligence_input * input_tokens
     output_token_cost = Plans.active().costs.audio_intelligence_output * output_tokens
     cost = input_token_cost + output_token_cost
