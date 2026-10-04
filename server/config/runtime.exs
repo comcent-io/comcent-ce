@@ -12,9 +12,10 @@ import Config
 # (which the library rejects, crashing boot). Treat both nil and "" as
 # "not configured". Production only: a DSN left in a local .env otherwise
 # reports every dev crash and every failing test as an issue.
-case System.get_env("SERVER_SENTRY_DSN") do
-  dsn when is_binary(dsn) and dsn != "" and config_env() == :prod -> config :sentry, dsn: dsn
-  _ -> :ok
+sentry_dsn = System.get_env("SERVER_SENTRY_DSN")
+
+if config_env() == :prod and sentry_dsn not in [nil, ""] do
+  config :sentry, dsn: sentry_dsn
 end
 
 # Deepgram API key — optional. Real-time transcription / voice-bot features
