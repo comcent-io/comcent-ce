@@ -5,6 +5,8 @@ import type { Handle } from '@sveltejs/kit';
 
 Sentry.init({
   dsn: env.PUBLIC_SENTRY_DSN,
+  // The image's tag, set in docker/Dockerfile-web-app.
+  release: env.PUBLIC_APP_VERSION || undefined,
   tracesSampleRate: 1.0,
 
   // This sets the sample rate to be 10%. You may want this to be 100% while
