@@ -10,9 +10,10 @@ import Config
 # Sentry Configuration. Empty strings are truthy in Elixir, so the bare
 # `if System.get_env(...)` check would try to configure Sentry with dsn: ""
 # (which the library rejects, crashing boot). Treat both nil and "" as
-# "not configured".
+# "not configured". Production only: a DSN left in a local .env otherwise
+# reports every dev crash and every failing test as an issue.
 case System.get_env("SERVER_SENTRY_DSN") do
-  dsn when is_binary(dsn) and dsn != "" -> config :sentry, dsn: dsn
+  dsn when is_binary(dsn) and dsn != "" and config_env() == :prod -> config :sentry, dsn: dsn
   _ -> :ok
 end
 
