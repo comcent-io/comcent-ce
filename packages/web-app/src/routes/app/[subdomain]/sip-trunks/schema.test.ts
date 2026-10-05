@@ -64,61 +64,65 @@ describe('sipTrunkCreateSchema ', () => {
       expect(parsedData.success).toBe(false);
     });
 
-    // test for IPV6 address
-    it('should be valid IPV6 address', () => {
-      formData.outboundContact = '2001:0db8:85a3:0000:0000:8a2e:0370:7334';
-      let parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(true);
+    const parseContact = (value: string) =>
+      sipTrunkCreateSchema.safeParse({ ...formData, outboundContact: value });
 
-      formData.outboundContact = '2001:db8:85a3::8a2e:370:7334';
-      parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(true);
-
-      formData.outboundContact = '::1';
-      parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(true);
-
-      formData.outboundContact = '2001:0db8:85a3:0000:0000:8a2e:0370:7334:1234';
-      parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(false);
+    it.each([
+      ['sip.example.com', 'sip.example.com'],
+      ['sip.example.com:5080', 'sip.example.com:5080'],
+      ['sip:sip.example.com', 'sip.example.com'],
+      ['sip:sip.example.com:5080', 'sip.example.com:5080'],
+      ['SIP:sip.example.com:5080', 'sip.example.com:5080'],
+      ['www.something.com', 'www.something.com'],
+      ['203.0.113.10', '203.0.113.10'],
+      ['203.0.113.10:5060', '203.0.113.10:5060'],
+      ['sip:203.0.113.10:5080', '203.0.113.10:5080'],
+      ['sipp-uas:6351', 'sipp-uas:6351'],
+      ['  sip:sip.example.com:5080 ', 'sip.example.com:5080'],
+      ['sip.example.com:05080', 'sip.example.com:5080'],
+    ])('accepts %j and stores it as %j', (input, stored) => {
+      const parsed = parseContact(input);
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data.outboundContact).toBe(stored);
     });
 
-    it('should be valid IPV6 address with four digits in each group and every digit should be in hexadecimal format', () => {
-      formData.outboundContact = '2001:0db8:85a3:0000:0000:8a2e:03700:7334';
-      let parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(false);
-
-      formData.outboundContact = '2001:0db8:85g3:0000:0000:8a2e:0370:7334';
-      parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(false);
+    it.each([
+      '',
+      '   ',
+      'sip.example .com',
+      'sip:',
+      ':5080',
+      'sip:sip:sip.example.com',
+      'http://sip.example.com',
+      'http:sip.example.com',
+      'sip.example.com:0',
+      'sip.example.com:65536',
+      'sip.example.com:abc',
+      'sip.example.com:',
+      '2001:db8::1',
+      '[2001:db8::1]:5060',
+      '::1',
+      'sip:sip.example.com:5060:5061',
+    ])('rejects %j with the accepted forms in the message', (input) => {
+      const parsed = parseContact(input);
+      expect(parsed.success).toBe(false);
+      expect(!parsed.success && parsed.error.issues[0].message).toContain('sip:host:port');
     });
 
-    it('should be valid IPV6 address with : as a separator in between', () => {
-      formData.outboundContact = '20010db885g3000000008a2e03707334';
-      let parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(false);
+    it('explains why sips:, URI parameters and a user part are rejected', () => {
+      const message = (value: string) => {
+        const parsed = parseContact(value);
+        return parsed.success ? '' : parsed.error.issues[0].message;
+      };
 
-      formData.outboundContact = '2001:0db8-85a3:0000:0000:8a2e:0370:7334';
-      parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(false);
-
-      formData.outboundContact = ':2001:0db8:85a3:0000:0000:8a2e:0370:7334';
-      parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(false);
-
-      formData.outboundContact = '2001:0db8:85a3:0000:0000:8a2e:0370:7334:';
-      parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(false);
-    });
-
-    it('should be valid IPV6 address and valid IPV4 format if present', () => {
-      formData.outboundContact = '::ffff:192.0.300.128';
-      const parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(false);
+      expect(message('sips:sip.example.com:5061')).toContain('TLS');
+      expect(message('sip:sip.example.com;transport=tcp')).toContain(';transport=tcp');
+      expect(message('sip:trunk@sip.example.com')).toContain('user@');
+      expect(message('http://sip.example.com')).toContain('Only the sip: scheme');
     });
 
     // test for domain name
-    it('should be valid domain name not starting with sip: and should have atmost 63 characters in each part', () => {
+    it('should be valid domain name and should have atmost 63 characters in each part', () => {
       formData.outboundContact = 'example.com';
       let parsedData = sipTrunkCreateSchema.safeParse(formData);
       expect(parsedData.success).toBe(true);
@@ -130,10 +134,6 @@ describe('sipTrunkCreateSchema ', () => {
       formData.outboundContact = 'test.co.uk';
       parsedData = sipTrunkCreateSchema.safeParse(formData);
       expect(parsedData.success).toBe(true);
-
-      formData.outboundContact = 'sip:example.com';
-      parsedData = sipTrunkCreateSchema.safeParse(formData);
-      expect(parsedData.success).toBe(false);
 
       formData.outboundContact =
         '12345678901234567890123456789012345678901234567890123456789012345678901234.com';

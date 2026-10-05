@@ -113,7 +113,7 @@
               }
             });
           } else if (err.errors[i].path[0] === 'outboundContact') {
-            err.errors[i].message = 'Invalid SIP Proxy Address';
+            // The schema's message says what is wrong and which forms work.
             err.errors[i].path = ['Error'];
           }
         }
@@ -174,7 +174,7 @@
     <Field
       for="outboundContact"
       label="SIP proxy address"
-      hint="Your carrier's SIP host name or IP address (an IP can include a :port)."
+      hint="Your carrier's SIP host name or IPv4 address: host, host:port, sip:host or sip:host:port."
     >
       <Input
         type="text"
