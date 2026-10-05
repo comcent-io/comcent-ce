@@ -12,7 +12,8 @@ defmodule Comcent.Schemas.SipTrunk do
              :outbound_password,
              :outbound_contact,
              :inbound_ips,
-             :org_id
+             :org_id,
+             :provider_connection_id
            ]}
   schema "sip_trunks" do
     field(:name, :string)
@@ -22,6 +23,13 @@ defmodule Comcent.Schemas.SipTrunk do
     field(:inbound_ips, {:array, :string})
 
     belongs_to(:org, Comcent.Schemas.Org, foreign_key: :org_id)
+    # Set when a provider connection created this trunk. Such a trunk mirrors a
+    # real trunk in the customer's provider account, so it must not be deleted
+    # on its own -- see SipTrunkController.delete.
+    belongs_to(:provider_connection, Comcent.Schemas.ProviderConnection,
+      foreign_key: :provider_connection_id
+    )
+
     has_many(:numbers, Comcent.Schemas.Number, foreign_key: :sip_trunk_id)
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at)
@@ -35,7 +43,8 @@ defmodule Comcent.Schemas.SipTrunk do
       :outbound_password,
       :outbound_contact,
       :inbound_ips,
-      :org_id
+      :org_id,
+      :provider_connection_id
     ])
     |> validate_required([:name, :outbound_contact, :inbound_ips, :org_id])
   end

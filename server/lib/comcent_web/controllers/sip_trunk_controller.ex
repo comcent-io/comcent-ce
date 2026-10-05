@@ -97,6 +97,21 @@ defmodule ComcentWeb.SipTrunkController do
       nil ->
         conn |> put_status(:not_found) |> json(%{error: "SipTrunk not found"})
 
+      %{provider_connection_id: connection_id} when not is_nil(connection_id) ->
+        # This trunk mirrors a real SIP trunk in the customer's provider
+        # account. Deleting the row here would leave that trunk in place, still
+        # carrying their numbers, with nothing in Comcent pointing at it. The
+        # connection is the thing to disconnect, and it lives on its own page.
+        conn
+        |> put_status(:conflict)
+        |> json(%{
+          error:
+            "This SIP trunk is managed by a Twilio connection and cannot be deleted on its own.",
+          detail:
+            "Deleting it here would leave the real trunk in place in your Twilio account. Disconnect the Twilio connection instead, which restores your numbers to their original configuration.",
+          provider_connection_id: connection_id
+        })
+
       sip_trunk ->
         numbers = SipTrunk.get_numbers_for_trunk(id)
 

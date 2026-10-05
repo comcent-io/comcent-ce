@@ -85,6 +85,40 @@ defmodule ComcentWeb.Router do
     put("/sip-trunks/:id", SipTrunkController, :update)
     delete("/sip-trunks/:id", SipTrunkController, :delete)
 
+    # Provider connections. Admin-only: these carry credentials to the
+    # customer's billing-bearing provider account, and importing a number
+    # rewrites configuration inside it.
+    get("/provider-connections", ProviderConnectionController, :index)
+    post("/provider-connections", ProviderConnectionController, :create)
+    put("/provider-connections/:id/credentials", ProviderConnectionController, :rotate)
+    post("/provider-connections/:id/verify", ProviderConnectionController, :verify)
+
+    get(
+      "/provider-connections/:id/available-numbers",
+      ProviderConnectionController,
+      :available_numbers
+    )
+
+    post(
+      "/provider-connections/:id/import-numbers",
+      ProviderConnectionController,
+      :import_numbers
+    )
+
+    get(
+      "/provider-connections/:id/disconnect-preview",
+      ProviderConnectionController,
+      :disconnect_preview
+    )
+
+    post(
+      "/provider-connections/:id/refresh-numbers",
+      ProviderConnectionController,
+      :refresh_numbers
+    )
+
+    delete("/provider-connections/:id", ProviderConnectionController, :delete)
+
     # Voice Bots
     get("/voice-bots", VoiceBotController, :get_voice_bots)
     post("/voice-bots", VoiceBotController, :create)

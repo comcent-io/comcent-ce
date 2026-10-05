@@ -16,6 +16,11 @@
   interface SipTrunk {
     id: string;
     name: string;
+    // Set when a provider connection (e.g. Twilio) created this trunk. Such a
+    // trunk mirrors a real one in the customer's provider account, so it is
+    // removed by disconnecting the connection, not from here. Note the casing:
+    // the API camelCases keys on the way out.
+    providerConnectionId?: string | null;
   }
 
   let sipTrunkToBeDeleted: sipTrunkToBeDeletedType | null = $state(null);
@@ -114,16 +119,26 @@
               >
                 Edit
               </a>
-              <button
-                type="button"
-                onclick={() => {
-                  toggleDeletePopUp();
-                  sipTrunkToBeDeleted = trunk;
-                }}
-                class="font-medium text-red-600 dark:text-red-500 hover:underline"
-              >
-                Delete
-              </button>
+              {#if trunk.providerConnectionId}
+                <a
+                  href={`${data.basePath}/numbers/connections/${trunk.providerConnectionId}`}
+                  class="font-medium text-gray-500 dark:text-gray-400 hover:underline"
+                  title="This trunk is managed by a Twilio connection. Disconnect the connection to remove it."
+                >
+                  Managed by Twilio
+                </a>
+              {:else}
+                <button
+                  type="button"
+                  onclick={() => {
+                    toggleDeletePopUp();
+                    sipTrunkToBeDeleted = trunk;
+                  }}
+                  class="font-medium text-red-600 dark:text-red-500 hover:underline"
+                >
+                  Delete
+                </button>
+              {/if}
             </td>
           </tr>
         {/each}

@@ -14,7 +14,8 @@ defmodule Comcent.Schemas.Number do
              :is_default_outbound_number,
              :inbound_flow_graph,
              :sip_trunk_id,
-             :sip_trunk
+             :sip_trunk,
+             :provider_number_id
            ]}
   schema "numbers" do
     field(:name, :string)
@@ -25,7 +26,11 @@ defmodule Comcent.Schemas.Number do
 
     belongs_to(:org, Comcent.Schemas.Org, foreign_key: :org_id)
     belongs_to(:sip_trunk, Comcent.Schemas.SipTrunk, foreign_key: :sip_trunk_id)
+    # Null for manual/BYO SIP numbers — behaviour unchanged for those.
+    belongs_to(:provider_number, Comcent.Schemas.ProviderNumber, foreign_key: :provider_number_id)
+
     has_many(:campaigns, Comcent.Schemas.Campaign, foreign_key: :number_id)
+    has_many(:number_channels, Comcent.Schemas.NumberChannel, foreign_key: :number_id)
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at)
   end
@@ -39,7 +44,8 @@ defmodule Comcent.Schemas.Number do
       :is_default_outbound_number,
       :inbound_flow_graph,
       :org_id,
-      :sip_trunk_id
+      :sip_trunk_id,
+      :provider_number_id
     ])
     |> validate_required([:name, :number, :org_id, :sip_trunk_id])
     |> validate_outbound_regex()
