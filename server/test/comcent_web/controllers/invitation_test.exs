@@ -8,7 +8,7 @@ defmodule ComcentWeb.InvitationTest do
 
   import Ecto.Query
 
-  alias Comcent.{Auth, CallFixtures, Repo}
+  alias Comcent.{Auth, ProviderFixtures, Repo}
   alias Comcent.Schemas.{OrgInvite, OrgMember, User}
 
   setup do
@@ -21,7 +21,7 @@ defmodule ComcentWeb.InvitationTest do
         else: System.delete_env("SIGNING_KEY")
     end)
 
-    org = CallFixtures.org(name: "Northwind Traders")
+    org = ProviderFixtures.org()
     invitee = user("dana.#{System.unique_integer([:positive])}@example.com")
 
     invite =
@@ -41,7 +41,7 @@ defmodule ComcentWeb.InvitationTest do
              "invitation" => %{
                "id" => id,
                "role" => "MEMBER",
-               "org" => %{"name" => "Northwind Traders", "subdomain" => subdomain}
+               "org" => %{"name" => "Acme", "subdomain" => subdomain}
              },
              "suggestedUsername" => "dana." <> _
            } = ctx |> as(ctx.invitee) |> get(path(ctx)) |> json_response(200)
