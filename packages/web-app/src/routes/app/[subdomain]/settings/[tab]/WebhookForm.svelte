@@ -86,7 +86,9 @@
         class="block text-sm font-medium text-gray-900 dark:text-white mr-2"
       >
         Presence Update Event
-        <span class="font-normal text-gray-500 dark:text-gray-300">(not sent yet)</span>
+        <span class="font-normal text-gray-500 dark:text-gray-300">
+          (sends PRESENCE_UPDATE when a member's presence changes)
+        </span>
       </label>
       <input
         type="checkbox"
