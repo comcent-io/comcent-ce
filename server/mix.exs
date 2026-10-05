@@ -71,7 +71,8 @@ defmodule Comcent.MixProject do
       {:tailwind, "~> 0.3.1"},
       {:esbuild, "~> 0.8"},
       {:sentry, "~> 10.0"},
-      {:bcrypt_elixir, "~> 3.2"}
+      {:bcrypt_elixir, "~> 3.2"},
+      {:cloak_ecto, "~> 1.3"}
     ]
   end
 

@@ -15,6 +15,8 @@ defmodule Comcent.Application do
 
     children = [
       ComcentWeb.Telemetry,
+      # Must start before the Repo: encrypted fields are decrypted on load.
+      Comcent.Vault,
       Comcent.Repo,
       {DNSCluster, query: Application.get_env(:comcent, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Comcent.PubSub},

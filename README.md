@@ -95,7 +95,23 @@ super-admin.
 
 ### 6. Connect your SIP trunk
 
-To make and receive real phone calls, open **Sip Trunk** in the sidebar,
+**On Twilio? Let Comcent set it up.** Open **Numbers** in the sidebar, hit
+**Add numbers**, and pick **Connect a Twilio account**. Paste your Account
+SID and a **Standard** API key (Twilio Console → **Account → API keys &
+tokens → Create API key**), then tick the numbers to import. Comcent creates
+the Elastic SIP Trunk in your Twilio account, points the numbers at this
+server, and adds the trunk and the numbers here — so the rest of this step
+and the form in step 7 are already done. Open each imported number to build
+its inbound flow (step 7). Twilio keeps billing you directly, and
+disconnecting puts the numbers back as they were.
+
+Two optional `.env` settings apply: `SBC_SIP_FQDN` if Twilio should send
+calls to a hostname instead of your public IP, and `PROVIDER_CREDENTIALS_KEY`
+to encrypt the saved API key in the database (without it the key is stored
+unencrypted). See `.env.example`.
+
+Any other provider, or to do it by hand: to make and receive real phone
+calls, open **Sip Trunk** in the sidebar,
 hit **Create**, and fill in:
 
 - **Name** — anything, e.g. `twilio`.

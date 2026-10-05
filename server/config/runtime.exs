@@ -270,6 +270,52 @@ config :comcent, :sbc,
   public_ip: System.get_env("SBC_PUBLIC_IP"),
   rpc_api_token: rpc_api_token
 
+# Provisioning targets for numbers imported from a telephony provider.
+#
+# SBC_SIP_FQDN is where the provider sends inbound calls: a stable public name
+# for this deployment's SBC. Optional; when unset SBC_PUBLIC_IP is used.
+#
+# TWILIO_SIGNALING_CIDRS become sip_trunks.inbound_ips, the ACL the SBC accepts
+# calls from. Twilio's guidance is to allow every region rather than the nearest
+# edge, so failover between regions keeps working. These change over time, which
+# is why they are configuration and not a literal in the code.
+config :comcent, :provisioning,
+  sbc_sip_fqdn: System.get_env("SBC_SIP_FQDN"),
+  twilio_signaling_cidrs:
+    System.get_env(
+      "TWILIO_SIGNALING_CIDRS",
+      Enum.join(
+        [
+          # North America
+          "54.172.60.0/30",
+          "54.244.51.0/30",
+          # Europe
+          "54.171.127.192/30",
+          "35.156.191.128/30",
+          # Asia-Pacific
+          "54.65.63.192/30",
+          "54.169.127.128/30",
+          "54.252.254.64/30",
+          # South America
+          "177.71.206.192/30"
+        ],
+        ","
+      )
+    )
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+
+# Encryption key for provider credentials at rest. 32 bytes, base64.
+# Generate with: :crypto.strong_rand_bytes(32) |> Base.encode64()
+#
+# Optional. Without it the credentials are stored unencrypted and the server
+# says so at boot. Once set it must be kept: losing it makes every credential
+# saved with it undecryptable, and those accounts have to be reconnected.
+config :comcent, Comcent.Vault,
+  key:
+    System.get_env("PROVIDER_CREDENTIALS_KEY") ||
+      if(config_env() == :test, do: Base.encode64(:binary.copy(<<0>>, 32)))
+
 # Internal API as FreeSWITCH reaches it on the private network. Prompt
 # playback URLs handed to FreeSWITCH are built from it, so it must never be
 # the public URL. The default matches the compose service name, so installs

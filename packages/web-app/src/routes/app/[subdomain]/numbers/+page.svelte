@@ -1,11 +1,17 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { browser } from '$app/environment';
   import Pagination from '$lib/components/Pagination.svelte';
   import { page } from '$app/state';
+  import { routeParam } from '$lib/routeParam';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
   import { goto } from '$app/navigation';
   import { getJson, postJson } from '$lib/http';
+  import {
+    listConnections,
+    statusClass,
+    statusLabel,
+    type ProviderConnection,
+  } from '$lib/providerConnections';
 
   let { data } = $props();
 
@@ -24,9 +30,22 @@
   let latestRequestId = 0;
   let lastFetchKey = '';
 
+  let connections: ProviderConnection[] = $state([]);
+  let connectionsLoaded = $state(false);
+  // The chooser is state-aware: with a connection already present the
+  // first option becomes 'import more', not 'connect an account'. Making
+  // someone re-run onboarding to add a second number would defeat the point.
+  let showChooser = $state(false);
+
+  async function loadConnections() {
+    const result = await listConnections(subdomain);
+    connectionsLoaded = true;
+    if (result.ok) connections = result.data.providerConnections;
+  }
+
   let isDeletePopUp = $state(false);
   let errorMessage = $state('');
-  const subdomain = page.params.subdomain;
+  const subdomain = routeParam('subdomain');
 
   async function fetchNumbers() {
     const requestId = ++latestRequestId;
@@ -73,7 +92,10 @@
     const nextFetchKey = `${page.url.search}|${page.params.subdomain}`;
     if (nextFetchKey !== lastFetchKey) {
       lastFetchKey = nextFetchKey;
-      untrack(() => fetchNumbers());
+      untrack(() => {
+        fetchNumbers();
+        loadConnections();
+      });
     }
   });
 
@@ -87,8 +109,22 @@
       const response = await fetch(`/api/v2/${subdomain}/numbers/${numberToBeDeleted?.id}`, {
         method: 'DELETE',
       });
-      if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
-      goto(`/app/${subdomain}/numbers`, { invalidateAll: true });
+      // Parsed defensively: this endpoint always sends JSON today, but a 204 or
+      // an HTML error page from something in front of it would otherwise throw
+      // here and report a delete that succeeded as a failure.
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? response.statusText);
+
+      // A failed provider restore is not a failed delete: the number is gone
+      // from Comcent either way, but it may still be pointing at a Comcent
+      // trunk in their provider account, which they need to know about.
+      if (body.providerRestored === false && body.warning) errorMessage = body.warning;
+
+      // Refetch directly rather than navigating. goto() targets the URL we are
+      // already on, so the reactive guard sees no change and never refetches --
+      // which is why a deleted row used to stay on screen.
+      await fetchNumbers();
+      await loadConnections();
     } catch (error: any) {
       errorMessage = error.message;
     } finally {
@@ -110,14 +146,89 @@
 
 <h3 class="text-3xl font-bold dark:text-white">Numbers</h3>
 
-<div class="my-4">
-  <a
-    href={`${data.basePath}/numbers/create`}
+{#if connectionsLoaded && connections.length > 0}
+  <!-- Connections strip: which provider accounts are linked and whether they
+       still work. A rejected key is why calls stop, so it belongs above the
+       numbers rather than buried on a settings page. -->
+  <div class="my-4 flex flex-wrap gap-3">
+    {#each connections as c}
+      <div
+        class="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2 bg-white dark:bg-gray-800"
+      >
+        <div>
+          <div class="font-medium text-gray-900 dark:text-white">{c.label}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">
+            {c.provider} · {c.externalAccountSid.slice(0, 10)}…
+          </div>
+        </div>
+        <span class="text-xs px-2 py-0.5 rounded {statusClass(c.status)}">
+          {statusLabel(c.status)}
+        </span>
+        {#if c.status !== 'unmanaged'}
+          <a
+            href={`${data.basePath}/numbers/connections/${c.id}/import`}
+            class="text-sm text-blue-700 hover:underline dark:text-blue-400"
+          >
+            Import more
+          </a>
+        {/if}
+        <a
+          href={`${data.basePath}/numbers/connections/${c.id}`}
+          class="text-sm text-gray-600 hover:underline dark:text-gray-400"
+        >
+          Manage
+        </a>
+      </div>
+    {/each}
+  </div>
+{/if}
+
+<div class="my-4 relative inline-block">
+  <button
     id="add-new-no-btn"
+    onclick={() => (showChooser = !showChooser)}
     class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
   >
-    Add
-  </a>
+    Add numbers
+  </button>
+
+  {#if showChooser}
+    <div
+      class="absolute z-10 mt-1 w-80 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+    >
+      {#each connections.filter((c) => c.status !== 'unmanaged') as c}
+        <a
+          href={`${data.basePath}/numbers/connections/${c.id}/import`}
+          class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
+        >
+          <div class="font-medium text-gray-900 dark:text-white">Import from {c.label}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">
+            Pick from the numbers already in this account
+          </div>
+        </a>
+      {/each}
+
+      <a
+        href={`${data.basePath}/numbers/connect`}
+        class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
+      >
+        <div class="font-medium text-gray-900 dark:text-white">
+          {connections.length > 0 ? 'Connect another Twilio account' : 'Connect a Twilio account'}
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">
+          Use numbers you already own in Twilio
+        </div>
+      </a>
+
+      <a
+        href={`${data.basePath}/numbers/create`}
+        class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700"
+      >
+        <div class="font-medium text-gray-900 dark:text-white">Other carrier / SIP trunk</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">Configure a trunk manually</div>
+      </a>
+    </div>
+  {/if}
 </div>
 
 {#if errorMessage}
