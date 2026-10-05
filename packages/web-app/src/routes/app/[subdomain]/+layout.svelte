@@ -5,9 +5,8 @@
   import { publicAppBaseUrl, publicSipUserRootDomain, publicSipWsUrl } from '$lib/publicConfig';
   import { page } from '$app/state';
   import { routeParam } from '$lib/routeParam';
-  import PieIcon from '$lib/components/Icons/PieIcon.svelte';
-  import SteerIcon from '$lib/components/Icons/SteerIcon.svelte';
   import SideBarLink from './SideBarLink.svelte';
+  import SideBarGroup from './SideBarGroup.svelte';
   import { Toaster } from '$lib/toast';
   import DollarIcon from '$lib/components/Icons/DollarIcon.svelte';
   import CloseMenuIcon from '$lib/components/Icons/CloseMenuIcon.svelte';
@@ -15,8 +14,6 @@
   import Button from '$lib/components/Button.svelte';
   import { clickOutside } from '$lib/clickOutside';
   import { goto } from '$app/navigation';
-  import AngleRight from '$lib/components/Icons/AngleRight.svelte';
-  import AngleDown from '$lib/components/Icons/AngleDown.svelte';
   import { onMount, tick } from 'svelte';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
   import { logout } from '$lib/session';
@@ -38,7 +35,6 @@
   // svelte-ignore state_referenced_locally
   let showLowBalanceAlert = data.showLowBalanceAlert;
   let showSwitchOrgMenu = $state(false);
-  let showCampaignGroups = false;
   let dialerWidget: any = $state(null);
   const authToken = browser ? getIdTokenFromCookie() || '' : '';
 
@@ -183,51 +179,51 @@
   <aside
     class="fixed top-0 left-0 z-40 w-64 h-screen pt-14 transition-transform {isMinScreenSidebarOpen
       ? ''
-      : '-translate-x-full'} bg-white border-r border-gray-200 md:translate-x-0 dark:bg-gray-800 dark:border-gray-700"
+      : '-translate-x-full'} bg-white border-r border-slate-200 md:translate-x-0 dark:bg-slate-800 dark:border-slate-700"
     aria-label="Sidenav"
   >
-    <div class="overflow-y-auto py-5 px-3 h-full bg-white dark:bg-gray-800">
-      <ul class="space-y-2">
-        <SideBarLink title="Dashboard" href={`${data.basePath}`} icon={PieIcon} />
-        <SideBarLink title="Promises" href={`${data.basePath}/promises`} icon={PieIcon} />
+    <div class="overflow-y-auto py-5 px-3 h-full">
+      <ul class="space-y-1">
+        <SideBarLink
+          title="Dashboard"
+          href={data.basePath}
+          icon="dashboard"
+          active={page.url.pathname === data.basePath}
+        />
+        <SideBarLink title="Promises" href={`${data.basePath}/promises`} icon="promises" />
         {#if data.member.role === 'ADMIN'}
-          <SideBarLink title="Call Story" href={`${data.basePath}/call-story`} icon={PieIcon} />
-          <SideBarLink title="Members" href={`${data.basePath}/members`} icon={PieIcon} />
-          <SideBarLink title="Sip Trunk" href={`${data.basePath}/sip-trunks`} icon={PieIcon} />
-          <SideBarLink title="Presence" href={`${data.basePath}/presence`} icon={PieIcon} />
+          <SideBarLink title="Call Story" href={`${data.basePath}/call-story`} icon="callStory" />
+          <SideBarLink title="Members" href={`${data.basePath}/members`} icon="members" />
+          <SideBarLink title="Sip Trunk" href={`${data.basePath}/sip-trunks`} icon="sipTrunk" />
+          <SideBarLink title="Presence" href={`${data.basePath}/presence`} icon="presence" />
           <SideBarLink
             title="Daily Summary"
             href={`${data.basePath}/daily-summary`}
-            icon={PieIcon}
+            icon="dailySummary"
           />
-          <SideBarLink title="Numbers" href={`${data.basePath}/numbers`} icon={PieIcon} />
-          <SideBarLink title="Queues" href={`${data.basePath}/queues`} icon={PieIcon} />
-          <SideBarLink title="Voice Bots" href={`${data.basePath}/voice-bots`} icon={PieIcon} />
+          <SideBarLink title="Numbers" href={`${data.basePath}/numbers`} icon="numbers" />
+          <SideBarLink title="Queues" href={`${data.basePath}/queues`} icon="queues" />
+          <SideBarLink title="Voice Bots" href={`${data.basePath}/voice-bots`} icon="voiceBots" />
         {/if}
       </ul>
-      <ul class="pt-5 mt-5 space-y-2 border-t border-gray-200 dark:border-gray-700">
-        {#if data.member.role === 'ADMIN'}
+      {#if data.member.role === 'ADMIN'}
+        <ul class="pt-4 mt-4 space-y-1 border-t border-slate-200 dark:border-slate-700">
           <SideBarLink
             title="Settings"
             href={`${data.basePath}/settings/webhooks`}
-            icon={SteerIcon}
+            icon="settings"
+            active={page.url.pathname.startsWith(`${data.basePath}/settings/`)}
           />
-          <hr class="dark:border-gray-700" />
-          <button
-            class="flex w-full items-center p-2 text-base font-medium text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group mt-4"
-            onclick={() => {
-              showSwitchOrgMenu = !showSwitchOrgMenu;
-            }}
+        </ul>
+        <ul class="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700">
+          <SideBarGroup
+            title="Switch Organization"
+            icon="organization"
+            bind:open={showSwitchOrgMenu}
           >
-            <SteerIcon />
-            <span class="ml-3">Switch Organization</span>
-          </button>
-          <div
-            class="items-center text-base font-medium text-gray-900 rounded-lg dark:text-white group"
-          >
-            {#if showSwitchOrgMenu}
+            <div class="mt-2 space-y-2 px-1">
               <select
-                class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 mb-3"
+                class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-cyan-500 focus:outline-none focus:ring-0 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 name="switchOrganization"
                 id="switchOrganization"
                 bind:value={selectedOrganization}
@@ -242,14 +238,14 @@
               <a
                 id="#createOrganization"
                 href={'/org/create'}
-                class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 mt-2"
+                class="block w-full rounded-xl bg-slate-900 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-slate-700 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
               >
                 Create Organization
               </a>
-            {/if}
-          </div>
-        {/if}
-      </ul>
+            </div>
+          </SideBarGroup>
+        </ul>
+      {/if}
     </div>
   </aside>
 
