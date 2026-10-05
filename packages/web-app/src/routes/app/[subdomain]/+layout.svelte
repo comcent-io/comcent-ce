@@ -8,12 +8,12 @@
   import SideBarLink from './SideBarLink.svelte';
   import SideBarGroup from './SideBarGroup.svelte';
   import { Toaster } from '$lib/toast';
-  import DollarIcon from '$lib/components/Icons/DollarIcon.svelte';
   import CloseMenuIcon from '$lib/components/Icons/CloseMenuIcon.svelte';
   import MenuBurgerIcon from '$lib/components/Icons/MenuBurgerIcon.svelte';
-  import Button from '$lib/components/Button.svelte';
+  import UserAvatar from '$lib/components/UserAvatar.svelte';
+  import SideBarIcon from './SideBarIcon.svelte';
   import { clickOutside } from '$lib/clickOutside';
-  import { goto } from '$app/navigation';
+  import { afterNavigate, goto } from '$app/navigation';
   import { onMount, tick } from 'svelte';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
   import { logout } from '$lib/session';
@@ -41,6 +41,12 @@
   onMount(async () => {
     await tick();
     window.dialerWidget = dialerWidget;
+  });
+
+  // The user menu closes once a link in it has taken you somewhere
+  // (closing it in the link's own click handler could cancel the click).
+  afterNavigate(() => {
+    isUserMenuOpen = false;
   });
 
   function closeLowBalanceWarning() {
@@ -119,55 +125,95 @@
 
       <!-- Main content and other items remain unchanged -->
 
-      <div class="flex items-center lg:order-2">
+      <div class="flex items-center gap-2 lg:order-2">
         <!-- Wallet balance indicator is EE-only -->
 
-        <div class="relative">
+        <div
+          class="relative"
+          use:clickOutside={() => {
+            isUserMenuOpen = false;
+          }}
+        >
           <button
             type="button"
-            class="flex mx-3 text-sm bg-gray-800 rounded-full md:mr-0 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600"
-            aria-expanded="false"
+            class="flex items-center gap-2 rounded-xl p-1 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700 md:pe-2"
+            aria-expanded={isUserMenuOpen}
             onclick={() => (isUserMenuOpen = !isUserMenuOpen)}
           >
             <span class="sr-only">Open user menu</span>
-            <img class="w-8 h-8 rounded-full" src={data.user.picture} alt="user profile" />
+            <UserAvatar picture={data.user.picture} name={data.user.name} email={data.user.email} />
+            <span class="hidden max-w-40 truncate md:inline">{data.user.name}</span>
+            <svg
+              class="hidden h-4 w-4 text-slate-400 md:block"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                clip-rule="evenodd"
+              />
+            </svg>
           </button>
-          <!-- Dropdown menu -->
-          <div
-            class="absolute right-1 z-50 my-4 w-56 text-base list-none bg-white rounded divide-y divide-gray-100 shadow dark:bg-gray-700 dark:divide-gray-600"
-            id="dropdown"
-            class:hidden={!isUserMenuOpen}
-          >
-            <div class="py-3 px-4">
-              <span class="block text-sm font-semibold text-gray-900 dark:text-white">
-                {data.user.name}
-              </span>
-              <span class="block text-sm text-gray-900 truncate dark:text-white">
-                {data.user.email}
-              </span>
-            </div>
-            <ul class="py-1 text-gray-700 dark:text-gray-300" aria-labelledby="dropdown">
-              <li>
-                <a
-                  href={`${data.basePath}/members/me`}
-                  class="block py-2 px-4 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-400 dark:hover:text-white"
-                >
-                  My profile
-                </a>
-              </li>
-            </ul>
-            <ul class="py-1 text-gray-700 dark:text-gray-300" aria-labelledby="dropdown">
-              <li>
+          {#if isUserMenuOpen}
+            <div
+              id="dropdown"
+              class="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
+            >
+              <div
+                class="flex items-center gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700"
+              >
+                <UserAvatar
+                  picture={data.user.picture}
+                  name={data.user.name}
+                  email={data.user.email}
+                />
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                    {data.user.name}
+                  </p>
+                  <p class="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {data.user.email}
+                  </p>
+                </div>
+              </div>
+              <ul class="p-1.5 text-sm">
+                <li>
+                  <a
+                    href={`${data.basePath}/members/me`}
+                    class="flex items-center gap-3 rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
+                  >
+                    <SideBarIcon name="members" class="text-slate-400" />
+                    My profile
+                  </a>
+                </li>
+              </ul>
+              <div class="border-t border-slate-200 p-1.5 text-sm dark:border-slate-700">
                 <button
                   type="button"
                   onclick={logout}
-                  class="block w-full text-left py-2 px-4 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+                  class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
                 >
+                  <svg
+                    class="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke-width="1.5"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"
+                    />
+                  </svg>
                   Logout
                 </button>
-              </li>
-            </ul>
-          </div>
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
     </div>

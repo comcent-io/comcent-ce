@@ -7,7 +7,6 @@
   import CallTimeline from '$lib/components/CallTimeline.svelte';
   import VerticalLineTimer from '$lib/components/VerticalLineTimer.svelte';
   import type { CallStoryFromServer } from '$lib/types/CallStoryFromServer';
-  import moment from 'moment-timezone';
   import { scale } from '$lib/scaleStore';
 
   let localScale = $state(1);
@@ -46,7 +45,13 @@
   onMount(() => {
     const enhancedSpans = setSpanRelativeTime(callStory.callSpans);
     spansByUsers = _.groupBy(enhancedSpans, 'currentParty');
-    console.log('spansByUsers', spansByUsers);
+
+    // Open with the whole call fitting the width (the timeline is drawn at
+    // `scale` pixels per second, after the 200px name column).
+    if (callStoryContainer && callDuration > 0) {
+      const fit = Math.floor((callStoryContainer.clientWidth - 205) / callDuration);
+      localScale = Math.min(300, Math.max(1, fit));
+    }
   });
 
   function setSpanRelativeTime(spans: any[]) {
@@ -121,40 +126,35 @@
   }
 </script>
 
-<div
-  class="w-full p-4 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 mb-5"
->
-  <h5 class="mb-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
-    Call
-    <button onclick={onHeadingClick} class="text-transparent">:</button>
-    <span class="text-xs">{callStory.id}</span>
-  </h5>
-
-  <div class="mb-4">
-    <label for="default-range" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-      Scale ({localScale})
-    </label>
-    <input
-      id="default-range"
-      bind:value={localScale}
-      type="range"
-      min="1"
-      max="300"
-      class="w-[28%] h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-    />
-  </div>
-
-  <span class="text-sm text-gray-500 dark:text-gray-400">
-    {moment(callStory.startAt).calendar()}
-  </span>
-
-  <div class="text-lg text-gray-500 dark:text-gray-400">
-    {callStory.caller} &rarr; {callStory.callee} ({callStory.direction})
+<div class="w-full">
+  <div class="mb-2 flex flex-wrap items-center justify-between gap-4">
+    <p class="text-sm text-gray-500 dark:text-gray-400">
+      Each row is one person on the call. Hover to see the time; play a recording from its row.
+    </p>
+    <div class="flex items-center gap-3">
+      <!-- Clicking the label five times shows the debug view. -->
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+      <label
+        for="call-graph-zoom"
+        class="text-sm font-medium text-gray-700 dark:text-gray-300"
+        onclick={onHeadingClick}
+      >
+        Zoom
+      </label>
+      <input
+        id="call-graph-zoom"
+        bind:value={localScale}
+        type="range"
+        min="1"
+        max="300"
+        class="h-2 w-40 cursor-pointer appearance-none rounded-lg bg-gray-200 accent-blue-600 dark:bg-gray-700"
+      />
+    </div>
   </div>
 
   {#if callStory}
     <div>
-      <div class="bg-white rounded-lg dark:bg-gray-800 overflow-x-auto">
+      <div class="overflow-x-auto">
         <div
           class="mb-5 call-story pt-5 relative"
           bind:this={callStoryContainer}

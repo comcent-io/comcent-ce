@@ -2,6 +2,13 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import ErrorMessage from '$lib/components/ErrorMessage.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import Pill from '$lib/components/Pill.svelte';
+  import Table from '$lib/components/Table.svelte';
+  import EmptyState from '$lib/components/form/EmptyState.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
+  import SecondaryButton from '$lib/components/form/SecondaryButton.svelte';
   import { deleteJson, getJson } from '$lib/http';
   import { goto } from '$app/navigation';
   import toast from '$lib/toast';
@@ -65,21 +72,17 @@
   }
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Sip Trunks</h3>
-
-<div class="my-4">
-  <a
-    href={`${data.basePath}/sip-trunks/create`}
-    class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-  >
-    Create
-  </a>
-</div>
+<PageHeader
+  title="SIP Trunks"
+  description="The connections to your phone carriers that carry your calls in and out. Add one for each carrier account you use."
+>
+  {#snippet actions()}
+    <Button href={`${data.basePath}/sip-trunks/create`}>Create</Button>
+  {/snippet}
+</PageHeader>
 
 {#if errorMessage}
-  <div class="text-red-500 mb-4">
-    {errorMessage}
-  </div>
+  <ErrorMessage error={{ message: errorMessage, formErrors: [] }} />
 {/if}
 
 {#if isDeletePopUp}
@@ -90,59 +93,53 @@
   />
 {/if}
 
-<div class="relative overflow-x-auto shadow-md sm:rounded-lg">
-  <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-      <tr>
-        <th scope="col" class="px-6 py-3">Name</th>
-        <th scope="col" class="px-6 py-3">Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#if loading}
-        <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
-          <td colspan="2" class="px-6 py-4">Loading...</td>
-        </tr>
-      {:else}
-        {#each sipTrunks as trunk}
-          <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
-            <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-              {trunk.name}
-            </td>
-
-            <td
-              class="space-x-8 px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
+<Table
+  columns={['Name', { label: 'Actions', srOnly: true }]}
+  {loading}
+  isEmpty={sipTrunks.length === 0}
+>
+  {#snippet empty()}
+    <EmptyState
+      title="No SIP trunks yet"
+      description="A SIP trunk links Comcent to your phone carrier. Click Create above to add your first one, or connect a Twilio account from Numbers."
+    />
+  {/snippet}
+  {#each sipTrunks as trunk (trunk.id)}
+    <tr>
+      <td class="font-medium text-gray-900 dark:text-white">
+        <div class="flex flex-wrap items-center gap-2">
+          {trunk.name}
+          {#if trunk.providerConnectionId}
+            <!-- A trunk mirrored from a Twilio account is removed by
+                 disconnecting that account, so it has no Delete here. -->
+            <a
+              href={`${data.basePath}/numbers/connections/${trunk.providerConnectionId}`}
+              title="This trunk is managed by a Twilio connection. Disconnect the connection to remove it."
             >
-              <a
-                href={`${data.basePath}/sip-trunks/${trunk.id}/edit`}
-                class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
-              >
-                Edit
-              </a>
-              {#if trunk.providerConnectionId}
-                <a
-                  href={`${data.basePath}/numbers/connections/${trunk.providerConnectionId}`}
-                  class="font-medium text-gray-500 dark:text-gray-400 hover:underline"
-                  title="This trunk is managed by a Twilio connection. Disconnect the connection to remove it."
-                >
-                  Managed by Twilio
-                </a>
-              {:else}
-                <button
-                  type="button"
-                  onclick={() => {
-                    toggleDeletePopUp();
-                    sipTrunkToBeDeleted = trunk;
-                  }}
-                  class="font-medium text-red-600 dark:text-red-500 hover:underline"
-                >
-                  Delete
-                </button>
-              {/if}
-            </td>
-          </tr>
-        {/each}
-      {/if}
-    </tbody>
-  </table>
-</div>
+              <Pill tone="cyan">Managed by Twilio</Pill>
+            </a>
+          {/if}
+        </div>
+      </td>
+      <td>
+        <div class="flex items-center justify-end gap-4">
+          <SecondaryButton size="sm" href={`${data.basePath}/sip-trunks/${trunk.id}/edit`}>
+            Edit
+          </SecondaryButton>
+          {#if !trunk.providerConnectionId}
+            <SecondaryButton
+              size="sm"
+              tone="danger"
+              onclick={() => {
+                toggleDeletePopUp();
+                sipTrunkToBeDeleted = trunk;
+              }}
+            >
+              Delete
+            </SecondaryButton>
+          {/if}
+        </div>
+      </td>
+    </tr>
+  {/each}
+</Table>

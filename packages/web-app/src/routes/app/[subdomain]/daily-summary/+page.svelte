@@ -85,7 +85,7 @@
   });
 </script>
 
-<div class="p-6 dark:bg-gray-900">
+<div>
   {#if !selectedDate}
     <DailySummaryList {dailySummaries} {loading} onSelectSummary={fetchSummaryDetails} />
   {:else}

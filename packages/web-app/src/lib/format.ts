@@ -51,6 +51,37 @@ export function formatDate(value: DateInput, fallback = ''): string {
   return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+/** "9:51 am", the time of day in the viewer's timezone; `fallback` when empty. */
+export function formatTime(value: DateInput, fallback = ''): string {
+  const date = toDate(value);
+  return date ? moment(date).format('h:mm a') : fallback;
+}
+
+/** A stored enum value as a label: "ADMIN" → "Admin", "IN_PROGRESS" → "In progress". */
+export function formatEnum(value: string | null | undefined): string {
+  if (!value) return '';
+  const words = value.toLowerCase().replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * How long something lasted, from two timestamps: "0:56", "12:05",
+ * "1:02:09"; `fallback` when either is missing.
+ */
+export function formatDuration(start: DateInput, end: DateInput, fallback = ''): string {
+  const from = toDate(start);
+  const to = toDate(end);
+  if (!from || !to) return fallback;
+
+  const total = Math.max(0, Math.round((to.getTime() - from.getTime()) / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = String(total % 60).padStart(2, '0');
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}`
+    : `${minutes}:${seconds}`;
+}
+
 /**
  * The compact stamp tables use, "2026/09/29 09:51 am": fixed width, and
  * sorts the way it reads.

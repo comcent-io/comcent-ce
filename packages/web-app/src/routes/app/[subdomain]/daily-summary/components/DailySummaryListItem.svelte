@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { DailySummary } from './types';
   import { formatDate } from '$lib/format';
+  import { processContent } from './utils';
 
   interface Props {
     summary: DailySummary;
@@ -8,6 +9,14 @@
   }
 
   let { summary, onSelect }: Props = $props();
+
+  // The summary's opening words, without its Markdown, as one line.
+  let preview = $derived(
+    processContent(summary.executiveSummary ?? '')
+      .replace(/[#*_`>]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  );
 </script>
 
 <div
@@ -22,15 +31,18 @@
     }
   }}
 >
-  <div class="flex items-center justify-between">
-    <div>
-      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+  <div class="flex items-center justify-between gap-6">
+    <div class="min-w-0">
+      <h3 class="text-base font-semibold text-gray-900 dark:text-white">
         {formatDate(summary.date)}
       </h3>
+      <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
+        {preview}
+      </p>
     </div>
     <button
       type="button"
-      class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+      class="shrink-0 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
       onclick={(e) => {
         e.preventDefault();
         onSelect(summary.date);

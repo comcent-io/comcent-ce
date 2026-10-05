@@ -4,14 +4,15 @@
   import { page } from '$app/state';
   import { routeParam } from '$lib/routeParam';
   import toast from '$lib/toast';
+  import Pill from '$lib/components/Pill.svelte';
   import {
     disconnect,
     disconnectPreview,
     listConnections,
     refreshNumbers,
     rotateCredentials,
-    statusClass,
     statusLabel,
+    statusTone,
     type DisconnectPreview,
     type NumberState,
     type ProviderConnection,
@@ -159,9 +160,7 @@
   {:else}
     <div class="flex items-center gap-3 mt-2 mb-6">
       <h1 class="text-3xl font-bold dark:text-white">{connection.label}</h1>
-      <span class="text-xs px-2 py-0.5 rounded {statusClass(connection.status)}">
-        {statusLabel(connection.status)}
-      </span>
+      <Pill tone={statusTone(connection.status)}>{statusLabel(connection.status)}</Pill>
     </div>
 
     {#if errorMessage}

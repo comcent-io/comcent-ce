@@ -4,6 +4,13 @@
   import { browser } from '$app/environment';
   import { Socket } from 'phoenix';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
+  import Card from '$lib/components/Card.svelte';
+  import PartyAvatar from '$lib/components/PartyAvatar.svelte';
+  import Pill from '$lib/components/Pill.svelte';
+  import Spinner from '$lib/components/Icons/Spinner.svelte';
+  import EmptyState from '$lib/components/form/EmptyState.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
+  import { partyName } from '$lib/party';
 
   type WaitingCall = {
     fromUser: string;
@@ -26,6 +33,8 @@
   };
 
   let queueDashboardData: QueueDashboardData | undefined = $state();
+  let loadFailed = $state(false);
+  let columnsEl: HTMLDivElement | undefined = $state();
   let currentTime = new Date();
 
   // Function to calculate waiting time
@@ -85,11 +94,11 @@
       if (waitingCallEl && availableMemberEl && line) {
         const waitingCallRect = waitingCallEl.getBoundingClientRect();
         const availableMemberRect = availableMemberEl.getBoundingClientRect();
-        const containerEl = waitingCallEl.parentElement?.parentElement?.parentElement;
 
-        if (!containerEl) return;
+        // The lines are drawn over the two columns, so measure from them.
+        if (!columnsEl) return;
 
-        const containerRect = containerEl.getBoundingClientRect();
+        const containerRect = columnsEl.getBoundingClientRect();
 
         // Calculate start point from the incoming call number
         const startX = waitingCallRect.right - containerRect.left;
@@ -187,7 +196,10 @@
 
   onMount(async () => {
     const response = await fetch(`/api/v2/${page.params.subdomain}/queues/${page.params.id}/state`);
-    if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
+    if (!response.ok) {
+      loadFailed = true;
+      throw new Error((await response.json()).error ?? response.statusText);
+    }
     const data = await response.json();
     queueDashboardData = data.state;
     // Update line positions after initial data load
@@ -195,124 +207,134 @@
   });
 </script>
 
+<PageHeader
+  title={queueDashboardData ? `${queueDashboardData.queueName} queue dashboard` : 'Queue dashboard'}
+  description="The callers waiting in this queue right now, and the members free to take them."
+  backHref={`/app/${page.params.subdomain}/queues`}
+  backLabel="Queues"
+/>
+
+{#snippet stat(label: string, value: number, note: string)}
+  <Card>
+    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
+    <p class="mt-3 text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
+    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{note}</p>
+  </Card>
+{/snippet}
+
+{#snippet columnHeading(title: string, count: string)}
+  <div
+    class="mb-4 flex items-center justify-between gap-3 border-b border-gray-200 pb-3 dark:border-gray-700"
+  >
+    <h4 class="text-lg font-semibold text-gray-900 dark:text-white">{title}</h4>
+    <Pill>{count}</Pill>
+  </div>
+{/snippet}
+
 {#if queueDashboardData}
-  <div class="p-6">
-    <h3 class="text-3xl font-bold dark:text-white mb-8">
-      {queueDashboardData.queueName} queue dashboard
-    </h3>
-
-    <!-- Agent Count Summary -->
-    <div class="grid grid-cols-2 gap-8 relative">
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-8">
-            <div class="text-center">
-              <p class="text-2xl font-bold text-red-600 dark:text-red-400">
-                {queueDashboardData.waitingCalls.length}
-              </p>
-              <p class="text-sm text-gray-600 dark:text-gray-400">Waiting Calls</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
-        <div class="flex items-center justify-end">
-          <div class="flex items-center space-x-8">
-            <div class="text-center">
-              <p class="text-2xl font-bold text-green-600 dark:text-green-400">
-                {queueDashboardData.availableMembers.length}
-              </p>
-              <p class="text-sm text-gray-600 dark:text-gray-400">Available Agents</p>
-            </div>
-            <div class="text-center">
-              <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {queueDashboardData.totalAgents}
-              </p>
-              <p class="text-sm text-gray-600 dark:text-gray-400">Total Agents</p>
-            </div>
-          </div>
-        </div>
-      </div>
+  <div class="space-y-6">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {@render stat(
+        'Waiting calls',
+        queueDashboardData.waitingCalls.length,
+        'callers in the queue',
+      )}
+      {@render stat(
+        'Available members',
+        queueDashboardData.availableMembers.length,
+        'free to take a call',
+      )}
+      {@render stat('Total members', queueDashboardData.totalAgents, 'in this queue')}
     </div>
 
-    <div class="grid grid-cols-2 gap-8 relative">
-      <!-- Incoming Calls Column -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-        <h3
-          class="text-xl font-bold dark:text-white mb-6 pb-2 border-b border-gray-200 dark:border-gray-700"
-        >
-          Incoming Calls ({queueDashboardData.waitingCalls.length})
-        </h3>
-        <div class="space-y-4">
-          {#if queueDashboardData.waitingCalls.length === 0}
-            <p class="text-gray-500 dark:text-gray-400 italic">No incoming calls</p>
-          {:else}
-            {#each queueDashboardData.waitingCalls as waitingCall, i}
-              <div class="flex items-center space-x-4">
-                <div class="flex flex-col">
-                  <p class="text-sm font-semibold text-gray-900 dark:text-white">
-                    {waitingCall.fromUser}
+    <div class="relative grid grid-cols-2 gap-8" bind:this={columnsEl}>
+      <!-- Waiting calls -->
+      <Card>
+        {@render columnHeading('Waiting calls', String(queueDashboardData.waitingCalls.length))}
+        {#if queueDashboardData.waitingCalls.length === 0}
+          <EmptyState title="No one is waiting" description="Callers show here as they queue." />
+        {:else}
+          <div class="space-y-3">
+            {#each queueDashboardData.waitingCalls as waitingCall, i (i)}
+              <div class="flex items-center gap-3">
+                <PartyAvatar party={waitingCall.fromUser} />
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
+                    {partyName(waitingCall.fromUser)}
                   </p>
-                  <p class="text-xs text-yellow-500 font-medium">
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
                     Waiting since {getWaitingTime(waitingCall.dateTime)}
                   </p>
                 </div>
+                {#if waitingCall.attemptingToConnect}
+                  <Pill tone="amber" dot>Connecting</Pill>
+                {:else}
+                  <Pill tone="red" dot>Waiting</Pill>
+                {/if}
                 <div
-                  class="bg-{waitingCall.attemptingToConnect
-                    ? 'yellow'
-                    : 'red'}-500 shadow-sm relative w-2 h-7"
+                  class="h-8 w-1.5 shrink-0 rounded-full {waitingCall.attemptingToConnect
+                    ? 'bg-amber-500'
+                    : 'bg-red-500'}"
                   id="waiting-call-{i}"
                 ></div>
               </div>
             {/each}
-          {/if}
-        </div>
-      </div>
+          </div>
+        {/if}
+      </Card>
 
-      <!-- Available Members Column -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-        <h3
-          class="text-xl font-bold dark:text-white mb-6 pb-2 border-b border-gray-200 dark:border-gray-700"
-        >
-          Available Members ({queueDashboardData.availableMembers
-            .length}/{queueDashboardData.totalAgents})
-        </h3>
-        <div class="space-y-4">
-          {#if queueDashboardData.availableMembers.length === 0}
-            <p class="text-gray-500 dark:text-gray-400 italic">No available members</p>
-          {:else}
-            {#each queueDashboardData.availableMembers as availableMember, j}
-              <div class="flex items-center space-x-4">
+      <!-- Available members -->
+      <Card>
+        {@render columnHeading(
+          'Available members',
+          `${queueDashboardData.availableMembers.length} of ${queueDashboardData.totalAgents}`,
+        )}
+        {#if queueDashboardData.availableMembers.length === 0}
+          <EmptyState
+            title="No member is available"
+            description="Members show here when they are free to take this queue's calls."
+          />
+        {:else}
+          <div class="space-y-3">
+            {#each queueDashboardData.availableMembers as availableMember, j (j)}
+              {@const offered = queueDashboardData.waitingCalls.some(
+                (call) => call.attemptingToConnectToMember?.username === availableMember.username,
+              )}
+              <div class="flex items-center gap-3">
                 <div
-                  class="bg-{queueDashboardData.waitingCalls.some(
-                    (call) =>
-                      call.attemptingToConnectToMember?.username === availableMember.username,
-                  )
-                    ? 'yellow'
-                    : 'red'}-500 shadow-sm relative w-2 h-7"
+                  class="h-8 w-1.5 shrink-0 rounded-full {offered
+                    ? 'bg-amber-500'
+                    : 'bg-green-500'}"
                   id="available-member-{j}"
                 ></div>
-                <p class="text-sm font-semibold text-gray-900 dark:text-white">
+                <PartyAvatar party={availableMember.username} />
+                <p
+                  class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white"
+                >
                   {availableMember.username}
                 </p>
+                {#if offered}
+                  <Pill tone="amber" dot>Offered a call</Pill>
+                {:else}
+                  <Pill tone="green" dot>Available</Pill>
+                {/if}
               </div>
             {/each}
-          {/if}
-        </div>
-      </div>
+          </div>
+        {/if}
+      </Card>
 
-      <!-- Connection Lines -->
-      {#each queueDashboardData.waitingCalls as waitingCall}
+      <!-- Lines from each caller to the member being offered the call -->
+      {#each queueDashboardData.waitingCalls as waitingCall, i (i)}
         {#if waitingCall.attemptingToConnectToMember?.username}
-          <div class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 1;">
-            <svg class="absolute top-0 left-0 w-full h-full" style="overflow: visible;">
+          <div class="pointer-events-none absolute left-0 top-0 h-full w-full" style="z-index: 1;">
+            <svg class="absolute left-0 top-0 h-full w-full" style="overflow: visible;">
               <line
                 x1="0"
                 y1="0"
                 x2="100%"
                 y2="0"
-                class="stroke-current text-yellow-500"
+                class="stroke-current text-amber-500"
                 style="stroke-width: 2;"
                 id="line-{waitingCall.attemptingToConnectToMember.username}"
               />
@@ -322,10 +344,10 @@
       {/each}
     </div>
   </div>
+{:else if loadFailed}
+  <EmptyState title="Queue not found" description="It may have been deleted." />
 {:else}
-  <div class="p-6">
-    <p class="text-md font-semibold text-red-500">Data not found</p>
-  </div>
+  <div class="flex justify-center py-10"><Spinner /></div>
 {/if}
 
 <style>

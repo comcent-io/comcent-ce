@@ -19,6 +19,7 @@
   import { isValidPhoneNumber } from 'libphonenumber-js';
   import type { MemberSearchResult } from '$lib/types/MemberSearchResult';
   import Spinner from '../Icons/Spinner.svelte';
+  import PresenceDot from '../PresenceDot.svelte';
   import toast from '$lib/toast';
   import { Socket } from 'phoenix';
 
@@ -537,15 +538,6 @@
     statusMenuOpen = !statusMenuOpen;
   }
 
-  const statusDotColors: Record<string, string> = {
-    'Logged Out': 'bg-gray-400 dark:bg-gray-500',
-    Available: 'bg-green-500',
-    'On Break': 'bg-amber-500',
-    'On Call': 'bg-blue-500',
-    'Wrap Up': 'bg-purple-500',
-    Busy: 'bg-red-500',
-  };
-
   let showExpanded = $derived(expanded || !!currentCall || heldCalls.length > 0);
 
   function toggleExpanded() {
@@ -799,7 +791,7 @@
             onclick={toggleStatusMenu}
             class="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-sm font-medium text-gray-100 hover:bg-gray-700"
           >
-            <span class="h-2 w-2 rounded-full {statusDotColors[status] ?? 'bg-gray-400'}"></span>
+            <PresenceDot presence={status} />
             {status}
             <svg
               class="h-3 w-3 text-gray-400"
@@ -825,7 +817,7 @@
                   onclick={() => selectStatus(s)}
                   class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
-                  <span class="h-2 w-2 rounded-full {statusDotColors[s] ?? 'bg-gray-400'}"></span>
+                  <PresenceDot presence={s} />
                   {s}
                 </button>
               {/each}

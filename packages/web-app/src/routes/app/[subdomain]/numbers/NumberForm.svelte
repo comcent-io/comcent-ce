@@ -1,6 +1,13 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
+  import Button from '$lib/components/Button.svelte';
+  import ErrorMessage from '$lib/components/ErrorMessage.svelte';
+  import Field from '$lib/components/form/Field.svelte';
+  import FormActions from '$lib/components/form/FormActions.svelte';
+  import FormSection from '$lib/components/form/FormSection.svelte';
+  import Input from '$lib/components/form/Input.svelte';
+  import Select from '$lib/components/form/Select.svelte';
   import FlowDiagram from './flow/FlowDiagram.svelte';
   import type { numberData } from './schema';
   let flowDiagram: FlowDiagram | undefined = $state();
@@ -85,96 +92,62 @@
     e.preventDefault();
     handleSubmit();
   }}
-  class="space-y-8"
+  class="space-y-6"
 >
   {#if errorMessage}
-    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-600">
-      {errorMessage}
-    </div>
+    <ErrorMessage error={{ message: errorMessage, formErrors: [] }} />
   {/if}
 
-  <section
-    class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/60"
+  <FormSection
+    title="Number details"
+    description="The phone number, the trunk it comes in on, and which numbers it may call."
   >
-    <div class="mb-4">
-      <h4 class="text-xl font-semibold text-slate-900 dark:text-white">Number details</h4>
-      <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-        Set the phone number, its trunk, and optional outbound restrictions before defining the
-        inbound flow.
-      </p>
-    </div>
-
-    <div class="grid gap-6 lg:grid-cols-2">
-      <div>
-        <label for="name" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
-          Name
-        </label>
-        <input
+    <div class="grid gap-5 lg:grid-cols-2">
+      <Field for="name" label="Name" hint="How this number is shown in Comcent.">
+        <Input
           type="text"
           id="name"
           name="name"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
           placeholder="Friendly Name"
           required
           bind:value={formData.name}
         />
-      </div>
-      <div>
-        <label for="number" class="mb-2 block text-sm font-medium text-gray-900 dark:text-white">
-          Number (E.164)
-        </label>
-        <input
+      </Field>
+      <Field for="number" label="Number" hint="In E.164 form, e.g. +14155550123.">
+        <Input
           type="text"
           id="number"
           name="number"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
           placeholder="Number in E.164 format"
           required
           bind:value={formData.number}
         />
-      </div>
-      <div>
-        <label
-          for="sipTrunkId"
-          class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >
-          SIP Trunk
-        </label>
-        <select
-          id="sipTrunkId"
-          name="sipTrunkId"
-          bind:value={formData.sipTrunkId}
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
-        >
-          {#each sipTrunks as trunk}
+      </Field>
+      <Field for="sipTrunkId" label="SIP trunk" hint="The carrier this number's calls use.">
+        <Select id="sipTrunkId" name="sipTrunkId" bind:value={formData.sipTrunkId}>
+          {#each sipTrunks as trunk (trunk.id)}
             <option value={trunk.id} selected={trunk.id === formData.sipTrunkId}>
               {trunk.name}
             </option>
           {/each}
-        </select>
-      </div>
-      <div>
-        <label
-          for="allowOutboundRegex"
-          class="mb-2 block text-sm font-medium text-gray-900 dark:text-white"
-        >
-          Allow Outbound if destination matches regex
-        </label>
-        <input
+        </Select>
+      </Field>
+      <Field
+        for="allowOutboundRegex"
+        label="Allowed outbound destinations"
+        optional
+        hint={`A regular expression. Outbound calls from this number to a destination that doesn't match are refused. Destinations are checked in E.164 form (+14155550123), so ^\\+1[0-9]{10}$ allows only North American numbers. Leave empty to allow any destination.`}
+      >
+        <Input
           type="text"
           id="allowOutboundRegex"
           name="allowOutboundRegex"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
           placeholder={'^\\+1[0-9]{10}$'}
-          aria-describedby="allowOutboundRegexHelp"
           bind:value={formData.allowOutboundRegex}
         />
-        <p id="allowOutboundRegexHelp" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          {`Outbound calls from this number to a destination that doesn't match are refused. Destinations are checked in E.164 form (+14155550123), so ^\\+1[0-9]{10}$ allows only North American numbers. Leave empty to allow any destination.`}
-        </p>
-      </div>
+      </Field>
     </div>
-  </section>
+  </FormSection>
 
   <section>
     <FlowDiagram
@@ -184,32 +157,7 @@
     />
   </section>
 
-  <button
-    type="button"
-    onclick={handleSubmit}
-    disabled={isLoading}
-    class="w-full rounded-lg bg-blue-700 px-5 py-3 text-center text-sm font-medium text-white focus:outline-none focus:ring-4 focus:ring-blue-300 hover:bg-blue-800 sm:w-auto dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-  >
-    {#if isLoading}
-      <!-- Tailwind CSS Spinner -->
-      <svg
-        class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-      >
-        <circle
-          class="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          stroke-width="4"
-        ></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 010-16v8h8"></path>
-      </svg>
-    {:else}
-      {isUpdate ? 'Update' : 'Add'}
-    {/if}
-  </button>
+  <FormActions cancelHref={`/app/${subdomain}/numbers`}>
+    <Button onclick={handleSubmit} progress={isLoading}>{isUpdate ? 'Update' : 'Add'}</Button>
+  </FormActions>
 </form>

@@ -4,6 +4,11 @@
   import { goto } from '$app/navigation';
   import toast from '$lib/toast';
   import Spinner from '$lib/components/Icons/Spinner.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import Table from '$lib/components/Table.svelte';
+  import EmptyState from '$lib/components/form/EmptyState.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
+  import SecondaryButton from '$lib/components/form/SecondaryButton.svelte';
   import { onMount } from 'svelte';
 
   let { data } = $props();
@@ -11,6 +16,7 @@
   let isDeletePopUp = $state(false);
   let isDeleteInProgress = $state(false);
   let queues: any[] = $state([]);
+  let loading = $state(true);
   const subdomain = page.params.subdomain;
 
   interface QueueToBeDeletedType {
@@ -32,6 +38,8 @@
       queues = data.queues;
     } catch (error: any) {
       toast.error(`${error.message}`);
+    } finally {
+      loading = false;
     }
   });
 
@@ -55,16 +63,14 @@
   }
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Queues</h3>
-
-<div class="my-4">
-  <a
-    href={`${data.basePath}/queues/create`}
-    class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-  >
-    Add
-  </a>
-</div>
+<PageHeader
+  title="Queues"
+  description="Groups of agents who share incoming calls, such as Sales or Support. A call sent to a queue rings the next free agent in it."
+>
+  {#snippet actions()}
+    <Button href={`${data.basePath}/queues/create`}>Add</Button>
+  {/snippet}
+</PageHeader>
 
 {#if isDeletePopUp}
   <ConfirmDialog
@@ -74,69 +80,57 @@
   />
 {/if}
 
-<div class="relative overflow-x-auto shadow-md sm:rounded-lg">
-  <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-      <tr>
-        <th scope="col" class="px-6 py-3">Name</th>
-        <th scope="col" class="px-6 py-3">Number</th>
-        <th scope="col" class="px-6 py-3">Wrap Up Time</th>
-        <th scope="col" class="px-6 py-3">Reject Delay Time</th>
-        <th scope="col" class="px-6 py-3">Max No Answers</th>
-        <th scope="col" class="px-6 py-3">Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each queues as queue}
-        <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
-          <th
-            scope="row"
-            class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
-          >
-            {queue.name}
-          </th>
-          <td class="px-6 py-4">
-            {queue.extension}
-          </td>
-          <td class="px-6 py-4">
-            {queue.wrapUpTime}
-          </td>
-          <td class="px-6 py-4">
-            {queue.rejectDelayTime}
-          </td>
-          <td class="px-6 py-4">
-            {queue.maxNoAnswers}
-          </td>
-          <td class="flex items-center space-x-4 px-6 py-4">
-            <a
-              href={`${data.basePath}/queues/${queue.id}/edit`}
-              class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
+<Table
+  columns={[
+    'Name',
+    'Extension',
+    'Wrap-up time',
+    'Reject delay',
+    'Missed calls before logout',
+    { label: 'Actions', srOnly: true },
+  ]}
+  {loading}
+  isEmpty={queues.length === 0}
+>
+  {#snippet empty()}
+    <EmptyState
+      title="No queues yet"
+      description="A queue shares incoming calls among a group of agents. Click Add above to create your first one, then add agents to it."
+    />
+  {/snippet}
+  {#each queues as queue (queue.id)}
+    <tr>
+      <th scope="row" class="whitespace-nowrap font-medium text-gray-900 dark:text-white">
+        {queue.name}
+      </th>
+      <td class="tabular-nums">{queue.extension ?? '—'}</td>
+      <td class="tabular-nums">{queue.wrapUpTime}s</td>
+      <td class="tabular-nums">{queue.rejectDelayTime}s</td>
+      <td class="tabular-nums">{queue.maxNoAnswers}</td>
+      <td>
+        <div class="flex items-center justify-end gap-4">
+          <SecondaryButton size="sm" href={`${data.basePath}/queues/${queue.id}/dashboard`}>
+            Dashboard
+          </SecondaryButton>
+          <SecondaryButton size="sm" href={`${data.basePath}/queues/${queue.id}/edit`}>
+            Edit
+          </SecondaryButton>
+          {#if isDeleteInProgress && queue.id === queueToBeDeleted?.id}
+            <Spinner />
+          {:else}
+            <SecondaryButton
+              size="sm"
+              tone="danger"
+              onclick={() => {
+                queueToBeDeleted = queue;
+                toggleDeletePopUp();
+              }}
             >
-              Edit
-            </a>
-            {#if isDeleteInProgress && queue.id === queueToBeDeleted?.id}
-              <Spinner />
-            {:else}
-              <button
-                type="button"
-                onclick={() => {
-                  queueToBeDeleted = queue;
-                  toggleDeletePopUp();
-                }}
-                class="font-medium text-red-600 dark:text-red-500 hover:underline"
-              >
-                Delete
-              </button>
-            {/if}
-            <a
-              href={`${data.basePath}/queues/${queue.id}/dashboard`}
-              class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
-            >
-              Dashboard
-            </a>
-          </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
-</div>
+              Delete
+            </SecondaryButton>
+          {/if}
+        </div>
+      </td>
+    </tr>
+  {/each}
+</Table>

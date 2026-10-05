@@ -2,6 +2,8 @@
   import { untrack } from 'svelte';
   import { page } from '$app/state';
   import { getJson } from '$lib/http';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
+  import SkeletonLoadingList from '$lib/components/SkeletonLoadingList.svelte';
   import NumberForm from '../../NumberForm.svelte';
 
   const defaultInboundFlow = JSON.stringify({
@@ -53,10 +55,17 @@
   });
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Numbers Edit</h3>
+<PageHeader
+  title="Edit number"
+  description="This number's name, the trunk it uses, and where its incoming calls go."
+  backHref={`/app/${page.params.subdomain}/numbers`}
+  backLabel="Numbers"
+/>
 
-<div class="mt-6 max-w-6xl">
-  {#if !isLoading}
+<div class="max-w-6xl">
+  {#if isLoading}
+    <SkeletonLoadingList />
+  {:else}
     <NumberForm formData={number} {sipTrunks} isUpdate={true} />
   {/if}
 </div>

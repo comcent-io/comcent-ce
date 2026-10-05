@@ -325,7 +325,7 @@ async function openEditNumberPage(page: Page, subdomain: string, name: string) {
   await expect(row).toBeVisible();
   await row.getByRole('link', { name: 'Edit' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Numbers Edit' }),
+    page.getByRole('heading', { name: 'Edit number' }),
   ).toBeVisible();
 }
 

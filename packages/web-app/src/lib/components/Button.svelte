@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import type { HTMLButtonAttributes } from 'svelte/elements';
+  import type { HTMLAnchorAttributes, HTMLButtonAttributes } from 'svelte/elements';
   import Spinner from './Icons/Spinner.svelte';
 
+  // The main action. With `href` it is a link that looks the same, e.g. a
+  // page's "Create" or "Add" that opens another page.
   const buttonColor = {
     default:
       'relative text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800',
@@ -11,6 +13,7 @@
   };
 
   interface Props extends Omit<HTMLButtonAttributes, 'type' | 'color'> {
+    href?: string;
     progress?: boolean;
     type?: 'button' | 'submit';
     className?: string;
@@ -19,6 +22,7 @@
   }
 
   let {
+    href,
     progress = false,
     type = 'button',
     className = '',
@@ -28,13 +32,23 @@
   }: Props = $props();
 </script>
 
-<button {type} disabled={progress} class="{buttonColor[color]} {className}" {...rest}>
-  <span class={progress ? 'opacity-30' : ''}>
+{#if href}
+  <a
+    {...rest as HTMLAnchorAttributes}
+    {href}
+    class="inline-flex items-center justify-center {buttonColor[color]} {className}"
+  >
     {@render children?.()}
-  </span>
-  {#if progress}
-    <span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-      <Spinner />
+  </a>
+{:else}
+  <button {type} disabled={progress} class="{buttonColor[color]} {className}" {...rest}>
+    <span class={progress ? 'opacity-30' : ''}>
+      {@render children?.()}
     </span>
-  {/if}
-</button>
+    {#if progress}
+      <span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+        <Spinner />
+      </span>
+    {/if}
+  </button>
+{/if}

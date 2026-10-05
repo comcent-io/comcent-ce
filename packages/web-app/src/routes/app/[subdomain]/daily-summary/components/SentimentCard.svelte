@@ -1,4 +1,5 @@
 <script lang="ts">
+  import FormSection from '$lib/components/form/FormSection.svelte';
   import type { SentimentCounts } from './types';
   import { calculatePercentage } from './utils';
 
@@ -13,54 +14,37 @@
       ? sentimentCounts.positive + sentimentCounts.negative + sentimentCounts.neutral
       : 0,
   );
+
+  let rows = $derived(
+    sentimentCounts
+      ? [
+          { label: 'Positive', count: sentimentCounts.positive, bar: 'bg-green-500' },
+          { label: 'Neutral', count: sentimentCounts.neutral, bar: 'bg-gray-400' },
+          { label: 'Negative', count: sentimentCounts.negative, bar: 'bg-red-500' },
+        ]
+      : [],
+  );
 </script>
 
-<div
-  class="bg-gray-800 dark:bg-gray-800 rounded-lg p-6 border border-gray-700 dark:border-gray-700 min-h-[250px]"
->
-  <h2 class="text-xl font-bold text-white mb-4">Customer sentiment</h2>
-  <div class="space-y-4">
-    {#if sentimentCounts && totalSentiment > 0}
-      <!-- Positive -->
-      <div>
-        <div class="mb-2">
-          <span class="text-white text-sm font-medium">Positive</span>
+<FormSection title="Sentiment" description="How people on the day's calls came across.">
+  {#if sentimentCounts && totalSentiment > 0}
+    <div class="space-y-4">
+      {#each rows as row (row.label)}
+        <div>
+          <div class="mb-1.5 flex justify-between text-sm">
+            <span class="font-medium text-gray-700 dark:text-gray-300">{row.label}</span>
+            <span class="tabular-nums text-gray-500 dark:text-gray-400">{row.count}</span>
+          </div>
+          <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+            <div
+              class="h-2 rounded-full transition-all {row.bar}"
+              style="width: {calculatePercentage(row.count, totalSentiment)}%"
+            ></div>
+          </div>
         </div>
-        <div class="w-full bg-gray-700 rounded-full h-2.5">
-          <div
-            class="bg-green-500 h-2.5 rounded-full transition-all"
-            style="width: {calculatePercentage(sentimentCounts.positive, totalSentiment)}%"
-          ></div>
-        </div>
-      </div>
-
-      <!-- Neutral -->
-      <div>
-        <div class="mb-2">
-          <span class="text-white text-sm font-medium">Neutral</span>
-        </div>
-        <div class="w-full bg-gray-700 rounded-full h-2.5">
-          <div
-            class="bg-gray-400 h-2.5 rounded-full transition-all"
-            style="width: {calculatePercentage(sentimentCounts.neutral, totalSentiment)}%"
-          ></div>
-        </div>
-      </div>
-
-      <!-- Negative -->
-      <div>
-        <div class="mb-2">
-          <span class="text-white text-sm font-medium">Negative</span>
-        </div>
-        <div class="w-full bg-gray-700 rounded-full h-2.5">
-          <div
-            class="bg-red-500 h-2.5 rounded-full transition-all"
-            style="width: {calculatePercentage(sentimentCounts.negative, totalSentiment)}%"
-          ></div>
-        </div>
-      </div>
-    {:else}
-      <p class="text-gray-400 italic text-sm">No sentiment data available</p>
-    {/if}
-  </div>
-</div>
+      {/each}
+    </div>
+  {:else}
+    <p class="text-sm text-gray-500 dark:text-gray-400">No sentiment for this day.</p>
+  {/if}
+</FormSection>

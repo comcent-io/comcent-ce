@@ -4,6 +4,14 @@
   import { onMount } from 'svelte';
   import Pagination from '$lib/components/Pagination.svelte';
   import LabelFilter from '$lib/components/LabelFilter.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import ErrorMessage from '$lib/components/ErrorMessage.svelte';
+  import Pill from '$lib/components/Pill.svelte';
+  import SearchIcon from '$lib/components/Icons/SearchIcon.svelte';
+  import Table from '$lib/components/Table.svelte';
+  import EmptyState from '$lib/components/form/EmptyState.svelte';
+  import Input from '$lib/components/form/Input.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
   import TableRow from './TableRow.svelte';
 
   let searchText = $state('');
@@ -176,136 +184,79 @@
   });
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Call Story</h3>
+<PageHeader
+  title="Call Story"
+  description="Every call your team handled, with its recording, transcript and AI insights. Open a call to see it all."
+/>
 
 {#if error}
-  <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-    {error}
+  <ErrorMessage error={{ message: error, formErrors: [] }} />
+{/if}
+
+<form class="mb-4 flex flex-wrap items-center gap-2" onsubmit={handleSearch}>
+  <label for="call-search" class="sr-only">Search calls</label>
+  <div class="relative min-w-64 flex-1">
+    <span
+      class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-gray-500 dark:text-gray-400"
+    >
+      <SearchIcon />
+    </span>
+    <Input
+      id="call-search"
+      type="search"
+      bind:value={searchText}
+      placeholder="Search what was said, e.g. refund or invoice"
+      class="ps-10"
+      oninput={() => {
+        // Emptying the box (or its ✕) shows every call again.
+        if (!searchText) clearSearch();
+      }}
+    />
+  </div>
+  <Button type="submit">Search</Button>
+  <LabelFilter
+    bind:this={labelFilterComponent}
+    subdomain={routeParam('subdomain')}
+    appliedCount={appliedLabels.length}
+    onApply={handleLabelApply}
+    onClear={handleLabelClear}
+  />
+</form>
+
+{#if appliedLabels.length > 0}
+  <div class="mb-4 flex flex-wrap items-center gap-2">
+    <span class="text-sm text-gray-500 dark:text-gray-400">Showing calls labelled</span>
+    {#each appliedLabels as label (label.id || label.name)}
+      <Pill tone="cyan">{label.name}</Pill>
+    {/each}
   </div>
 {/if}
 
-<!-- Filters Container -->
-<div class="max-w-7xl mx-auto mb-6 mt-2">
-  <!-- Search Form with Filter Button -->
-  <form class="w-full" onsubmit={handleSearch}>
-    <label
-      for="default-search"
-      class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-    >
-      Search Call Stories
-    </label>
-    <div class="flex gap-2">
-      <div class="relative flex-1">
-        <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-          <svg
-            class="w-4 h-4 text-gray-500 dark:text-gray-400"
-            aria-hidden="true"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 20 20"
-          >
-            <path
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"
-            />
-          </svg>
-        </div>
-        <input
-          bind:value={searchText}
-          type="search"
-          id="default-search"
-          class="block w-full p-4 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          placeholder="Enter a keyword or phrase"
-          required
-        />
-        <button
-          class="absolute inset-y-0 end-24 flex items-center ps-3"
-          type="button"
-          onclick={clearSearch}
-        >
-          <svg
-            class="w-4 h-4 text-gray-500 dark:text-gray-400"
-            aria-hidden="true"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18 18 6m0 12L6 6"
-            />
-          </svg>
-        </button>
-        <button
-          type="submit"
-          class="text-white absolute end-2.5 bottom-2.5 bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-        >
-          Search
-        </button>
-      </div>
-
-      <!-- Label Filter Component -->
-      <div class="mt-1.5">
-        <LabelFilter
-          bind:this={labelFilterComponent}
-          subdomain={routeParam('subdomain')}
-          appliedCount={appliedLabels.length}
-          onApply={handleLabelApply}
-          onClear={handleLabelClear}
-        />
-      </div>
-    </div>
-  </form>
-
-  <!-- Active Filters Display -->
-  {#if appliedLabels.length > 0}
-    <div class="mt-3 flex flex-wrap gap-2">
-      {#each appliedLabels as label}
-        <span
-          class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium dark:bg-blue-900 dark:text-blue-200"
-        >
-          {label.name}
-        </span>
-      {/each}
-    </div>
-  {/if}
-</div>
-
-<div class="mt-4 relative overflow-visible shadow-md sm:rounded-lg">
-  <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-      <tr>
-        <th scope="col" class="px-6 py-3">Date Time</th>
-        <th scope="col" class="px-6 py-3">Direction</th>
-        <th scope="col" class="px-6 py-3">Caller</th>
-        <th scope="col" class="px-6 py-3">Callee</th>
-        <th scope="col" class="px-6 py-3">Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#if loading}
-        <tr>
-          <td colspan="5" class="px-6 py-8 text-center">
-            <div class="flex justify-center items-center">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
-              <span class="ml-2 text-gray-600">Loading call stories...</span>
-            </div>
-          </td>
-        </tr>
-      {:else}
-        {#each callStories as callStory}
-          <TableRow {callStory} />
-        {/each}
-      {/if}
-    </tbody>
-  </table>
-</div>
+<Table
+  columns={[
+    'Date & time',
+    'Direction',
+    'Caller',
+    'Callee',
+    'Duration',
+    'Labels',
+    { label: 'Open', srOnly: true },
+  ]}
+  {loading}
+  isEmpty={callStories.length === 0}
+>
+  {#snippet empty()}
+    <EmptyState
+      title={searchText || appliedLabels.length > 0 ? 'No matching calls' : 'No calls yet'}
+      description={searchText || appliedLabels.length > 0
+        ? 'Try other words, or clear the search and label filter.'
+        : 'Every call your team takes or makes shows up here once it ends.'}
+    />
+  {/snippet}
+  {#each callStories as callStory (callStory.id)}
+    <TableRow {callStory} />
+  {/each}
+</Table>
 
 <Pagination
   baseUrl={`/app/${page.params.subdomain}/call-story`}

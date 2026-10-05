@@ -2,8 +2,11 @@
   import { tick, untrack } from 'svelte';
   import toast from '$lib/toast';
   import Dialog from '$lib/components/Dialog.svelte';
+  import ErrorMessage from '$lib/components/ErrorMessage.svelte';
   import Spinner from '$lib/components/Icons/Spinner.svelte';
-  import CallInfoHeader from './CallInfoHeader.svelte';
+  import Tabs from '$lib/components/Tabs.svelte';
+  import { formatDateTime, formatDuration } from '$lib/format';
+  import { partyName } from '$lib/party';
   import CallPromises from './CallPromises.svelte';
   import CallRecordings from './CallRecordings.svelte';
   import CallTranscript from './CallTranscript.svelte';
@@ -104,52 +107,56 @@
   // Load the call's details when the modal opens or shows another call.
   $effect(() => {
     if (showModal && callStoryId) {
-      untrack(() => loadCallDetails());
+      untrack(() => {
+        current = 'promises';
+        loadCallDetails();
+      });
     }
   });
+
+  // The same header as a call opened from Call Story: who called whom, then
+  // when, which way and how long.
+  let title = $derived(
+    callStory ? `${partyName(callStory.caller)} → ${partyName(callStory.callee)}` : 'Call details',
+  );
+  let description = $derived(
+    callStory
+      ? [
+          formatDateTime(callStory.startAt),
+          callStory.direction === 'inbound' ? 'Inbound' : 'Outbound',
+          formatDuration(callStory.startAt, callStory.endAt),
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : '',
+  );
+
+  const tabs = [
+    { id: 'promises', label: 'Promises' },
+    { id: 'recording', label: 'Recording' },
+    { id: 'transcript', label: 'Transcript' },
+  ];
+  let current = $state('promises');
 </script>
 
 {#if showModal}
-  <Dialog title="Call Details" onClose={handleClose} showDialog={showModal} className="max-w-2xl">
+  <Dialog {title} {description} onClose={handleClose} showDialog={showModal} className="max-w-3xl">
     {#key callStoryId}
       {#if loading}
-        <div class="flex justify-center items-center h-64">
-          <Spinner />
-          <span class="ml-3 text-gray-600 dark:text-gray-400">Loading call details...</span>
-        </div>
+        <div class="flex justify-center py-10"><Spinner /></div>
       {:else if error}
-        <div class="text-center py-12">
-          <svg
-            class="mx-auto h-12 w-12 text-red-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            ></path>
-          </svg>
-          <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Error</h3>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{error}</p>
-        </div>
+        <ErrorMessage error={{ message: error, formErrors: [] }} />
       {:else if callStory}
-        <!-- Unified Professional Call Details Container -->
-        <div class="bg-slate-800 dark:bg-gray-850 rounded-xl p-6 -mx-4 -mt-4">
-          <CallInfoHeader
-            caller={callStory.caller}
-            callee={callStory.callee}
-            direction={callStory.direction}
-            startAt={callStory.startAt}
-          />
+        <Tabs {tabs} {current} onSelect={(id) => (current = id)} />
 
-          <CallPromises {promises} />
-
-          <CallRecordings recordings={audioRecordings} />
-
-          <CallTranscript {transcriptData} />
+        <div class="min-h-48">
+          {#if current === 'promises'}
+            <CallPromises {promises} />
+          {:else if current === 'recording'}
+            <CallRecordings recordings={audioRecordings} />
+          {:else if current === 'transcript'}
+            <CallTranscript {transcriptData} />
+          {/if}
         </div>
       {/if}
     {/key}

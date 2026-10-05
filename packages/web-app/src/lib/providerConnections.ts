@@ -1,4 +1,5 @@
 import { deleteJson, getJson, postJson, putJson } from '$lib/http';
+import type { PillTone } from '$lib/components/Pill.svelte';
 
 /**
  * Client for the provider-connections API.
@@ -209,17 +210,18 @@ export function statusLabel(status: ProviderConnection['status']): string {
   }
 }
 
-export function statusClass(status: ProviderConnection['status']): string {
+/** The status badge's colour (a Pill tone). */
+export function statusTone(status: ProviderConnection['status']): PillTone {
   switch (status) {
     case 'active':
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      return 'green';
     case 'invalid_credentials':
     case 'revoked':
-      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      return 'red';
     case 'unmanaged':
       // Amber, not red: nothing is broken, but we cannot act on it.
-      return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
+      return 'amber';
     default:
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      return 'gray';
   }
 }

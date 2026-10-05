@@ -1,11 +1,23 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ensureMemberInOrg, ensureUserAcceptedTerms, ensureUserEmailVerified } from '../utils/telephonyDb';
-import { ensureRegisteredUser, loginAsMember, setDialerPresenceStatus } from '../utils/webDialer';
+import {
+  ensureMemberInOrg,
+  ensureUserAcceptedTerms,
+  ensureUserEmailVerified,
+} from '../utils/telephonyDb';
+import {
+  ensureRegisteredUser,
+  loginAsMember,
+  setDialerPresenceStatus,
+} from '../utils/webDialer';
 
 test.describe.configure({ mode: 'serial' });
 
 function memberPresenceCard(page: Page, username: string) {
-  return page.locator('div').filter({ hasText: `${username}@acme.comcent.io` }).first();
+  // The member's own row: a looser "first div with the address" now matches
+  // the page wrapper, where another member's status would satisfy the check.
+  return page
+    .getByRole('row')
+    .filter({ hasText: `${username}@acme.comcent.io` });
 }
 
 test('Presence dashboard updates in realtime when another web dialer user changes status', async ({

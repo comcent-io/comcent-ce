@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { getJson } from '$lib/http';
   import ErrorMessage from '$lib/components/ErrorMessage.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
   import NumberForm from '../NumberForm.svelte';
 
   type PageError = { message: string; formErrors: { message: string; path: string[] }[] };
@@ -35,9 +36,14 @@
   });
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Create Number</h3>
+<PageHeader
+  title="Create number"
+  description="Add a phone number from one of your SIP trunks, and choose where its incoming calls go."
+  backHref={`/app/${page.params.subdomain}/numbers`}
+  backLabel="Numbers"
+/>
 
-<div class="mt-6 max-w-6xl">
+<div class="max-w-6xl space-y-6">
   {#if error}
     <ErrorMessage {error} />
   {/if}

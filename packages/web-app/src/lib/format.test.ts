@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatDateTime, formatTableDate, formatTableDateTime, toDate } from './format';
+import {
+  formatDate,
+  formatDateTime,
+  formatDuration,
+  formatEnum,
+  formatTableDate,
+  formatTableDateTime,
+  formatTime,
+  toDate,
+} from './format';
 
 describe('toDate', () => {
   it('reads a timestamp without a zone as UTC', () => {
@@ -37,5 +46,24 @@ describe('dates for display', () => {
     const local = new Date(2026, 8, 29, 9, 51);
     expect(formatTableDateTime(local)).toBe('2026/09/29 09:51 am');
     expect(formatTableDate(local)).toBe('2026/09/29');
+  });
+
+  it('writes the time of day', () => {
+    expect(formatTime(new Date(2026, 8, 29, 9, 51))).toBe('9:51 am');
+    expect(formatTime(new Date(2026, 8, 29, 21, 5))).toBe('9:05 pm');
+    expect(formatTime(null, '-')).toBe('-');
+  });
+
+  it('writes a stored enum value as a label', () => {
+    expect(formatEnum('ADMIN')).toBe('Admin');
+    expect(formatEnum('IN_PROGRESS')).toBe('In progress');
+    expect(formatEnum(null)).toBe('');
+  });
+
+  it('writes how long something lasted', () => {
+    expect(formatDuration('2026-10-05T09:52:19Z', '2026-10-05T09:53:15Z')).toBe('0:56');
+    expect(formatDuration('2026-10-05T09:00:00Z', '2026-10-05T09:12:05Z')).toBe('12:05');
+    expect(formatDuration('2026-10-05T09:00:00Z', '2026-10-05T10:02:09Z')).toBe('1:02:09');
+    expect(formatDuration('2026-10-05T09:00:00Z', null, '-')).toBe('-');
   });
 });

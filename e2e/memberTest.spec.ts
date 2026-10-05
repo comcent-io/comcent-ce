@@ -214,7 +214,7 @@ async function sendInvite(
 }
 
 async function openPendingInvitesTab(page: Page) {
-  await page.getByRole('button', { name: /Pending Invites \(/ }).click();
+  await page.getByRole('tab', { name: /Pending Invites \(/ }).click();
 }
 
 async function expectInviteRow(page: Page, email: string) {
@@ -250,9 +250,13 @@ test('Member list page, send invitation successfully and show it in pending invi
 
   await openPendingInvitesTab(page);
   await expectInviteRow(page, inviteEmail);
-  await expect(page.getByRole('cell', { name: 'MEMBER' })).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'PENDING' })).toBeVisible();
   const row = page.locator('tbody tr').filter({ hasText: inviteEmail }).first();
+  await expect(
+    row.getByRole('cell', { name: 'Member', exact: true }),
+  ).toBeVisible();
+  await expect(
+    row.getByRole('cell', { name: 'Pending', exact: true }),
+  ).toBeVisible();
   await expect(row.getByRole('cell', { name: '0', exact: true })).toBeVisible();
 });
 
@@ -293,7 +297,8 @@ test('Member list page, edit role successfully', async ({ page }, testInfo) => {
   await page.locator('#role').selectOption('ADMIN');
   await page.getByRole('button', { name: 'Update' }).click();
 
-  await expect(page.locator('h5')).toContainText(`${email} (ADMIN)`);
+  await expect(page.getByRole('heading', { name: email })).toBeVisible();
+  await expect(page.getByTestId('member-role')).toHaveText('Admin');
 });
 
 test('Member list page, regenerate password successfully', async ({
