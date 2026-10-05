@@ -141,7 +141,7 @@
         class="w-full p-2.5 text-sm rounded-lg border border-gray-300 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
       />
       <span class="text-xs text-gray-500 dark:text-gray-400">
-        Stored encrypted. It is never shown again after saving.
+        It is never shown again after saving.
       </span>
     </label>
 

@@ -122,7 +122,7 @@ services:
       - comcent-network
 
   web-app:
-    image: node:20.11.1
+    image: node:24.21.0
     env_file:
       - .env
     # Domain config is derived from PUBLIC_BASE_URL in .env (http://localhost:6173).
