@@ -1,5 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import { getJson } from '$lib/http';
+import { setLastOrg } from '$lib/lastOrg';
 import type { LayoutLoad } from './$types';
 
 // Sections only admins can open. The API rejects a member's requests to these
@@ -34,6 +35,9 @@ export const load: LayoutLoad = async ({ url, params, fetch, parent }) => {
   }
 
   const { numbers, memberProfile: member, organizations } = result.data;
+
+  // A member of it: this is now the org signing in reopens.
+  setLastOrg(params.subdomain);
 
   if (!member) {
     throw Error('Member not found');

@@ -2,6 +2,8 @@
   import { untrack } from 'svelte';
   import { page } from '$app/state';
   import { getJson } from '$lib/http';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
+  import SkeletonLoadingList from '$lib/components/SkeletonLoadingList.svelte';
   import VoiceBotForm from '../../VoiceBotForm.svelte';
   import type { voiceBotData } from '../../schema';
 
@@ -42,10 +44,17 @@
   });
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Voice Bots Edit</h3>
+<PageHeader
+  title="Edit voice bot"
+  description="Changes apply to the next call the bot answers."
+  backHref={`/app/${page.params.subdomain}/voice-bots`}
+  backLabel="Voice bots"
+/>
 
-<div class="max-w-sm">
-  {#if !isLoading}
+<div class="max-w-3xl">
+  {#if isLoading}
+    <SkeletonLoadingList />
+  {:else}
     <VoiceBotForm {formData} isUpdate={true} />
   {/if}
 </div>

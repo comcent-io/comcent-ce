@@ -20,7 +20,7 @@ export const load: PageLoad = async ({ fetch }) => {
 
   // Nothing to accept: no terms on this deployment, or already accepted.
   const terms = termsToAccept(session.data.terms);
-  if (!terms) redirect(303, '/org');
+  if (!terms) redirect(303, '/app');
 
   return { terms };
 };

@@ -75,7 +75,6 @@
   function handleSelectChange() {
     showSwitchOrgMenu = false;
     goto(`/app/${selectedOrganization}`, { invalidateAll: true });
-    localStorage.setItem('selectedSubdomain', selectedOrganization);
   }
 
   let origin: string | null = $state(null);

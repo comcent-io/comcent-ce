@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SentimentCounts } from './types';
-  import { formatDate } from './utils';
+  import { formatDate } from '$lib/format';
   import ExecutiveSummaryCard from './ExecutiveSummaryCard.svelte';
   import PromisesCard from './PromisesCard.svelte';
   import SentimentCard from './SentimentCard.svelte';

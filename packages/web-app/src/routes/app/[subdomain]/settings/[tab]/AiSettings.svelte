@@ -5,7 +5,15 @@
   import toast from '$lib/toast';
   import { onMount } from 'svelte';
   import SkeletonLoadingList from '$lib/components/SkeletonLoadingList.svelte';
-  import H3 from '$lib/components/html/H3.svelte';
+  import Card from '$lib/components/Card.svelte';
+  import Field from '$lib/components/form/Field.svelte';
+  import FormActions from '$lib/components/form/FormActions.svelte';
+  import FormSection from '$lib/components/form/FormSection.svelte';
+  import Toggle from '$lib/components/form/Toggle.svelte';
+  import Hint from '$lib/components/form/Hint.svelte';
+  import Input from '$lib/components/form/Input.svelte';
+  import RemoveButton from '$lib/components/form/RemoveButton.svelte';
+  import Select from '$lib/components/form/Select.svelte';
   import moment from 'moment-timezone';
 
   let aiSettings = $state({
@@ -48,7 +56,6 @@
       nextLabelId = labels.length + 1;
     }
 
-    console.log('response', data);
     loaded = true;
     loading = false;
   });
@@ -110,234 +117,169 @@
   }
 </script>
 
+{#snippet needsTranscription()}
+  {#if !aiSettings.enableTranscription}
+    <Hint>Needs transcription: turn it on above first.</Hint>
+  {/if}
+{/snippet}
+
 {#if loading}
   <SkeletonLoadingList className="my-4" />
 {:else if !loaded}
-  <H3 className="mt-4">Some thing went wrong</H3>
+  <Card className="mt-4">
+    <p class="text-sm text-gray-700 dark:text-gray-300">
+      The AI settings couldn't be loaded. Refresh the page to try again.
+    </p>
+  </Card>
 {:else}
-  <div class="my-4">
-    <ul
-      class="block p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
+  <form
+    class="mt-4 max-w-4xl space-y-4"
+    onsubmit={(event) => {
+      event.preventDefault();
+      onSave();
+    }}
+  >
+    <FormSection
+      title="Transcription and search"
+      description="Each call is transcribed, and calls can be searched by what was said. Turn it off and calls are kept as recordings only."
     >
-      <li>
-        <label class="inline-flex items-center mb-5 cursor-pointer">
-          <input
-            type="checkbox"
-            class="sr-only peer"
-            bind:checked={aiSettings.enableTranscription}
-            onchange={onEnableTranscriptChanged}
-          />
+      {#snippet aside()}
+        <Toggle
+          id="enableTranscription"
+          label="Enable Transcription & Search"
+          bind:checked={aiSettings.enableTranscription}
+          onchange={onEnableTranscriptChanged}
+        />
+      {/snippet}
+    </FormSection>
+
+    <FormSection
+      title="Sentiment analysis"
+      description="Says how each side of a call felt, from the transcript."
+    >
+      {#snippet aside()}
+        <Toggle
+          id="enableSentimentAnalysis"
+          label="Enable Sentiment Analysis"
+          bind:checked={aiSettings.enableSentimentAnalysis}
+          disabled={!aiSettings.enableTranscription}
+        />
+      {/snippet}
+      {@render needsTranscription()}
+    </FormSection>
+
+    <FormSection title="Summary" description="A short AI summary of each call.">
+      {#snippet aside()}
+        <Toggle
+          id="enableSummary"
+          label="Enable Summary"
+          bind:checked={aiSettings.enableSummary}
+          disabled={!aiSettings.enableTranscription}
+        />
+      {/snippet}
+      {@render needsTranscription()}
+    </FormSection>
+
+    <FormSection
+      title="Daily summary"
+      description="Once a day, an AI summary of the previous 24 hours of calls, shown on the Daily Summary page."
+    >
+      {#snippet aside()}
+        <Toggle
+          id="enableDailySummary"
+          label="Enable Daily Summary"
+          bind:checked={aiSettings.enableDailySummary}
+          disabled={!aiSettings.enableTranscription}
+        />
+      {/snippet}
+
+      {#if aiSettings.enableDailySummary}
+        <div class="grid gap-4 md:grid-cols-2">
+          <Field for="timezone-select" label="Timezone">
+            <Select id="timezone-select" bind:value={aiSettings.dailySummaryTimeZone}>
+              {#each timezones as timezone (timezone)}
+                <option value={timezone}>{timezone}</option>
+              {/each}
+            </Select>
+          </Field>
+          <Field
+            for="time-input"
+            label="Time"
+            hint="The summary is made at this time each day, in the timezone on the left."
+          >
+            <Input id="time-input" type="time" bind:value={aiSettings.dailySummaryTime} />
+          </Field>
+        </div>
+      {/if}
+      {@render needsTranscription()}
+    </FormSection>
+
+    <FormSection
+      title="Call labels"
+      description="Each call is tagged with the labels below that fit it."
+    >
+      {#snippet aside()}
+        <Toggle
+          id="enableLabels"
+          label="Enable Labels"
+          bind:checked={aiSettings.enableLabels}
+          onchange={onEnableLabelsChanged}
+          disabled={!aiSettings.enableTranscription}
+        />
+      {/snippet}
+
+      {#if aiSettings.enableLabels}
+        <div class="space-y-3">
           <div
-            class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:w-5 after:h-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
-          ></div>
-          <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">
-            Enable Transcription & Search
-          </span>
-        </label>
-      </li>
-      <li>
-        <ul
-          class="block p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
+            class="hidden grid-cols-[12rem_minmax(0,1fr)_2.5rem] gap-3 text-xs font-medium text-gray-500 sm:grid dark:text-gray-400"
+          >
+            <span>Name</span>
+            <span>What it means</span>
+          </div>
+          {#each labels as label, index (label.id)}
+            <div class="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)_2.5rem] sm:gap-3">
+              <Input
+                id="label-name-{label.id}"
+                type="text"
+                aria-label="Label {index + 1} name"
+                bind:value={label.name}
+                placeholder="Label Name"
+              />
+              <Input
+                id="label-desc-{label.id}"
+                type="text"
+                aria-label="Label {index + 1} description"
+                bind:value={label.description}
+                placeholder="Brief description"
+              />
+              {#if labels.length > 1}
+                <RemoveButton
+                  label="Remove label {index + 1}"
+                  onclick={() => removeLabel(label.id)}
+                />
+              {/if}
+            </div>
+          {/each}
+        </div>
+        <button
+          type="button"
+          onclick={addLabel}
+          class="text-sm font-medium text-blue-600 hover:underline dark:text-blue-500"
+          title="Add new label"
         >
-          <li>
-            <label class="inline-flex items-center mb-5 cursor-pointer">
-              <input
-                name="enableSentimentAnalysis"
-                type="checkbox"
-                bind:checked={aiSettings.enableSentimentAnalysis}
-                class="sr-only peer"
-                disabled={!aiSettings.enableTranscription}
-              />
-              <div
-                class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:w-5 after:h-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
-              ></div>
-              <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">
-                Enable Sentiment Analysis
-              </span>
-            </label>
-          </li>
+          + Add label
+        </button>
+        <!-- Unformatted: wrapping puts a space before the colon. -->
+        <!-- prettier-ignore -->
+        <Hint>
+          For example: <span class="font-medium">billing</span>, meaning questions about invoices or payments.
+        </Hint>
+      {/if}
+      {@render needsTranscription()}
+    </FormSection>
 
-          <li>
-            <label class="inline-flex items-center mb-5 cursor-pointer">
-              <input
-                name="enableSummary"
-                type="checkbox"
-                bind:checked={aiSettings.enableSummary}
-                class="sr-only peer"
-                disabled={!aiSettings.enableTranscription}
-              />
-              <div
-                class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:w-5 after:h-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
-              ></div>
-              <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">
-                Enable Summary
-              </span>
-            </label>
-          </li>
-
-          <li class="mt-2">
-            <label class="inline-flex items-center mb-5 cursor-pointer">
-              <input
-                name="enableDailySummary"
-                type="checkbox"
-                bind:checked={aiSettings.enableDailySummary}
-                class="sr-only peer"
-                disabled={!aiSettings.enableTranscription}
-              />
-              <div
-                class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:w-5 after:h-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
-              ></div>
-              <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">
-                Enable Daily Summary
-              </span>
-            </label>
-          </li>
-
-          {#if aiSettings.enableDailySummary}
-            <li class="ml-6 mt-4">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    for="timezone-select"
-                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                  >
-                    Timezone
-                  </label>
-                  <select
-                    id="timezone-select"
-                    bind:value={aiSettings.dailySummaryTimeZone}
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  >
-                    {#each timezones as timezone}
-                      <option value={timezone}>{timezone}</option>
-                    {/each}
-                  </select>
-                </div>
-                <div>
-                  <label
-                    for="time-input"
-                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                  >
-                    Time
-                  </label>
-                  <input
-                    id="time-input"
-                    type="time"
-                    bind:value={aiSettings.dailySummaryTime}
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  />
-                </div>
-              </div>
-            </li>
-          {/if}
-
-          <li class="mt-4">
-            <label class="inline-flex items-center mb-5 cursor-pointer">
-              <input
-                name="enableLabels"
-                type="checkbox"
-                bind:checked={aiSettings.enableLabels}
-                onchange={onEnableLabelsChanged}
-                class="sr-only peer"
-                disabled={!aiSettings.enableTranscription}
-              />
-              <div
-                class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:w-5 after:h-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
-              ></div>
-              <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300">
-                Enable Labels
-              </span>
-            </label>
-
-            {#if aiSettings.enableLabels}
-              <div class="mt-4 ml-6 space-y-3 transition-all duration-300">
-                <div class="mb-3">
-                  <p class="text-sm text-gray-600 dark:text-gray-400">
-                    Define custom labels to categorize and organize your data
-                  </p>
-                </div>
-
-                {#each labels as label, index (label.id)}
-                  <div
-                    class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 transition-all duration-200"
-                  >
-                    <div class="w-48">
-                      <input
-                        id="label-name-{label.id}"
-                        type="text"
-                        bind:value={label.name}
-                        placeholder="Label Name"
-                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-600 dark:border-gray-500 dark:text-white dark:placeholder-gray-400"
-                      />
-                    </div>
-
-                    <div class="flex-1">
-                      <input
-                        id="label-desc-{label.id}"
-                        type="text"
-                        bind:value={label.description}
-                        placeholder="Brief description"
-                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-600 dark:border-gray-500 dark:text-white dark:placeholder-gray-400"
-                      />
-                    </div>
-
-                    <div class="flex gap-2">
-                      {#if index === labels.length - 1}
-                        <button
-                          type="button"
-                          onclick={addLabel}
-                          class="flex items-center justify-center w-10 h-10 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                          title="Add new label"
-                        >
-                          <svg
-                            class="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M12 4v16m8-8H4"
-                            />
-                          </svg>
-                        </button>
-                      {/if}
-
-                      {#if labels.length > 1}
-                        <button
-                          type="button"
-                          onclick={() => removeLabel(label.id)}
-                          class="flex items-center justify-center w-10 h-10 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                          title="Remove this label"
-                        >
-                          <svg
-                            class="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      {/if}
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </li>
-        </ul>
-      </li>
-      <li>
-        <Button onclick={onSave} progress={saveProgress} className="mt-4">Save</Button>
-      </li>
-    </ul>
-  </div>
+    <FormActions>
+      <Button type="submit" progress={saveProgress}>Save</Button>
+    </FormActions>
+  </form>
 {/if}

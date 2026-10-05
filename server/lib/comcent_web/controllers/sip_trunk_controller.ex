@@ -13,12 +13,15 @@ defmodule ComcentWeb.SipTrunkController do
     json(conn, %{sip_trunks: sip_trunks})
   end
 
-  # The address a customer configures on their carrier's side of a trunk. It
-  # comes from this deployment's configuration because it differs per install;
-  # when it isn't configured it comes back as nil so the page can leave it out
-  # instead of showing an address that would get calls rejected.
+  # The addresses a customer configures on their carrier's side of a trunk.
+  # They come from this deployment's configuration because they differ per
+  # install; a value that isn't configured comes back as nil so the page can
+  # leave it out instead of showing an address that would get calls rejected.
   def get_settings(conn, _params) do
-    json(conn, %{public_ip: present(Application.get_env(:comcent, :sbc)[:public_ip])})
+    json(conn, %{
+      public_ip: present(Application.get_env(:comcent, :sbc)[:public_ip]),
+      sip_host: present(Application.get_env(:comcent, :provisioning)[:sbc_sip_fqdn])
+    })
   end
 
   def create(conn, params) do

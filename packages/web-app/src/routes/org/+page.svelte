@@ -2,7 +2,9 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { getJson } from '$lib/http';
-  import { logout } from '$lib/session';
+  import { getLastOrg } from '$lib/lastOrg';
+  import { publicSipUserRootDomain } from '$lib/publicConfig';
+  import AccountPage from '$lib/components/account/AccountPage.svelte';
 
   type OrgSummary = {
     id: string;
@@ -16,21 +18,29 @@
     org: OrgSummary;
   };
 
+  let { data } = $props();
+
+  // How many orgs one person can create or join.
+  const MAX_ORGS = 10;
+
   let orgs: OrgSummary[] = $state([]);
   let invites: OrgInviteSummary[] = $state([]);
-  let loading = $state(false);
+  let loading = $state(true);
+  let failed = $state(false);
+  // This page only lists: reopening the last used org is the /app entry
+  // point's job, so the list can always be reached. It's marked here.
+  let lastOrg: string | null = $state(null);
+
+  let firstName = $derived((data.user?.name ?? '').trim().split(/\s+/)[0] ?? '');
 
   onMount(() => {
-    const storedSubdomain = localStorage.getItem('selectedSubdomain');
-    if (storedSubdomain) {
-      goto(`/app/${storedSubdomain}`, { invalidateAll: true });
-    }
-
+    lastOrg = getLastOrg();
     void loadOrgData();
   });
 
   async function loadOrgData() {
     loading = true;
+    failed = false;
     const result = await getJson<{ orgs: OrgSummary[]; invites: OrgInviteSummary[] }>(
       '/api/v2/user/orgs',
     );
@@ -39,89 +49,189 @@
         await goto('/login');
         return;
       }
+      failed = true;
       loading = false;
       return;
     }
 
-    orgs = result.data.orgs ?? [];
+    // The last used org first, the rest as the server sorts them (by name).
+    const all = result.data.orgs ?? [];
+    orgs = [
+      ...all.filter((org) => org.subdomain === lastOrg),
+      ...all.filter((org) => org.subdomain !== lastOrg),
+    ];
     invites = result.data.invites ?? [];
     loading = false;
   }
 
-  function handleOrgClick(subdomain: string) {
-    localStorage.setItem('selectedSubdomain', subdomain);
-  }
+  const cardClass =
+    'group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-cyan-500 hover:shadow-md dark:border-slate-700 dark:bg-slate-800';
+  const primaryButtonClass =
+    'inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400';
 </script>
 
-<div class="mx-auto max-w-4xl">
-  <h3 class="text-3xl font-bold dark:text-white mb-5">Organizations</h3>
+{#snippet inviteCard(invite: OrgInviteSummary)}
+  <a href={`/invitation/${invite.id}`} class={cardClass}>
+    <p class="text-lg font-semibold text-slate-900 dark:text-white">{invite.org.name}</p>
+    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Invitation for {invite.email}</p>
+    <p class="mt-4 text-sm font-medium text-cyan-700 group-hover:underline dark:text-cyan-300">
+      View invitation →
+    </p>
+  </a>
+{/snippet}
 
+<AccountPage email={data.user?.email}>
   {#if loading}
-    <div
-      class="p-4 mb-4 text-sm text-gray-800 rounded-lg bg-gray-50 dark:bg-gray-800 dark:text-gray-300"
-    >
-      Loading organizations...
+    <div class="mt-10 space-y-4" aria-busy="true">
+      <div class="h-8 w-64 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700"></div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="h-32 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700"></div>
+        <div class="h-32 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700"></div>
+      </div>
     </div>
-  {:else if !orgs.length}
+  {:else if failed}
     <div
-      class="p-4 mb-4 text-sm text-yellow-800 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300"
+      class="mt-10 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
       role="alert"
     >
-      No organization found. Please create one.
+      Your organizations couldn't be loaded.
+      <button type="button" class="ml-1 font-semibold underline" onclick={loadOrgData}>
+        Try again
+      </button>
     </div>
-  {/if}
-
-  {#each orgs as org}
-    <a
-      href={`/app/${org.subdomain}`}
-      onclick={() => handleOrgClick(org.subdomain)}
-      class="mb-5 block max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700"
-    >
-      <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-        {org.name}
-      </h5>
-      <p class="font-normal text-gray-700 dark:text-gray-400">
-        {org.subdomain}
+  {:else if orgs.length === 0}
+    <!-- Just signed up, or not in any org yet: say what this page is. -->
+    <h1 class="mt-10 text-3xl font-semibold text-slate-900 dark:text-white">
+      {#if invites.length}
+        You've been invited to Comcent
+      {:else}
+        Welcome to Comcent{firstName ? `, ${firstName}` : ''}
+      {/if}
+    </h1>
+    <!-- These three sentences are left unformatted: wrapping them puts a space
+           between a highlighted word and the punctuation after it. -->
+    <!-- prettier-ignore -->
+    <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+        Everything in Comcent belongs to an <strong>organization</strong>: your company's workspace.
+        Its phone numbers, team members, call recordings and voice bots live there,
+        shared by everyone in it. To start, create one for your company or join your team's.
       </p>
-    </a>
-  {/each}
 
-  {#if orgs.length < 10}
-    <a
-      href="/org/create"
-      class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-    >
-      Create Organization
-    </a>
-  {/if}
+    {#if invites.length}
+      <h2 class="mt-8 text-sm font-semibold uppercase tracking-wider text-slate-400">
+        Waiting for you
+      </h2>
+      <div class="mt-3 grid gap-4 sm:grid-cols-2">
+        {#each invites as invite (invite.id)}
+          {@render inviteCard(invite)}
+        {/each}
+      </div>
+    {/if}
 
-  {#if invites.length}
-    <div class="mx-auto mt-8 max-w-4xl">
-      <h3 class="text-3xl font-bold dark:text-white mb-5">Pending Invitations</h3>
+    <div class="mt-8 grid gap-4 sm:grid-cols-2">
+      <div
+        class="flex flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+      >
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">
+          {invites.length ? 'Or set up your own company' : 'Set up your company'}
+        </h2>
+        <!-- prettier-ignore -->
+        <p class="mt-2 flex-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            Create an organization and you're its admin. It gets its own address, like
+            <span class="font-medium text-slate-900 dark:text-white">acme.{publicSipUserRootDomain}</span>,
+            and you can invite your team to it.
+          </p>
+        <a href="/org/create" class="{primaryButtonClass} mt-5">Create Organization</a>
+      </div>
 
-      {#each invites as invite}
-        <a
-          href={`/invitation/${invite.id}`}
-          class="mb-5 block max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700"
+      <!-- With an invitation above, joining is already on the page. -->
+      {#if !invites.length}
+        <div
+          class="flex flex-col rounded-3xl border border-dashed border-slate-300 p-6 dark:border-slate-600"
         >
-          <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-            {invite.org.name}
-          </h5>
-          <p class="font-normal text-gray-700 dark:text-gray-400">
-            {invite.email}
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-white">Joining your team?</h2>
+          <!-- prettier-ignore -->
+          <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              If your company already uses Comcent, don't create another organization. Ask one of its
+              admins to invite
+              <span class="font-medium text-slate-900 dark:text-white">{data.user?.email ?? 'your email'}</span>.
+              The invitation shows up on this page.
+            </p>
+        </div>
+      {/if}
+    </div>
+
+    <div class="mt-10">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">
+        After you create one
+      </h2>
+      <ol class="mt-4 grid gap-3 sm:grid-cols-2">
+        {#each ['Create your organization', 'Connect your own carrier and add a phone number', 'Invite your team and start taking calls'] as step, index (step)}
+          <li class="flex items-start gap-3 text-sm text-slate-600 dark:text-slate-300">
+            <span
+              class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-100 text-xs font-semibold text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200"
+            >
+              {index + 1}
+            </span>
+            <span class="pt-0.5">{step}</span>
+          </li>
+        {/each}
+      </ol>
+    </div>
+  {:else}
+    <h1 class="mt-10 text-3xl font-semibold text-slate-900 dark:text-white">Your organizations</h1>
+    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+      Each organization is a separate workspace with its own numbers and team. Pick the one to work
+      in.
+    </p>
+
+    <div class="mt-8 grid gap-4 sm:grid-cols-2">
+      {#each orgs as org (org.id)}
+        <a href={`/app/${org.subdomain}`} class={cardClass}>
+          <div class="flex items-start justify-between gap-3">
+            <p class="text-lg font-semibold text-slate-900 dark:text-white">{org.name}</p>
+            {#if org.subdomain === lastOrg}
+              <span
+                class="shrink-0 rounded-full bg-cyan-50 px-2.5 py-0.5 text-xs font-medium text-cyan-800 dark:bg-cyan-950 dark:text-cyan-200"
+              >
+                Last used
+              </span>
+            {/if}
+          </div>
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {org.subdomain}.{publicSipUserRootDomain}
+          </p>
+          <p
+            class="mt-4 text-sm font-medium text-cyan-700 group-hover:underline dark:text-cyan-300"
+          >
+            Open →
           </p>
         </a>
       {/each}
-    </div>
-  {/if}
 
-  <div class="mt-5">
-    <button
-      type="button"
-      onclick={logout}
-      class="text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 focus:outline-none dark:focus:ring-red-800"
-    >
-      Logout
-    </button>
-  </div>
-</div>
+      {#if orgs.length < MAX_ORGS}
+        <a
+          href="/org/create"
+          class="flex min-h-32 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 p-5 text-center text-slate-600 transition hover:border-cyan-500 hover:text-slate-900 dark:border-slate-600 dark:text-slate-300 dark:hover:text-white"
+        >
+          <span class="text-2xl leading-none">+</span>
+          <span class="mt-2 text-sm font-semibold">Create Organization</span>
+          <span class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            For another company or team
+          </span>
+        </a>
+      {/if}
+    </div>
+
+    {#if invites.length}
+      <h2 class="mt-12 text-lg font-semibold text-slate-900 dark:text-white">
+        Pending invitations
+      </h2>
+      <div class="mt-4 grid gap-4 sm:grid-cols-2">
+        {#each invites as invite (invite.id)}
+          {@render inviteCard(invite)}
+        {/each}
+      </div>
+    {/if}
+  {/if}
+</AccountPage>

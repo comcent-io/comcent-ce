@@ -1,5 +1,5 @@
 <script lang="ts">
-  import moment from 'moment-timezone';
+  import { formatTableDateTime } from '$lib/format';
   import CallStory from '$lib/components/CallStory.svelte';
   import Transcript from './Transcript.svelte';
   import Summary from './Summary.svelte';
@@ -28,7 +28,7 @@
 <tr
   class="odd:bg-white odd:dark:bg-gray-900 even:bg-gray-50 even:dark:bg-gray-800 border-b dark:border-gray-700"
 >
-  <td class="px-6 py-4">{moment(callStory.startAt).format('YYYY/MM/DD hh:mm a')}</td>
+  <td class="px-6 py-4">{formatTableDateTime(callStory.startAt)}</td>
   <td class="px-6 py-4">{callStory.direction}</td>
   <td class="px-6 py-4">{callStory.caller}</td>
   <td class="px-6 py-4">{callStory.callee}</td>

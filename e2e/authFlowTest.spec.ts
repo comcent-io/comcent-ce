@@ -38,6 +38,20 @@ test('Password signup, email verification, and login flow works', async ({
   // unset, so email verification lands straight on the org picker.
   await page.waitForURL('/org');
 
+  // A new user is told what the page is, and both ways on.
+  await expect(
+    page.getByRole('heading', { name: 'Welcome to Comcent, Test' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Create Organization' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Joining your team?' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('p', { hasText: 'Ask one of its admins to invite' }),
+  ).toContainText(signupEmail);
+
   await clearSession(page);
 
   await login.gotoLoginPage();

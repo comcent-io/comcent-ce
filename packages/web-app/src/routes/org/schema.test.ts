@@ -10,14 +10,18 @@ describe('createOrgSchema', () => {
       subdomain: 'aiet',
       useCustomDomain: false,
       sipUsername: 'username',
-      country: 'US',
-      state: 'CA',
-      zip: '12345',
       userExt: '1342',
-      userName: 'abcdefg',
-      city: 'San Francisco',
       assignExtAutomatically: false,
     };
+  });
+
+  it('needs only a name, a subdomain and a SIP username', () => {
+    const parsedData = createOrgSchema.safeParse({
+      name: 'Northwind Traders',
+      subdomain: 'northwind',
+      sipUsername: 'founder',
+    });
+    expect(parsedData.success).toBe(true);
   });
   // test for name
   it('should have name property length between 3 and 60', () => {
@@ -42,9 +46,20 @@ describe('createOrgSchema', () => {
     parsedData = createOrgSchema.safeParse(formData);
     expect(parsedData.success).toBe(false);
 
-    formData.subdomain = 'LongStringExample';
+    formData.subdomain = 'longstringexample';
     parsedData = createOrgSchema.safeParse(formData);
     expect(parsedData.success).toBe(false);
+  });
+
+  it('should have a subdomain that can be a host name', () => {
+    for (const subdomain of ['acme', 'acme-2', 'n0rthwind']) {
+      formData.subdomain = subdomain;
+      expect(createOrgSchema.safeParse(formData).success).toBe(true);
+    }
+    for (const subdomain of ['Acme', 'acme corp', 'acme_corp', 'acme-', '1acme', 'acme.io']) {
+      formData.subdomain = subdomain;
+      expect(createOrgSchema.safeParse(formData).success).toBe(false);
+    }
   });
 
   // test for useCustomDomain

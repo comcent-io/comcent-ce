@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import moment from 'moment-timezone';
+  import { formatTableDate, formatTableDateTime } from '$lib/format';
 
   interface Promise {
     id: string;
@@ -47,14 +47,6 @@
     onViewDetails,
     emptyMessage,
   }: Props = $props();
-
-  function formatDate(dateString: string): string {
-    return moment(dateString).format('YYYY/MM/DD');
-  }
-
-  function formatDateWithTime(dateString: string): string {
-    return moment(dateString).format('YYYY/MM/DD hh:mm A');
-  }
 
   let openPromises = $derived(promises.filter((p) => p.status === 'OPEN'));
   let allOpenSelected = $derived(
@@ -104,7 +96,7 @@
                 />
               </td>
               <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                {formatDate(promise.createdAt)}
+                {formatTableDate(promise.createdAt)}
               </td>
               <td class="px-6 py-4">
                 <div class="font-medium text-gray-900 dark:text-white">
@@ -129,7 +121,7 @@
                 </select>
               </td>
               <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                {promise.dueDate ? formatDateWithTime(promise.dueDate) : ''}
+                {formatTableDateTime(promise.dueDate)}
               </td>
               <td class="px-6 py-4">
                 <span

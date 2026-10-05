@@ -1,5 +1,9 @@
 <script lang="ts">
   import Button from '$lib/components/Button.svelte';
+  import CheckboxRow from '$lib/components/form/CheckboxRow.svelte';
+  import Field from '$lib/components/form/Field.svelte';
+  import Input from '$lib/components/form/Input.svelte';
+  import Label from '$lib/components/form/Label.svelte';
 
   type WebhookFormData = {
     name: string;
@@ -27,77 +31,57 @@
 </script>
 
 <form
-  class="space-y-6"
+  class="space-y-5"
   onsubmit={(e) => {
     e.preventDefault();
     onSubmit?.(formData);
   }}
 >
-  <div>
-    <label for="name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-      Name
-    </label>
-    <input
+  <Field for="webhookName" label="Name" hint="For you to tell your webhooks apart.">
+    <Input
       type="text"
+      id="webhookName"
       name="name"
-      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
       placeholder="Friendly name"
       required
       bind:value={formData.name}
     />
-  </div>
-  <div>
-    <label for="webhookUrl" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-      URL
-    </label>
-    <input
+  </Field>
+
+  <Field
+    for="webhookUrl"
+    label="URL"
+    hint="Where we POST the events, e.g. https://example.com/comcent/webhook. Use https so the token travels encrypted."
+  >
+    <Input
       type="text"
+      id="webhookUrl"
       name="webhookUrl"
-      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+      inputmode="url"
+      autocomplete="off"
       placeholder="Webhook URL"
       required
       bind:value={formData.webhookUrl}
     />
-  </div>
-  <div
-    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-  >
-    <div>
-      <p class="text-white font-semibold pb-3">Choose events</p>
-    </div>
-    <div class="flex items-center mb-2">
-      <label for="callUpdate" class="block text-sm font-medium text-gray-900 dark:text-white mr-2">
-        Call Update Event
-        <span class="font-normal text-gray-500 dark:text-gray-300">
-          (sends NEW_CALL_STORY when a call ends)
-        </span>
-      </label>
-      <input
-        type="checkbox"
+  </Field>
+
+  <fieldset>
+    <Label tag="legend">Events</Label>
+    <div class="space-y-2">
+      <CheckboxRow
         id="callUpdate"
-        name="callUpdate"
-        class="w-4 h-4 text-blue-600 bg-green-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-blue-300 focus:ring-2 dark:bg-blue-300 dark:border-blue-300"
+        label="Call update event"
+        description="Sent when a call ends and its call story is ready: type NEW_CALL_STORY, with the call's details as data."
         bind:checked={formData.callUpdate}
       />
-    </div>
-    <div class="flex items-center">
-      <label
-        for="presenceUpdate"
-        class="block text-sm font-medium text-gray-900 dark:text-white mr-2"
-      >
-        Presence Update Event
-        <span class="font-normal text-gray-500 dark:text-gray-300">
-          (sends PRESENCE_UPDATE when a member's presence changes)
-        </span>
-      </label>
-      <input
-        type="checkbox"
+      <CheckboxRow
         id="presenceUpdate"
-        name="presenceUpdate"
-        class="w-4 h-4 text-blue-600 bg-green-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-blue-300 focus:ring-2 dark:bg-blue-300 dark:border-blue-300"
+        label="Presence update event"
+        description="Sent when a member's presence changes (e.g. Available to On Break): type PRESENCE_UPDATE, with the member and their previous and new presence as data."
         bind:checked={formData.presenceUpdate}
       />
     </div>
-  </div>
+  </fieldset>
+
   <Button type="submit" progress={isProgress}>{buttonText}</Button>
 </form>

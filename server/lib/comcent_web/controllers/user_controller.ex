@@ -7,6 +7,7 @@ defmodule ComcentWeb.UserController do
   alias Comcent.Schemas.{Country, Org, OrgBillingAddress, OrgInvite, OrgMember, State, User}
 
   @username_regex ~r/^[a-zA-Z][a-zA-Z0-9._+]*$/
+  @subdomain_regex ~r/^[a-z][a-z0-9-]{1,13}[a-z0-9]$/
   @trial_max_members 10
 
   def get_session(conn, _params) do
@@ -128,10 +129,9 @@ defmodule ComcentWeb.UserController do
             id: invitation.id,
             email: invitation.email,
             role: invitation.role,
-            org: %{
-              id: invitation.org.id,
-              name: invitation.org.name
-            }
+            # The subdomain shows the SIP address the username becomes, and
+            # is where accepting takes them.
+            org: invitation.org
           },
           suggested_username: suggested_username
         })
@@ -201,7 +201,13 @@ defmodule ComcentWeb.UserController do
         {:error, "#{field} is invalid"}
 
       nil ->
-        validate_username(String.trim(params["sip_username"] || ""))
+        # It becomes a host name: <subdomain>.<SIP domain>.
+        if String.match?(params["subdomain"] |> to_string() |> String.trim(), @subdomain_regex) do
+          validate_username(String.trim(params["sip_username"] || ""))
+        else
+          {:error,
+           "The subdomain can have lowercase letters, numbers and hyphens, starts with a letter and is at most 15 characters"}
+        end
     end
   end
 
@@ -305,7 +311,8 @@ defmodule ComcentWeb.UserController do
         role: i.role,
         org: %{
           id: o.id,
-          name: o.name
+          name: o.name,
+          subdomain: o.subdomain
         }
       }
     )
