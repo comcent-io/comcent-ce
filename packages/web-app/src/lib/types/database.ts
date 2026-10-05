@@ -1,5 +1,10 @@
 export type JsonValue =
-  string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: JsonValue }
+  | JsonValue[];
 
 export interface OrgWebhook {
   id: string;
@@ -38,9 +43,12 @@ export interface CallStory {
   orgId: string;
   customerNumber?: string | null;
   startAt?: string;
+  endAt?: string | null;
   caller?: string;
   callee?: string;
   direction?: string;
+  // The org's labels the AI gave this call, by name.
+  labels?: string[] | null;
   isTranscribed?: boolean;
   isSummarized?: boolean;
   isSentimentAnalyzed?: boolean;

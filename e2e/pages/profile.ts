@@ -8,7 +8,7 @@ export class Profile {
   constructor(page: Page) {
     this.page = page;
     this.outboundNumberSelect = page.getByLabel('Default Outbound Number');
-    this.updateBtn = page.getByRole('button', { name: 'Update' });
+    this.updateBtn = page.getByRole('button', { name: 'Save' });
   }
 
   async gotoMyProfile() {

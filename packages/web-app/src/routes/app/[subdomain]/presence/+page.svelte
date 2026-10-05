@@ -7,21 +7,22 @@
   import { Socket } from 'phoenix';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
   import { publicSipUserRootDomain } from '$lib/publicConfig';
+  import Pill from '$lib/components/Pill.svelte';
+  import PresenceDot from '$lib/components/PresenceDot.svelte';
+  import Table from '$lib/components/Table.svelte';
+  import UserAvatar from '$lib/components/UserAvatar.svelte';
+  import EmptyState from '$lib/components/form/EmptyState.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
 
   const sipDomain = publicSipUserRootDomain || 'example.com';
 
   let members: any[] = $state([]);
+  let loading = $state(true);
   let lastFetchKey = '';
-
-  const colors: Record<string, string> = {
-    Available: 'bg-green-600',
-    'Logged Out': 'bg-gray-400',
-    'On Call': 'bg-red-600',
-    'On Break': 'bg-yellow-600',
-  };
 
   async function fetchMembers() {
     const result = await getJson<{ members: any[] }>(`/api/v2/${page.params.subdomain}/members`);
+    loading = false;
     if (!result.ok) {
       members = [];
       return;
@@ -39,7 +40,6 @@
     fetchMembers();
 
     const idToken = getIdTokenFromCookie();
-    console.log('idToken', idToken);
 
     socket = new Socket(`/ws`, {
       params: {
@@ -101,31 +101,48 @@
   });
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white mb-5">Presence</h3>
+<PageHeader
+  title="Presence"
+  description="Who on your team is available, on a call, on a break or logged out right now, and for how long. It updates live."
+/>
 
-<div class="flex gap-4 flex-wrap -mx-2">
-  {#each members as member}
-    <div
-      class="p-4 w-full max-w-sm bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700"
-    >
-      <div class="flex gap-2 items-center">
-        <img
-          class="w-16 h-16 mb-3 rounded-full shadow-lg"
-          src={member.user.picture}
-          alt="Profile"
-        />
-        <div class="object-cover">
-          <h5 class="text-md font-medium text-gray-900 dark:text-white">{member.user.name}</h5>
-          <div class="text-sm text-gray-500 dark:text-gray-400">
-            {member.username}@{page.params.subdomain}.{sipDomain}
-          </div>
-          <div class="text-sm text-gray-500 dark:text-gray-400">
-            <div class="inline-block w-2 h-2 rounded-full {colors[member.presence]}"></div>
-            {member.presence}
-            <TimeSince startAt={member.presenceSpan?.[0]?.startAt} />
-          </div>
+<Table columns={['Member', 'SIP address', 'Status']} {loading} isEmpty={members.length === 0}>
+  {#snippet empty()}
+    <EmptyState
+      title="No members yet"
+      description="Invite your team from Members. Once they sign in, you can see here who is free to take a call."
+    />
+  {/snippet}
+  {#each members as member (member.user.id)}
+    <tr>
+      <td>
+        <div class="flex items-center gap-3">
+          <span class="relative shrink-0">
+            <UserAvatar
+              picture={member.user.picture}
+              name={member.user.name}
+              email={member.user.email}
+            />
+            <!-- The status dot on the avatar, ringed so it reads on any photo. -->
+            <span
+              class="absolute -bottom-0.5 -right-0.5 flex rounded-full ring-2 ring-white dark:ring-gray-800"
+            >
+              <PresenceDot presence={member.presence} size="md" />
+            </span>
+          </span>
+          <span class="font-medium text-gray-900 dark:text-white">{member.user.name}</span>
         </div>
-      </div>
-    </div>
+      </td>
+      <td class="whitespace-nowrap">{member.username}@{page.params.subdomain}.{sipDomain}</td>
+      <td>
+        <div class="flex flex-wrap items-center gap-2">
+          <Pill>
+            <PresenceDot presence={member.presence} />
+            {member.presence}
+          </Pill>
+          <TimeSince startAt={member.presenceSpan?.[0]?.startAt} />
+        </div>
+      </td>
+    </tr>
   {/each}
-</div>
+</Table>

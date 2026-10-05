@@ -1,4 +1,6 @@
 <script lang="ts">
+  import PartyAvatar from '$lib/components/PartyAvatar.svelte';
+
   interface Props {
     url: string;
     currentParty: string;
@@ -65,7 +67,7 @@
 </script>
 
 <div
-  class="bg-slate-200 dark:bg-gray-700 rounded-lg p-4 border border-slate-400 dark:border-gray-600 shadow-sm"
+  class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40"
 >
   <audio
     bind:this={audioElement}
@@ -79,20 +81,11 @@
   <!-- Speaker Info & Controls Container -->
   <div class="flex items-center justify-between gap-4">
     <!-- Left: Speaker Info -->
-    <div class="flex items-center space-x-3">
-      <div class="bg-blue-600 rounded-full p-2.5 shadow-md">
-        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-          ></path>
-        </svg>
-      </div>
+    <div class="flex items-center gap-3">
+      <PartyAvatar party={currentParty} />
       <div>
-        <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Speaker</p>
-        <p class="text-sm font-bold text-gray-900 dark:text-white">
+        <p class="text-xs text-gray-500 dark:text-gray-400">Speaker</p>
+        <p class="text-sm font-medium text-gray-900 dark:text-white">
           {getDisplayName(currentParty)}
         </p>
       </div>
@@ -102,8 +95,10 @@
     <div class="flex-1 flex items-center space-x-3">
       <!-- Play/Pause Button -->
       <button
+        type="button"
+        aria-label={isPlaying ? 'Pause' : 'Play'}
         onclick={togglePlayPause}
-        class="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-full shadow-md transition-all duration-200 transform hover:scale-105"
+        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
       >
         {#if isPlaying}
           <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -121,19 +116,19 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-          class="h-2 bg-slate-400 dark:bg-gray-600 rounded-full cursor-pointer relative overflow-hidden group"
+          class="group relative h-2 cursor-pointer overflow-hidden rounded-full bg-gray-200 dark:bg-gray-600"
           onclick={seekAudio}
         >
           <div
-            class="h-full bg-indigo-600 rounded-full transition-all duration-100"
+            class="h-full rounded-full bg-blue-600 transition-all duration-100 dark:bg-blue-500"
             style="width: {duration > 0 ? (currentTime / duration) * 100 : 0}%"
           ></div>
           <div
-            class="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white dark:bg-gray-200 rounded-full shadow-md border-2 border-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity"
+            class="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border-2 border-blue-600 bg-white opacity-0 shadow-md transition-opacity group-hover:opacity-100"
             style="left: {duration > 0 ? (currentTime / duration) * 100 : 0}%"
           ></div>
         </div>
-        <div class="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+        <div class="flex justify-between text-xs tabular-nums text-gray-500 dark:text-gray-400">
           <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
         </div>

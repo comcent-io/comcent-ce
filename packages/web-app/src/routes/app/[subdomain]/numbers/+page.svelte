@@ -4,12 +4,19 @@
   import { page } from '$app/state';
   import { routeParam } from '$lib/routeParam';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import ErrorMessage from '$lib/components/ErrorMessage.svelte';
+  import Pill from '$lib/components/Pill.svelte';
+  import Table from '$lib/components/Table.svelte';
+  import EmptyState from '$lib/components/form/EmptyState.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
+  import SecondaryButton from '$lib/components/form/SecondaryButton.svelte';
   import { goto } from '$app/navigation';
   import { getJson, postJson } from '$lib/http';
   import {
     listConnections,
-    statusClass,
     statusLabel,
+    statusTone,
     type ProviderConnection,
   } from '$lib/providerConnections';
 
@@ -26,7 +33,7 @@
   let itemsPerPage = $state(10);
   let totalPages = $state(1);
   let totalCount = $state(0);
-  let isLoading = $state(false);
+  let isLoading = $state(true);
   let latestRequestId = 0;
   let lastFetchKey = '';
 
@@ -144,16 +151,36 @@
   }
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Numbers</h3>
+<PageHeader
+  title="Numbers"
+  description="The phone numbers your customers call and your team calls from. Choose where each number's calls go, and which one shows on outgoing calls."
+>
+  {#snippet actions()}
+    <div class="relative">
+      <Button
+        id="add-new-no-btn"
+        aria-haspopup="true"
+        aria-expanded={showChooser}
+        onclick={() => (showChooser = !showChooser)}
+      >
+        Add numbers
+      </Button>
+
+      {#if showChooser}
+        {@render chooser()}
+      {/if}
+    </div>
+  {/snippet}
+</PageHeader>
 
 {#if connectionsLoaded && connections.length > 0}
   <!-- Connections strip: which provider accounts are linked and whether they
        still work. A rejected key is why calls stop, so it belongs above the
        numbers rather than buried on a settings page. -->
-  <div class="my-4 flex flex-wrap gap-3">
+  <div class="mb-4 flex flex-wrap gap-3">
     {#each connections as c}
       <div
-        class="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2 bg-white dark:bg-gray-800"
+        class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800"
       >
         <div>
           <div class="font-medium text-gray-900 dark:text-white">{c.label}</div>
@@ -161,13 +188,11 @@
             {c.provider} · {c.externalAccountSid.slice(0, 10)}…
           </div>
         </div>
-        <span class="text-xs px-2 py-0.5 rounded {statusClass(c.status)}">
-          {statusLabel(c.status)}
-        </span>
+        <Pill tone={statusTone(c.status)} dot>{statusLabel(c.status)}</Pill>
         {#if c.status !== 'unmanaged'}
           <a
             href={`${data.basePath}/numbers/connections/${c.id}/import`}
-            class="text-sm text-blue-700 hover:underline dark:text-blue-400"
+            class="text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-400"
           >
             Import more
           </a>
@@ -183,58 +208,48 @@
   </div>
 {/if}
 
-<div class="my-4 relative inline-block">
-  <button
-    id="add-new-no-btn"
-    onclick={() => (showChooser = !showChooser)}
-    class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+<!-- The Add numbers menu: import from a linked account, link a Twilio
+     account, or set up a number on any other carrier's trunk. -->
+{#snippet chooser()}
+  <div
+    class="absolute right-0 z-10 mt-2 w-80 overflow-hidden rounded-lg border border-gray-200 bg-white text-left shadow-lg dark:border-gray-700 dark:bg-gray-800"
   >
-    Add numbers
-  </button>
-
-  {#if showChooser}
-    <div
-      class="absolute z-10 mt-1 w-80 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-    >
-      {#each connections.filter((c) => c.status !== 'unmanaged') as c}
-        <a
-          href={`${data.basePath}/numbers/connections/${c.id}/import`}
-          class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
-        >
-          <div class="font-medium text-gray-900 dark:text-white">Import from {c.label}</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400">
-            Pick from the numbers already in this account
-          </div>
-        </a>
-      {/each}
-
+    {#each connections.filter((c) => c.status !== 'unmanaged') as c}
       <a
-        href={`${data.basePath}/numbers/connect`}
-        class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
+        href={`${data.basePath}/numbers/connections/${c.id}/import`}
+        class="block border-b border-gray-100 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700"
       >
-        <div class="font-medium text-gray-900 dark:text-white">
-          {connections.length > 0 ? 'Connect another Twilio account' : 'Connect a Twilio account'}
-        </div>
+        <div class="font-medium text-gray-900 dark:text-white">Import from {c.label}</div>
         <div class="text-xs text-gray-500 dark:text-gray-400">
-          Use numbers you already own in Twilio
+          Pick from the numbers already in this account
         </div>
       </a>
+    {/each}
 
-      <a
-        href={`${data.basePath}/numbers/create`}
-        class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700"
-      >
-        <div class="font-medium text-gray-900 dark:text-white">Other carrier / SIP trunk</div>
-        <div class="text-xs text-gray-500 dark:text-gray-400">Configure a trunk manually</div>
-      </a>
-    </div>
-  {/if}
-</div>
+    <a
+      href={`${data.basePath}/numbers/connect`}
+      class="block border-b border-gray-100 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700"
+    >
+      <div class="font-medium text-gray-900 dark:text-white">
+        {connections.length > 0 ? 'Connect another Twilio account' : 'Connect a Twilio account'}
+      </div>
+      <div class="text-xs text-gray-500 dark:text-gray-400">
+        Use numbers you already own in Twilio
+      </div>
+    </a>
+
+    <a
+      href={`${data.basePath}/numbers/create`}
+      class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700"
+    >
+      <div class="font-medium text-gray-900 dark:text-white">Other carrier / SIP trunk</div>
+      <div class="text-xs text-gray-500 dark:text-gray-400">Configure a trunk manually</div>
+    </a>
+  </div>
+{/snippet}
 
 {#if errorMessage}
-  <div class="text-red-500 mb-4">
-    {errorMessage}
-  </div>
+  <ErrorMessage error={{ message: errorMessage, formErrors: [] }} />
 {/if}
 
 {#if isDeletePopUp}
@@ -245,73 +260,52 @@
   />
 {/if}
 
-<div class="relative overflow-x-auto shadow-md sm:rounded-lg">
-  <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-      <tr>
-        <th scope="col" class="px-6 py-3">Name</th>
-        <th scope="col" class="px-6 py-3">Number</th>
-        <th scope="col" class="px-6 py-3">Trunk</th>
-        <th scope="col" class="px-6 py-3">Default</th>
-        <th scope="col" class="px-6 py-3">Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#if isLoading}
-        <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
-          <td class="px-6 py-4" colspan="5">Loading...</td>
-        </tr>
-      {:else}
-        {#each numbers as number}
-          <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
-            <th
-              scope="row"
-              class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
-            >
-              {number.name}
-            </th>
-            <td class="px-6 py-4">
-              {number.number}
-            </td>
-            <td class="px-6 py-4">
-              {number.sipTrunk.name}
-            </td>
-            <td class="px-6 py-4">
-              {number.isDefaultOutboundNumber ? 'Yes' : ''}
-            </td>
-            <td class="flex space-x-10 px-6 py-4">
-              <a
-                href={`${data.basePath}/numbers/${number.id}/edit`}
-                class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
-              >
-                Edit
-              </a>
-
-              <button
-                type="button"
-                onclick={() => setOrgDefaultNumber(number.id)}
-                class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
-              >
-                Set As Default
-              </button>
-
-              <button
-                type="button"
-                onclick={() => {
-                  numberToBeDeleted = number;
-                  toggleDeletePopUp();
-                }}
-                class="font-medium text-red-600 dark:text-red-500 hover:underline"
-              >
-                Delete
-              </button>
-            </td>
-          </tr>
-        {/each}
-      {/if}
-    </tbody>
-  </table>
-</div>
+<Table
+  columns={['Name', 'Number', 'SIP trunk', 'Default outgoing', { label: 'Actions', srOnly: true }]}
+  loading={isLoading}
+  isEmpty={numbers.length === 0}
+>
+  {#snippet empty()}
+    <EmptyState
+      title="No numbers yet"
+      description="Add a number so customers can call you and your team can call out. Use Add numbers above to import from Twilio or set one up on any carrier."
+    />
+  {/snippet}
+  {#each numbers as number (number.id)}
+    <tr>
+      <th scope="row" class="whitespace-nowrap font-medium text-gray-900 dark:text-white">
+        {number.name}
+      </th>
+      <td class="whitespace-nowrap tabular-nums">{number.number}</td>
+      <td>{number.sipTrunk.name}</td>
+      <td>
+        {#if number.isDefaultOutboundNumber}
+          <Pill tone="green">Yes</Pill>
+        {/if}
+      </td>
+      <td>
+        <div class="flex items-center justify-end gap-4">
+          <SecondaryButton size="sm" href={`${data.basePath}/numbers/${number.id}/edit`}>
+            Edit
+          </SecondaryButton>
+          <SecondaryButton size="sm" onclick={() => setOrgDefaultNumber(number.id)}>
+            Set As Default
+          </SecondaryButton>
+          <SecondaryButton
+            size="sm"
+            tone="danger"
+            onclick={() => {
+              numberToBeDeleted = number;
+              toggleDeletePopUp();
+            }}
+          >
+            Delete
+          </SecondaryButton>
+        </div>
+      </td>
+    </tr>
+  {/each}
+</Table>
 
 <Pagination
   baseUrl={`${data.basePath}/numbers`}

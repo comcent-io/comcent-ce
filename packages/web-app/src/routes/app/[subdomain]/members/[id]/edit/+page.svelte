@@ -3,8 +3,18 @@
   import { page } from '$app/state';
   import { getJson, postJson, putJson } from '$lib/http';
   import ErrorMessage from '$lib/components/ErrorMessage.svelte';
-  import ClipBoardCopyIcon from '$lib/components/Icons/ClipBoardCopyIcon.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import Pill from '$lib/components/Pill.svelte';
+  import Field from '$lib/components/form/Field.svelte';
+  import FormActions from '$lib/components/form/FormActions.svelte';
+  import FormSection from '$lib/components/form/FormSection.svelte';
+  import Input from '$lib/components/form/Input.svelte';
+  import Label from '$lib/components/form/Label.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
+  import SecondaryButton from '$lib/components/form/SecondaryButton.svelte';
+  import Select from '$lib/components/form/Select.svelte';
   import type { Roles } from '../../roleSchema';
+  import { formatEnum } from '$lib/format';
 
   type PageError = { message: string; formErrors: { message: string; path: string[] }[] };
   let member: any = $state(null);
@@ -75,81 +85,85 @@
   });
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Edit Member</h3>
+<PageHeader
+  title="Edit member"
+  description="This member's phone login, and what they may manage in Comcent."
+  backHref={`/app/${page.params.subdomain}/members`}
+  backLabel="Members"
+/>
 
-<div class="m-5">
+<div class="max-w-3xl space-y-6">
   {#if error}
     <ErrorMessage {error} />
   {/if}
+
   {#if member}
-    <div
-      class="max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 mt-4 mb-2"
+    <FormSection title={member.user.name} description={member.user.email}>
+      {#snippet aside()}
+        <span data-testid="member-role">
+          <Pill tone={member.role === 'ADMIN' ? 'cyan' : 'gray'}>{formatEnum(member.role)}</Pill>
+        </span>
+      {/snippet}
+    </FormSection>
+
+    <FormSection
+      title="Phone login"
+      description="What this member's softphone or desk phone signs in with."
     >
-      <h5 class="mb-2 text-xl font-bold tracking-tight text-gray-900 dark:text-white">
-        {member.user.name} ({member.role})
-      </h5>
-      <p class="mb-3 font-normal text-gray-700 dark:text-gray-400">
-        Email: {member.user.email}
-      </p>
-      <p class="mb-3 font-normal text-gray-700 dark:text-gray-400 dark:bg-gray-800">
-        Sip username: {member.username}
-      </p>
-      <div class="flex">
-        <input
-          type="password"
-          autocomplete="off"
-          class="rounded-none rounded-l-lg bg-gray-300 border text-gray-900 focus:ring-blue-500 focus:border-blue-500 block flex-1 min-w-0 w-2 text-sm border-gray-300 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          value={member.sipPassword}
-        />
-        <button
-          onclick={() => navigator.clipboard.writeText(member.sipPassword)}
-          class="dark:text-gray-400 dark:border-gray-600 border border-l-0 border-gray-300 rounded-r-md px-3 text-gray-900 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+      <div>
+        <Label tag="p">SIP username</Label>
+        <code
+          class="block truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
         >
-          <ClipBoardCopyIcon />
-        </button>
+          {member.username}
+        </code>
       </div>
-    </div>
+      <Field
+        for="sipPassword"
+        label="SIP password"
+        hint="Regenerating it signs out every phone using the old one."
+      >
+        <div class="flex items-center gap-2">
+          <Input
+            type="password"
+            id="sipPassword"
+            autocomplete="off"
+            readonly
+            class="min-w-0 flex-1"
+            value={member.sipPassword}
+          />
+          <SecondaryButton onclick={() => navigator.clipboard.writeText(member.sipPassword)}>
+            Copy
+          </SecondaryButton>
+        </div>
+      </Field>
+      <SecondaryButton disabled={isLoading} onclick={regeneratePassword}>
+        Regenerate password
+      </SecondaryButton>
+    </FormSection>
+
     <form
+      class="space-y-6"
       onsubmit={(e) => {
         e.preventDefault();
-        regeneratePassword();
+        updateRole();
       }}
     >
-      <button
-        type="submit"
-        disabled={isLoading}
-        class="dark:text-white mt-4 dark:border-gray-600 border border-l-0 border-gray-300 px-3 text-gray-900 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 rounded-md"
-      >
-        Regenerate password
-      </button>
+      <FormSection title="Role" description="What this member may manage in this organization.">
+        <Field
+          for="role"
+          label="Role"
+          hint="Admins can manage members, numbers, billing and settings."
+        >
+          <Select id="role" name="role" bind:value={role}>
+            <option value="ADMIN">Admin</option>
+            <option value="MEMBER">Member</option>
+          </Select>
+        </Field>
+      </FormSection>
+      <FormActions cancelHref={`/app/${page.params.subdomain}/members`}>
+        <Button type="submit" progress={isLoading}>Update</Button>
+      </FormActions>
     </form>
   {/if}
 </div>
-{#if member}
-  <form
-    onsubmit={(e) => {
-      e.preventDefault();
-      updateRole();
-    }}
-  >
-    <label for="role" class="mb-2 text-sm font-medium text-gray-900 dark:text-white">
-      Edit Role
-    </label>
-    <select
-      id="role"
-      name="role"
-      bind:value={role}
-      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 inline-block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-    >
-      <option value="ADMIN">ADMIN</option>
-      <option value="MEMBER">MEMBER</option>
-    </select>
-    <button
-      type="submit"
-      disabled={isLoading}
-      class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-    >
-      Update
-    </button>
-  </form>
-{/if}

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import FormSection from '$lib/components/form/FormSection.svelte';
+
   interface Props {
     totalPromisesCreated?: number;
     totalPromisesClosed?: number;
@@ -7,29 +9,19 @@
   let { totalPromisesCreated = 0, totalPromisesClosed = 0 }: Props = $props();
 </script>
 
-<div
-  class="bg-gray-800 dark:bg-gray-800 rounded-lg p-6 border border-gray-700 dark:border-gray-700 min-h-[250px]"
->
-  <h2 class="text-xl font-bold text-white mb-4">Promises</h2>
-  <div class="space-y-4">
-    <!-- Total Promises Created -->
+<FormSection title="Promises" description="Follow-ups agents committed to.">
+  <dl class="grid grid-cols-2 gap-4">
     <div>
-      <div class="mb-2">
-        <span class="text-white text-sm font-medium">Created Today</span>
-      </div>
-      <div class="text-3xl font-bold text-white">
+      <dt class="text-sm text-gray-500 dark:text-gray-400">Made</dt>
+      <dd class="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
         {totalPromisesCreated}
-      </div>
+      </dd>
     </div>
-
-    <!-- Total Promises Closed -->
     <div>
-      <div class="mb-2">
-        <span class="text-white text-sm font-medium">Total Closed</span>
-      </div>
-      <div class="text-3xl font-bold text-white">
+      <dt class="text-sm text-gray-500 dark:text-gray-400">Closed</dt>
+      <dd class="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
         {totalPromisesClosed}
-      </div>
+      </dd>
     </div>
-  </div>
-</div>
+  </dl>
+</FormSection>

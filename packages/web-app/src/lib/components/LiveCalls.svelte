@@ -4,7 +4,12 @@
   import { browser } from '$app/environment';
   import { Socket } from 'phoenix';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
-  import moment from 'moment';
+  import { formatTime } from '$lib/format';
+  import { partyName } from '$lib/party';
+  import FormSection from './form/FormSection.svelte';
+  import EmptyState from './form/EmptyState.svelte';
+  import Pill from './Pill.svelte';
+  import Spinner from './Icons/Spinner.svelte';
 
   type LiveCall = {
     callStoryId: string;
@@ -37,16 +42,6 @@
       return 'Unknown';
     }
     return direction === 'inbound' ? 'Inbound' : 'Outbound';
-  }
-
-  function displayName(name: string | undefined | null): string {
-    if (!name) {
-      return 'Unknown';
-    }
-    if (name.includes('@')) {
-      return name.split('@')[0];
-    }
-    return name;
   }
 
   let interval: NodeJS.Timeout | undefined;
@@ -136,77 +131,47 @@
   });
 </script>
 
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-  <div class="flex items-center justify-between mb-6">
-    <h3 class="text-xl font-bold dark:text-white">Live Calls</h3>
-    <div class="flex items-center space-x-2">
-      <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-      <span class="text-sm text-gray-500 dark:text-gray-400">Live</span>
-    </div>
-  </div>
+<FormSection title="Live calls" description="Calls in progress, updated as they happen.">
+  {#snippet aside()}
+    <span class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+      <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-green-500" aria-hidden="true"></span>
+      Live
+    </span>
+  {/snippet}
 
   {#if loading}
     <div class="flex items-center justify-center py-8">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <Spinner />
     </div>
   {:else if liveCalls.length === 0}
-    <div class="text-center py-8">
-      <div class="text-gray-400 dark:text-gray-500 mb-2">
-        <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-          />
-        </svg>
-      </div>
-      <p class="text-gray-500 dark:text-gray-400">No active calls</p>
-    </div>
+    <EmptyState
+      title="No calls in progress"
+      description="A call shows up here the moment it starts, with who is on it."
+    />
   {:else}
-    <div class="space-y-4">
+    <ul class="divide-y divide-gray-200 dark:divide-gray-700">
       {#each liveCalls as call (call.callStoryId)}
-        <div
-          class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-        >
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center space-x-3">
-              <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              <span
-                class="px-2 py-1 text-xs font-medium rounded-full {call.direction === 'inbound'
-                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                  : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'}"
-              >
-                {getDirectionLabel(call.direction)}
-              </span>
-            </div>
-            <span class="text-xs text-gray-500 dark:text-gray-400">
-              {moment(call.startAt).format('HH:mm:ss')}
+        <li class="flex flex-wrap items-center gap-x-6 gap-y-2 py-3 text-sm">
+          <span
+            class="h-2.5 w-2.5 animate-pulse rounded-full bg-green-500"
+            aria-hidden="true"
+          ></span>
+          <Pill tone={call.direction === 'inbound' ? 'cyan' : 'blue'}>
+            {getDirectionLabel(call.direction)}
+          </Pill>
+          <span class="font-medium text-gray-900 dark:text-white">
+            {partyName(call.caller)} → {partyName(call.callee)}
+          </span>
+          <span class="text-gray-500 dark:text-gray-400">
+            With <span class="font-medium text-gray-900 dark:text-white">
+              {partyName(call.currentParty)}
             </span>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <span class="text-gray-500 dark:text-gray-400">From:</span>
-              <span class="ml-2 font-medium text-gray-900 dark:text-white">
-                {displayName(call.caller)}
-              </span>
-            </div>
-            <div>
-              <span class="text-gray-500 dark:text-gray-400">To:</span>
-              <span class="ml-2 font-medium text-gray-900 dark:text-white">
-                {displayName(call.callee)}
-              </span>
-            </div>
-            <div>
-              <span class="text-gray-500 dark:text-gray-400">Current Party:</span>
-              <span class="ml-2 font-medium text-gray-900 dark:text-white">
-                {displayName(call.currentParty)}
-              </span>
-            </div>
-          </div>
-        </div>
+          </span>
+          <span class="ms-auto text-xs text-gray-500 dark:text-gray-400">
+            Started {formatTime(call.startAt)}
+          </span>
+        </li>
       {/each}
-    </div>
+    </ul>
   {/if}
-</div>
+</FormSection>

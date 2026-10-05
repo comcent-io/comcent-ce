@@ -1,5 +1,9 @@
 <script lang="ts">
   import TranscriptBubble from '$lib/components/TranscriptBubble.svelte';
+  import ErrorMessage from '$lib/components/ErrorMessage.svelte';
+  import EmptyState from '$lib/components/form/EmptyState.svelte';
+  import Spinner from '$lib/components/Icons/Spinner.svelte';
+  import { partyName } from '$lib/party';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
 
@@ -34,13 +38,22 @@
 </script>
 
 {#if loading}
-  <p>Loading...</p>
+  <div class="flex justify-center py-10"><Spinner /></div>
 {:else if error}
-  <p>Error: {error}</p>
-{:else if !transcriptData || !transcriptData.transcriptChat || !Array.isArray(transcriptData.transcriptChat)}
-  <p>No transcript data available</p>
+  <ErrorMessage error={{ message: error, formErrors: [] }} />
+{:else if !transcriptData || !Array.isArray(transcriptData.transcriptChat) || transcriptData.transcriptChat.length === 0}
+  <EmptyState
+    title="No transcript"
+    description="This call has no transcript, for example when nothing was said."
+  />
 {:else}
-  {#each transcriptData.transcriptChat as chat}
-    <TranscriptBubble name={chat.currentParty} message={chat.message} />
-  {/each}
+  <div class="space-y-4">
+    {#each transcriptData.transcriptChat as chat}
+      <TranscriptBubble
+        name={partyName(chat.currentParty)}
+        message={chat.message}
+        start={chat.start}
+      />
+    {/each}
+  </div>
 {/if}

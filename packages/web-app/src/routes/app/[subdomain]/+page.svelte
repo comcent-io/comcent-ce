@@ -5,6 +5,9 @@
   import { Socket } from 'phoenix';
   import { getIdTokenFromCookie } from '$lib/getIdTokenFromCookie';
   import LiveCalls from '$lib/components/LiveCalls.svelte';
+  import Card from '$lib/components/Card.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
+  import PresenceDot from '$lib/components/PresenceDot.svelte';
 
   let status: { name: string; value: number }[] = $state([]);
   let socket: Socket | undefined;
@@ -89,29 +92,26 @@
   });
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Dashboard</h3>
+<PageHeader
+  title="Dashboard"
+  description="Your team's presence right now, and the calls in progress."
+/>
 
-<br />
-<br />
-<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-  <!-- Status Cards -->
-  <div class="lg:col-span-4">
-    <div class="flex gap-2">
-      {#each status as { name, value }}
-        <div
-          class="w-1/4 max-w-xs p-6 bg-white border border-gray-200 rounded-lg shadow dark:bg-gray-800 dark:border-gray-700 text-center"
-        >
-          <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-            {value}
-          </h5>
-          <p class="mb-3 font-normal text-gray-700 dark:text-gray-400">{name}</p>
+<div class="space-y-6">
+  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    {#each status as { name, value } (name)}
+      <Card>
+        <div class="flex items-center gap-2">
+          <PresenceDot presence={name} size="md" />
+          <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{name}</p>
         </div>
-      {/each}
-    </div>
+        <p class="mt-3 text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {value === 1 ? 'member' : 'members'}
+        </p>
+      </Card>
+    {/each}
   </div>
 
-  <!-- Live Calls -->
-  <div class="lg:col-span-4">
-    <LiveCalls />
-  </div>
+  <LiveCalls />
 </div>

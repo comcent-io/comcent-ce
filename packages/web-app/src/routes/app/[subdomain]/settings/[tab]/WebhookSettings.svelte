@@ -160,7 +160,7 @@
       <code class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700">
         {`{"type": "NEW_CALL_STORY", "data": …}`}
       </code>
-      where data holds the call's details.
+      where data is the call as a vCon (the IETF standard for a conversation).
     </p>
     <p>
       <span class="font-medium text-gray-900 dark:text-white">Presence update event:</span>

@@ -5,6 +5,7 @@
   import PromisesCard from './PromisesCard.svelte';
   import SentimentCard from './SentimentCard.svelte';
   import Spinner from '$lib/components/Icons/Spinner.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
 
   interface Props {
     selectedDate: string;
@@ -28,16 +29,12 @@
 </script>
 
 <div>
-  <button
-    class="mb-6 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center"
-    onclick={onBack}
-  >
-    ← Back to List
-  </button>
-
-  <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-    Daily Summary - {formatDate(selectedDate)}
-  </h1>
+  <PageHeader
+    title="Daily Summary: {formatDate(selectedDate)}"
+    description="The day's calls in a few lines, the promises made, and how customers felt."
+    {onBack}
+    backLabel="All days"
+  />
 
   {#if loadingDetails}
     <div class="flex justify-center items-center h-64">
@@ -45,7 +42,7 @@
     </div>
   {:else}
     <!-- Flex Layout: Executive summary on left, Promises and Sentiment stacked on right -->
-    <div class="flex flex-col lg:flex-row gap-6 mt-6">
+    <div class="flex flex-col items-start lg:flex-row gap-6">
       <!-- Executive Summary Card - Left (wider, 75% width) -->
       <ExecutiveSummaryCard {executiveSummary} />
 
