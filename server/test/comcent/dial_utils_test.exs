@@ -61,6 +61,34 @@ defmodule Comcent.DialUtilsTest do
         System.delete_env("SBC_IP")
       end
     end
+
+    test "keeps the trunk's port and never doubles the sip: prefix" do
+      original_sbc_ip = System.get_env("SBC_IP")
+      System.put_env("SBC_IP", "192.168.1.100")
+
+      for {trunk_address, expected_address} <- [
+            {"sip.example.com", "sip.example.com"},
+            {"sip.example.com:5080", "sip.example.com:5080"},
+            {"203.0.113.10:5080", "203.0.113.10:5080"},
+            # Rows saved before the value was normalised may carry the prefix.
+            {"sip:sip.example.com", "sip.example.com"},
+            {"sip:sip.example.com:5080", "sip.example.com:5080"}
+          ] do
+        assert DialUtils.create_dial_string_for_sip_trunk(
+                 "11234567890",
+                 "9876543210",
+                 trunk_address
+               ) ==
+                 "[sip_h_X-Trunk-Number=11234567890,origination_caller_id_number=11234567890]sofia/internal/9876543210@#{expected_address};fs_path=sip:192.168.1.100:5065"
+      end
+
+      # Restore original environment
+      if original_sbc_ip do
+        System.put_env("SBC_IP", original_sbc_ip)
+      else
+        System.delete_env("SBC_IP")
+      end
+    end
   end
 
   describe "convert_number_to_e164_or_us11/2" do

@@ -36,7 +36,9 @@ defmodule ComcentWeb.Internal.SipTrunkController do
         |> json(%{
           outbound_username: sip_number.outbound_username,
           outbound_password: sip_number.outbound_password,
-          outbound_contact: sip_number.outbound_contact,
+          # The SBC splits this on ":" into the host and port it sends the
+          # INVITE to, so an older row's "sip:" prefix is dropped here.
+          outbound_contact: Comcent.OutboundContact.dial_address(sip_number.outbound_contact),
           inbound_ips: sip_number.inbound_ips
         })
     end

@@ -72,7 +72,11 @@ defmodule Comcent.DialUtils do
     variables =
       "[sip_h_X-Trunk-Number=#{from_number},origination_caller_id_number=#{caller_id}]"
 
-    "#{variables}sofia/internal/#{adjusted_to_number}@#{trunk_address};fs_path=#{sbc_sip_uri}"
+    # The trunk address goes after the "@", so it must be the bare host[:port]
+    # form; a leftover "sip:" from an older row would read as "@sip:host".
+    address = Comcent.OutboundContact.dial_address(trunk_address)
+
+    "#{variables}sofia/internal/#{adjusted_to_number}@#{address};fs_path=#{sbc_sip_uri}"
   end
 
   @doc """

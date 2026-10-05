@@ -47,5 +47,20 @@ defmodule Comcent.Schemas.SipTrunk do
       :provider_connection_id
     ])
     |> validate_required([:name, :outbound_contact, :inbound_ips, :org_id])
+    |> normalize_outbound_contact()
+  end
+
+  # Stored in the one form every reader expects; see Comcent.OutboundContact.
+  defp normalize_outbound_contact(changeset) do
+    case get_change(changeset, :outbound_contact) do
+      nil ->
+        changeset
+
+      value ->
+        case Comcent.OutboundContact.normalize(value) do
+          {:ok, canonical} -> put_change(changeset, :outbound_contact, canonical)
+          {:error, message} -> add_error(changeset, :outbound_contact, message)
+        end
+    end
   end
 end

@@ -6,6 +6,7 @@ defmodule ComcentWeb.Internal.DialplanControllerTest do
 
   use ComcentWeb.ConnCase
 
+  import Ecto.Query, only: [from: 2]
   import ExUnit.CaptureLog, only: [with_log: 1]
 
   alias Comcent.Repo
@@ -150,6 +151,49 @@ defmodule ComcentWeb.Internal.DialplanControllerTest do
 
       assert response(conn, 403) =~ "destination not allowed from this number"
     end
+  end
+
+  describe "the trunk's outbound contact" do
+    test "an outbound call keeps the trunk's port", %{conn: conn} do
+      org = org()
+      number = number(org, [])
+      set_outbound_contact(number, "carrier.example.com:5080")
+      member = member(org)
+
+      conn = outbound_call(conn, org, member, "+14155550123", number)
+
+      assert response(conn, 200) =~
+               "sofia/internal/+14155550123@carrier.example.com:5080;fs_path="
+    end
+
+    test "an older row saved with a sip: prefix still dials the bare address", %{conn: conn} do
+      org = org()
+      number = number(org, [])
+      set_outbound_contact(number, "sip:carrier.example.com:5080")
+      member = member(org)
+
+      body = conn |> outbound_call(org, member, "+14155550123", number) |> response(200)
+
+      assert body =~ "sofia/internal/+14155550123@carrier.example.com:5080;fs_path="
+      refute body =~ "@sip:"
+    end
+
+    test "the SBC's trunk lookup gets the bare host:port", %{conn: conn} do
+      org = org()
+      number = number(org, [])
+      set_outbound_contact(number, "sip:carrier.example.com:5080")
+
+      conn = post(conn, "/internal-api/number/sip-trunk", %{"number" => number.number})
+
+      assert json_response(conn, 200)["outboundContact"] == "carrier.example.com:5080"
+    end
+  end
+
+  # Written straight to the table, as rows saved before the value was
+  # normalised were.
+  defp set_outbound_contact(number, outbound_contact) do
+    from(s in SipTrunk, where: s.id == ^number.sip_trunk_id)
+    |> Repo.update_all(set: [outbound_contact: outbound_contact])
   end
 
   defp org do

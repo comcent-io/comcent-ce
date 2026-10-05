@@ -128,14 +128,49 @@ test('Sip trunk page, add with invalid proxy address', async ({ page }) => {
     provideOutboundCredentials: true,
     username: 'username',
     password: 'password',
-    proxyAddress: 'sip:invalid-sip.com',
+    proxyAddress: 'http://invalid-sip.com',
     inboundIps: ['23.14.5.1/24'],
   });
-  await expectSipTrunkError(
-    page,
-    /Invalid SIP Proxy Address|Sip Proxy Address should be/i,
-  );
+  await expectSipTrunkError(page, /Only the sip: scheme is supported/i);
 });
+
+test('Sip trunk page, sips: proxy address is refused with the reason', async ({
+  page,
+}) => {
+  await createSipTrunk(page, {
+    name: 'Tls Sip',
+    provideOutboundCredentials: false,
+    proxyAddress: 'sips:tls-sip.example.com:5061',
+    inboundIps: ['23.14.5.1/24'],
+  });
+  await expectSipTrunkError(page, /sips: \(TLS\) is not supported/i);
+});
+
+// Each accepted form is saved as the bare host[:port] the dialplan and the
+// SBC read, so editing the trunk shows it without the sip: prefix.
+for (const [proxyAddress, stored] of [
+  ['sip:carrier-port.example.com:5080', 'carrier-port.example.com:5080'],
+  ['sip:carrier-sip.example.com', 'carrier-sip.example.com'],
+  ['carrier-hostport.example.com:5080', 'carrier-hostport.example.com:5080'],
+] as const) {
+  test(`Sip trunk page, proxy address ${proxyAddress} is saved as ${stored}`, async ({
+    page,
+  }) => {
+    const name = uniqueSipTrunkName('ProxyForm');
+
+    await createSipTrunkAndExpectSuccess(page, {
+      name,
+      provideOutboundCredentials: false,
+      proxyAddress,
+      inboundIps: ['23.14.9.1/24'],
+    });
+
+    await openSipTrunkForEdit(page, name);
+    await expect(page.getByPlaceholder('provider.example.com')).toHaveValue(
+      stored,
+    );
+  });
+}
 
 test('Sip trunk page, add with invalid inbound ips', async ({ page }) => {
   await createSipTrunk(page, {
@@ -283,10 +318,10 @@ test('Sip trunk page, update with invalid proxy address', async ({ page }) => {
     provideOutboundCredentials: true,
     username: 'username',
     password: 'password',
-    proxyAddress: 'sip:invalid-sip.com',
+    proxyAddress: 'invalid-sip.com:99999',
     inboundIps: ['3.15.5.1/24'],
   });
-  await expectSipTrunkError(page, /Invalid SIP Proxy Address/i);
+  await expectSipTrunkError(page, /Invalid port, it must be 1-65535/i);
 });
 
 test('Sip trunk page, update with invalid inbound ips', async ({ page }) => {

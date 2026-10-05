@@ -54,6 +54,10 @@ export const allocations = {
   voiceBot: alloc('+14155552720', 6190),
   weekTimeActive: alloc('+14155552721', 6200),
   weekTimeFallback: alloc('+14155552726', 6330),
+  // The outbound contact gate dials a trunk whose address carries the UAS's
+  // own port, never 5060, so a dropped port cannot reach it by accident.
+  outboundContactSipUri: alloc('+14155552728', 6350),
+  outboundContactHostPort: alloc('+14155552729', 6360),
   // Queue stress tests use two queues and need wider, non-overlapping ranges
   // so large caller bursts and many SIP agents can run concurrently.
   queueStressQ1: alloc('+14155552722', 6210, {
