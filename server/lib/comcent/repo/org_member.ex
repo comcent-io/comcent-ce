@@ -1,6 +1,6 @@
 defmodule Comcent.Repo.OrgMember do
   import Ecto.Query
-  alias Comcent.Repo
+  alias Comcent.{Repo, WebhookPusher}
   alias Comcent.Schemas.{OrgMember, Org, User, QueueMembership}
   alias Phoenix.PubSub
   require Logger
@@ -64,17 +64,7 @@ defmodule Comcent.Repo.OrgMember do
          "OrgMember not found, organization not found, or presence was not #{expected_presence}"}
 
       {count, _} when count > 0 ->
-        # Broadcast the presence change
-        PubSub.broadcast(
-          Comcent.PubSub,
-          "presence:#{subdomain}",
-          {:presence_update,
-           %{
-             user_id: user_id,
-             presence: presence,
-             previous_presence: expected_presence
-           }}
-        )
+        presence_changed(subdomain, user_id, expected_presence, presence)
 
         # Log warning if multiple records were updated (should be rare)
         if count > 1 do
@@ -110,17 +100,7 @@ defmodule Comcent.Repo.OrgMember do
         {:error, "OrgMember not found or organization not found"}
 
       {count, _} when count > 0 ->
-        # Broadcast the presence change
-        PubSub.broadcast(
-          Comcent.PubSub,
-          "presence:#{subdomain}",
-          {:presence_update,
-           %{
-             user_id: user_id,
-             presence: presence,
-             previous_presence: previous_presence
-           }}
-        )
+        presence_changed(subdomain, user_id, previous_presence, presence)
 
         # Log warning if multiple records were updated (should be rare)
         if count > 1 do
@@ -132,6 +112,23 @@ defmodule Comcent.Repo.OrgMember do
         # Just return :ok without fetching updated data
         :ok
     end
+  end
+
+  # Tells the org's live views and queue schedulers (PubSub), and its
+  # webhooks (PRESENCE_UPDATE, sent in the background).
+  defp presence_changed(subdomain, user_id, previous_presence, presence) do
+    PubSub.broadcast(
+      Comcent.PubSub,
+      "presence:#{subdomain}",
+      {:presence_update,
+       %{
+         user_id: user_id,
+         presence: presence,
+         previous_presence: previous_presence
+       }}
+    )
+
+    WebhookPusher.after_presence_change(subdomain, user_id, previous_presence, presence)
   end
 
   @doc """

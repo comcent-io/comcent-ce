@@ -50,3 +50,7 @@ config :libcluster,
 
 # Configure the scheduler for test environment
 config :comcent, Comcent.Schedular, jobs: []
+
+# Event webhooks (e.g. PRESENCE_UPDATE) are sent in the test process, so
+# tests see the (mocked) delivery without waiting on a background task.
+config :comcent, :webhook_mode, :inline
