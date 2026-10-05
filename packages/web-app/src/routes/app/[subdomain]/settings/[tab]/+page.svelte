@@ -2,6 +2,7 @@
   import { page } from '$app/state';
   import WebhookSettings from './WebhookSettings.svelte';
   import AiSettings from './AiSettings.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
 
   const tabs = [
     { name: 'Webhooks', tab: 'webhooks', current: true },
@@ -16,11 +17,16 @@
     'inline-block p-4 text-blue-600 border-b-2 border-blue-600 rounded-t-lg active dark:text-blue-500 dark:border-blue-500';
 </script>
 
+<PageHeader
+  title="Settings"
+  description="Connect your own systems to Comcent, and choose what AI does with your calls."
+/>
+
 <div
   class="text-sm font-medium text-center text-gray-500 border-b border-gray-200 dark:text-gray-400 dark:border-gray-700"
 >
   <ul class="flex flex-wrap -mb-px">
-    {#each tabs as tab}
+    {#each tabs as tab (tab.tab)}
       <li class="me-2">
         <a href={tab.tab} class={currentTab === tab.tab ? activeTabClass : inactiveTabClass}>
           {tab.name}

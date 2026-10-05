@@ -76,7 +76,7 @@ test('Settings page, update webhook successfully', async ({ page }) => {
   await page.getByPlaceholder('Webhook URL').click();
   await page.getByPlaceholder('Webhook URL').fill('https://abc.efg/ccef/efg');
   await page.getByLabel('Presence Update Event').uncheck();
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.locator('tbody')).toContainText('Staging Webhook changed');
   await expect(page.locator('tbody')).toContainText('https://abc.efg/ccef/efg');
   await expect(page.locator('tbody')).toContainText('CALL_UPDATE');
@@ -86,6 +86,9 @@ test('Settings page, delete webhook successfully', async ({ page }) => {
   await page.goto('/app/acme');
   await page.getByRole('link', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Delete' }).click();
+  // It asks first.
+  await expect(page.getByText("This can't be undone.")).toBeVisible();
+  await page.getByRole('button', { name: "Yes, I'm sure" }).click();
   await expect(page.getByRole('status')).toContainText(
     'Webhook deleted successfully',
   );

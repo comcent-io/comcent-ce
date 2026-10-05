@@ -1,9 +1,16 @@
 <script lang="ts">
-  import CloseIcon from '$lib/components/Icons/CloseIcon.svelte';
-  import PlusIcon from '$lib/components/Icons/PlusIcon.svelte';
   import { page } from '$app/state';
-  import Spinner from '$lib/components/Icons/Spinner.svelte';
   import { onMount } from 'svelte';
+  import Button from '$lib/components/Button.svelte';
+  import CheckboxRow from '$lib/components/form/CheckboxRow.svelte';
+  import Field from '$lib/components/form/Field.svelte';
+  import FormActions from '$lib/components/form/FormActions.svelte';
+  import FormSection from '$lib/components/form/FormSection.svelte';
+  import Input from '$lib/components/form/Input.svelte';
+  import RemoveButton from '$lib/components/form/RemoveButton.svelte';
+  import SecondaryButton from '$lib/components/form/SecondaryButton.svelte';
+  import Select from '$lib/components/form/Select.svelte';
+  import Textarea from '$lib/components/form/Textarea.svelte';
   import type { voiceBotData } from './schema';
 
   let isLoading = $state(false);
@@ -125,229 +132,193 @@
   }
 </script>
 
-<form method="POST" onsubmit={handleSubmit}>
-  <div class="mb-6">
-    {#if errorMessage}
-      <div class="text-red-500 mb-4">
-        {errorMessage}
-      </div>
-    {/if}
-    <label for="name" class="block mb-2 text-base font-medium text-gray-900 dark:text-white">
-      Name
-    </label>
-    <input
-      type="text"
-      id="name"
-      name="name"
-      bind:value={formData.name}
-      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-      placeholder="Voice Bot Name"
-      required
-    />
-  </div>
-
-  <div class="mb-6">
-    <label
-      for="instructions"
-      class="block mb-2 text-base font-medium text-gray-900 dark:text-white"
+<form method="POST" class="space-y-6" onsubmit={handleSubmit}>
+  {#if errorMessage}
+    <div
+      class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-gray-800 dark:text-red-400"
+      role="alert"
     >
-      Tell the VoiceBot what to do
-    </label>
-    <textarea
-      id="instructions"
-      name="instructions"
-      bind:value={formData.instructions}
-      rows="4"
-      class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-      placeholder="Write your instructions here"
-      required
-    ></textarea>
-  </div>
-
-  <div class="mb-6">
-    <label
-      for="notToDoInstructions"
-      class="block mb-2 text-base font-medium text-gray-900 dark:text-white"
-    >
-      Tell the VoiceBot what not to do
-    </label>
-    <textarea
-      id="notToDoInstructions"
-      name="notToDoInstructions"
-      bind:value={formData.notToDoInstructions}
-      rows="4"
-      class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-      placeholder="If conversation is not related to voice-bot name, then reply that you can't respond. If unrelated question is asked more than three times then hang up."
-      required
-    ></textarea>
-  </div>
-
-  <div class="mb-6">
-    <label
-      for="greetingInstructions"
-      class="block mb-2 text-base font-medium text-gray-900 dark:text-white"
-    >
-      Tell the VoiceBot how to greet the customers
-    </label>
-    <textarea
-      id="greetingInstructions"
-      name="greetingInstructions"
-      bind:value={formData.greetingInstructions}
-      rows="4"
-      class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-      placeholder="Greet with appropriate greeting for EST timezone and explicitly mention that you are on recorded line"
-      required
-    ></textarea>
-  </div>
-
-  <div class="mb-6">
-    <label for="pipeline" class="block mb-2 text-base font-medium text-gray-900 dark:text-white">
-      Pipeline
-    </label>
-    <select
-      id="pipeline"
-      name="pipeline"
-      bind:value={formData.pipeline}
-      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-      required
-    >
-      <option value="DEEPGRAM_AND_OPENAI">Deepgram and OpenAI</option>
-      <option value="REALTIME_API">Realtime API</option>
-    </select>
-  </div>
-
-  <div class="mb-6">
-    <div class="block mb-2 text-base font-medium text-gray-900 dark:text-white">MCP Servers</div>
-    {#each formData.mcpServers as mcpServer, index}
-      <div class="mb-3 space-y-2">
-        <div class="flex items-center space-x-1">
-          <input
-            type="text"
-            id="mcpServerUrl"
-            name="mcpServerUrl"
-            bind:value={mcpServer.url}
-            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-            placeholder="MCP Server URL"
-          />
-          <button
-            type="button"
-            onclick={() => removeMcpServer(index)}
-            class="text-gray-400 bg-transparent rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-        <input
-          type="text"
-          id="mcpServerToken"
-          name="mcpServerToken"
-          bind:value={mcpServer.token}
-          class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-          placeholder="Authorization Token"
-        />
-      </div>
-    {/each}
-    <button
-      type="button"
-      onclick={addMcpServer}
-      class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm py-2 mr-2 px-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-    >
-      <div class="flex items-center">
-        <PlusIcon /> Add MCP Server
-      </div>
-    </button>
-  </div>
-
-  <fieldset>
-    <legend class="block mb-2 text-lg font-medium text-gray-900 dark:text-white">Functions</legend>
-
-    <!-- <fieldset>
-      <legend class="block mb-2 text-base font-medium text-gray-900 dark:text-white">
-        In-built Functions
-      </legend> -->
-
-    <div class="mb-6">
-      <label for="hangupFunction" class="flex items-center mb-4">
-        <input
-          type="checkbox"
-          id="hangupFunction"
-          name="hangupFunction"
-          class="mr-2"
-          bind:checked={formData.isHangup}
-        />
-        <span class="text-base font-medium text-gray-900 dark:text-white">
-          hangup (Description: used to hang up the call)
-        </span>
-      </label>
-
-      <label for="enqueueFunction" class="flex items-center mb-2">
-        <input
-          type="checkbox"
-          id="enqueueFunction"
-          name="enqueueFunction"
-          bind:checked={formData.isEnqueue}
-          class="mr-2"
-        />
-        <span class="text-base font-medium text-gray-900 dark:text-white">
-          enqueue (Description: used to transfer to queue specified in params)
-        </span>
-      </label>
-      {#if formData.isEnqueue}
-        {#if isLoadingQueues}
-          <div class="mb-3 text-sm text-gray-500 dark:text-gray-400">Loading queues...</div>
-        {:else if availableQueues.length === 0}
-          <div class="mb-3 text-sm text-yellow-500 dark:text-yellow-400">
-            No queues available. Please create a queue first.
-          </div>
-        {:else}
-          {#each formData.queues as _queue, index}
-            <div class="flex items-center space-x-1">
-              <select
-                id="queueName"
-                name="queueName"
-                bind:value={formData.queues[index]}
-                class="bg-gray-50 mb-3 border border-gray-300 text-gray-900 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-1/3 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                required
-              >
-                <option value="">Select a queue</option>
-                {#each getAvailableQueuesForDropdown(index) as availableQueue}
-                  <option value={availableQueue.name}>{availableQueue.name}</option>
-                {/each}
-              </select>
-              <button
-                type="button"
-                onclick={() => removeQueue(index)}
-                class="text-gray-400 bg-transparent rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-          {/each}
-          {#if canAddMoreQueues}
-            <button
-              type="button"
-              onclick={addQueue}
-              class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm py-2 mr-2 px-2 mb-3 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-            >
-              <div class="flex items-center">
-                <PlusIcon /> Add Queue
-              </div>
-            </button>
-          {/if}
-        {/if}
-      {/if}
+      {errorMessage}
     </div>
-    <!-- </fieldset> -->
-  </fieldset>
-  <button
-    type="submit"
-    disabled={isLoading}
-    class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+  {/if}
+
+  <FormSection
+    title="Name"
+    description="How the bot shows in your voice bot list, on numbers and in call history."
   >
-    {#if isLoading}
-      <Spinner />
-    {:else}
-      {`${isUpdate ? 'Update' : 'Create'}`}
-    {/if}
-  </button>
+    <div>
+      <label for="name" class="sr-only">Name</label>
+      <Input
+        type="text"
+        id="name"
+        name="name"
+        bind:value={formData.name}
+        placeholder="Voice Bot Name"
+        required
+      />
+    </div>
+  </FormSection>
+
+  <FormSection
+    title="Instructions"
+    description="Brief the bot the way you would brief a new colleague on the phones. It follows these on every call."
+  >
+    <Field
+      for="instructions"
+      label="What it should do"
+      hint="Its job, what it knows about your business, and how to handle a typical call."
+    >
+      <Textarea
+        id="instructions"
+        name="instructions"
+        bind:value={formData.instructions}
+        rows={6}
+        placeholder="Write your instructions here"
+        required
+      />
+    </Field>
+
+    <Field
+      for="notToDoInstructions"
+      label="What it must not do"
+      hint="Topics to refuse, promises it can't make, and when to give up and hang up."
+    >
+      <Textarea
+        id="notToDoInstructions"
+        name="notToDoInstructions"
+        bind:value={formData.notToDoInstructions}
+        rows={4}
+        placeholder="If conversation is not related to voice-bot name, then reply that you can't respond. If unrelated question is asked more than three times then hang up."
+        required
+      />
+    </Field>
+
+    <Field
+      for="greetingInstructions"
+      label="How it greets callers"
+      hint="The first thing callers hear, e.g. your company's name and that the call is recorded."
+    >
+      <Textarea
+        id="greetingInstructions"
+        name="greetingInstructions"
+        bind:value={formData.greetingInstructions}
+        rows={3}
+        placeholder="Greet with appropriate greeting for EST timezone and explicitly mention that you are on recorded line"
+        required
+      />
+    </Field>
+  </FormSection>
+
+  <FormSection title="Voice pipeline" description="How the bot listens and speaks.">
+    <Field for="pipeline" label="Pipeline">
+      <Select id="pipeline" name="pipeline" bind:value={formData.pipeline} required>
+        <option value="DEEPGRAM_AND_OPENAI">Deepgram and OpenAI</option>
+        <option value="REALTIME_API">Realtime API</option>
+      </Select>
+    </Field>
+  </FormSection>
+
+  <FormSection title="Actions" description="What the bot may do on a call besides talking.">
+    <div class="space-y-3">
+      <CheckboxRow
+        id="hangupFunction"
+        label="Hang up"
+        description="End the call when the conversation is over."
+        bind:checked={formData.isHangup}
+      />
+      <CheckboxRow
+        id="enqueueFunction"
+        label="Transfer to a queue"
+        description="Hand the caller to one of these queues when they need a person."
+        bind:checked={formData.isEnqueue}
+      >
+        {#if isLoadingQueues}
+          <p class="text-sm text-gray-500 dark:text-gray-400">Loading queues…</p>
+        {:else if availableQueues.length === 0}
+          <p class="text-sm text-yellow-700 dark:text-yellow-400">
+            No queues yet. Create a queue first, then come back to pick it here.
+          </p>
+        {:else}
+          <div class="space-y-2">
+            {#each formData.queues as _queue, index}
+              <div class="flex items-center gap-2">
+                <label for="queueName" class="sr-only">Queue</label>
+                <Select
+                  id="queueName"
+                  name="queueName"
+                  bind:value={formData.queues[index]}
+                  class="sm:max-w-xs"
+                  required
+                >
+                  <option value="">Select a queue</option>
+                  {#each getAvailableQueuesForDropdown(index) as availableQueue}
+                    <option value={availableQueue.name}>{availableQueue.name}</option>
+                  {/each}
+                </Select>
+                <RemoveButton label="Remove queue" onclick={() => removeQueue(index)} />
+              </div>
+            {/each}
+            {#if formData.queues.length === 0}
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                Pick at least one queue the bot can transfer to.
+              </p>
+            {/if}
+            {#if canAddMoreQueues}
+              <SecondaryButton size="sm" onclick={addQueue}>
+                <span aria-hidden="true" class="mr-1">+</span>
+                Add Queue
+              </SecondaryButton>
+            {/if}
+          </div>
+        {/if}
+      </CheckboxRow>
+    </div>
+  </FormSection>
+
+  <FormSection
+    title="MCP servers"
+    description="Tools the bot can use during a call, such as looking up an order, served from your own MCP (Model Context Protocol) servers."
+  >
+    <div class="space-y-3">
+      {#each formData.mcpServers as mcpServer, index}
+        <div
+          class="flex items-start gap-2 rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+        >
+          <div class="grid flex-1 gap-2 sm:grid-cols-2">
+            <div>
+              <label for="mcpServerUrl" class="sr-only">MCP server URL</label>
+              <Input
+                type="text"
+                id="mcpServerUrl"
+                name="mcpServerUrl"
+                bind:value={mcpServer.url}
+                placeholder="MCP Server URL"
+              />
+            </div>
+            <div>
+              <label for="mcpServerToken" class="sr-only">Authorization token</label>
+              <Input
+                type="text"
+                id="mcpServerToken"
+                name="mcpServerToken"
+                bind:value={mcpServer.token}
+                placeholder="Authorization Token"
+              />
+            </div>
+          </div>
+          <RemoveButton label="Remove MCP server" onclick={() => removeMcpServer(index)} />
+        </div>
+      {:else}
+        <p class="text-sm text-gray-500 dark:text-gray-400">None added.</p>
+      {/each}
+      <SecondaryButton size="sm" onclick={addMcpServer}>
+        <span aria-hidden="true" class="mr-1">+</span>
+        Add MCP Server
+      </SecondaryButton>
+    </div>
+  </FormSection>
+
+  <FormActions cancelHref={`/app/${subdomain}/voice-bots`}>
+    <Button type="submit" progress={isLoading}>{isUpdate ? 'Update' : 'Create'}</Button>
+  </FormActions>
 </form>

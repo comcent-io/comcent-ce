@@ -51,7 +51,10 @@ function uniquePhone(testInfo: TestInfo, suffix: number) {
   return `+1${tail}`;
 }
 
-async function createVoiceBotOrg(testInfo: TestInfo, queueNames: string[] = []): Promise<TestOrg> {
+async function createVoiceBotOrg(
+  testInfo: TestInfo,
+  queueNames: string[] = [],
+): Promise<TestOrg> {
   const client = createClient();
   await client.connect();
 
@@ -198,7 +201,12 @@ async function seedVoiceBot(org: TestOrg, voiceBot: SeededVoiceBot) {
   }
 }
 
-async function seedNumberWithVoiceBot(org: TestOrg, voiceBot: SeededVoiceBot, name: string, number: string) {
+async function seedNumberWithVoiceBot(
+  org: TestOrg,
+  voiceBot: SeededVoiceBot,
+  name: string,
+  number: string,
+) {
   const client = createClient();
   await client.connect();
 
@@ -225,7 +233,14 @@ async function seedNumberWithVoiceBot(org: TestOrg, voiceBot: SeededVoiceBot, na
         VALUES
           ($1, $2, $3, '', false, $4::jsonb, $5, $6, NOW(), NOW())
       `,
-      [uuid(), name, number, JSON.stringify(inboundFlowGraph), org.id, org.sipTrunks[0].id],
+      [
+        uuid(),
+        name,
+        number,
+        JSON.stringify(inboundFlowGraph),
+        org.id,
+        org.sipTrunks[0].id,
+      ],
     );
   } finally {
     await client.end();
@@ -244,7 +259,9 @@ async function gotoVoiceBotsPage(page: Page, subdomain: string) {
 async function gotoCreateVoiceBotPage(page: Page, subdomain: string) {
   await gotoVoiceBotsPage(page, subdomain);
   await page.getByRole('link', { name: 'Create' }).click();
-  await expect(page.getByRole('heading', { name: 'Create Voice Bot' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Create Voice Bot' }),
+  ).toBeVisible();
 }
 
 type VoiceBotFormInput = {
@@ -261,12 +278,18 @@ type VoiceBotFormInput = {
 
 async function fillVoiceBotForm(page: Page, input: VoiceBotFormInput) {
   await page.getByPlaceholder('Voice Bot Name').fill(input.name);
-  await page.getByPlaceholder('Write your instructions here').fill(input.instructions);
   await page
-    .getByPlaceholder('If conversation is not related to voice-bot name, then reply that you can\'t respond. If unrelated question is asked more than three times then hang up.')
+    .getByPlaceholder('Write your instructions here')
+    .fill(input.instructions);
+  await page
+    .getByPlaceholder(
+      "If conversation is not related to voice-bot name, then reply that you can't respond. If unrelated question is asked more than three times then hang up.",
+    )
     .fill(input.notToDoInstructions);
   await page
-    .getByPlaceholder('Greet with appropriate greeting for EST timezone and explicitly mention that you are on recorded line')
+    .getByPlaceholder(
+      'Greet with appropriate greeting for EST timezone and explicitly mention that you are on recorded line',
+    )
     .fill(input.greetingInstructions);
 
   if (input.pipeline) {
@@ -278,11 +301,17 @@ async function fillVoiceBotForm(page: Page, input: VoiceBotFormInput) {
   if ((await urlInputs.count()) === 0) {
     await page.getByRole('button', { name: /Add MCP Server/i }).click();
   }
-  await page.locator('input[placeholder="MCP Server URL"]').first().fill(mcpServer.url);
-  await page.locator('input[placeholder="Authorization Token"]').first().fill(mcpServer.token);
+  await page
+    .locator('input[placeholder="MCP Server URL"]')
+    .first()
+    .fill(mcpServer.url);
+  await page
+    .locator('input[placeholder="Authorization Token"]')
+    .first()
+    .fill(mcpServer.token);
 
   if (input.isHangup !== undefined) {
-    const hangup = page.getByLabel('hangup (Description: used to hang up the call)');
+    const hangup = page.getByLabel('Hang up');
     if (input.isHangup) {
       await hangup.check();
     } else {
@@ -291,7 +320,7 @@ async function fillVoiceBotForm(page: Page, input: VoiceBotFormInput) {
   }
 
   if (input.isEnqueue !== undefined) {
-    const enqueue = page.getByLabel('enqueue (Description: used to transfer to queue specified in params)');
+    const enqueue = page.getByLabel('Transfer to a queue');
     if (input.isEnqueue) {
       await enqueue.check();
       if (input.queueName) {
@@ -311,12 +340,21 @@ async function fillVoiceBotForm(page: Page, input: VoiceBotFormInput) {
   }
 }
 
-async function openVoiceBotEditPage(page: Page, subdomain: string, voiceBotName: string) {
+async function openVoiceBotEditPage(
+  page: Page,
+  subdomain: string,
+  voiceBotName: string,
+) {
   await gotoVoiceBotsPage(page, subdomain);
-  const row = page.locator('tbody tr').filter({ hasText: voiceBotName }).first();
+  const row = page
+    .locator('tbody tr')
+    .filter({ hasText: voiceBotName })
+    .first();
   await expect(row).toBeVisible();
   await row.getByRole('link', { name: 'Edit' }).click();
-  await expect(page.getByRole('heading', { name: 'Voice Bots Edit' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Edit voice bot' }),
+  ).toBeVisible();
 }
 
 function voiceBotRow(page: Page, name: string) {
@@ -327,8 +365,13 @@ function validationError(page: Page) {
   return page.locator('text=/should be at least|error|invalid/i').first();
 }
 
-test('Voice Bot page, add voice-bot successfully', async ({ page }, testInfo) => {
-  const org = await createVoiceBotOrg(testInfo, ['sales_queue', 'service_queue']);
+test('Voice Bot page, add voice-bot successfully', async ({
+  page,
+}, testInfo) => {
+  const org = await createVoiceBotOrg(testInfo, [
+    'sales_queue',
+    'service_queue',
+  ]);
   const name = `car dealer ${uniqueSlug(testInfo)}`;
 
   await gotoCreateVoiceBotPage(page, org.subdomain);
@@ -338,7 +381,8 @@ test('Voice Bot page, add voice-bot successfully', async ({ page }, testInfo) =>
       'You are a helpful assistant that helps customers search for cars and book appointments.',
     notToDoInstructions:
       'If the caller asks unrelated questions more than three times, politely refuse and hang up.',
-    greetingInstructions: 'Greet callers appropriately for EST timezone and mention the line is recorded.',
+    greetingInstructions:
+      'Greet callers appropriately for EST timezone and mention the line is recorded.',
     isHangup: true,
     isEnqueue: true,
     queueName: org.queues[0].name,
@@ -350,23 +394,35 @@ test('Voice Bot page, add voice-bot successfully', async ({ page }, testInfo) =>
 
   await openVoiceBotEditPage(page, org.subdomain, name);
   await expect(page.getByPlaceholder('Voice Bot Name')).toHaveValue(name);
-  await expect(page.getByPlaceholder('Write your instructions here')).toHaveValue(
+  await expect(
+    page.getByPlaceholder('Write your instructions here'),
+  ).toHaveValue(
     'You are a helpful assistant that helps customers search for cars and book appointments.',
   );
   await expect(
-    page.getByPlaceholder('If conversation is not related to voice-bot name, then reply that you can\'t respond. If unrelated question is asked more than three times then hang up.'),
+    page.getByPlaceholder(
+      "If conversation is not related to voice-bot name, then reply that you can't respond. If unrelated question is asked more than three times then hang up.",
+    ),
   ).toHaveValue(
     'If the caller asks unrelated questions more than three times, politely refuse and hang up.',
   );
   await expect(
-    page.getByPlaceholder('Greet with appropriate greeting for EST timezone and explicitly mention that you are on recorded line'),
-  ).toHaveValue('Greet callers appropriately for EST timezone and mention the line is recorded.');
-  await expect(page.getByLabel('hangup (Description: used to hang up the call)')).toBeChecked();
-  await expect(page.getByLabel('enqueue (Description: used to transfer to queue specified in params)')).toBeChecked();
-  await expect(page.locator('select#queueName').first()).toHaveValue(org.queues[0].name);
+    page.getByPlaceholder(
+      'Greet with appropriate greeting for EST timezone and explicitly mention that you are on recorded line',
+    ),
+  ).toHaveValue(
+    'Greet callers appropriately for EST timezone and mention the line is recorded.',
+  );
+  await expect(page.getByLabel('Hang up')).toBeChecked();
+  await expect(page.getByLabel('Transfer to a queue')).toBeChecked();
+  await expect(page.locator('select#queueName').first()).toHaveValue(
+    org.queues[0].name,
+  );
 });
 
-test('Voice Bot page, add voice-bot with invalid input', async ({ page }, testInfo) => {
+test('Voice Bot page, add voice-bot with invalid input', async ({
+  page,
+}, testInfo) => {
   const org = await createVoiceBotOrg(testInfo, ['sales_queue']);
 
   await gotoCreateVoiceBotPage(page, org.subdomain);
@@ -382,17 +438,26 @@ test('Voice Bot page, add voice-bot with invalid input', async ({ page }, testIn
   await page.getByRole('button', { name: 'Create' }).click();
 
   await expect(validationError(page)).toBeVisible();
-  await expect(page).toHaveURL(new RegExp(`/app/${org.subdomain}/voice-bots/create$`));
+  await expect(page).toHaveURL(
+    new RegExp(`/app/${org.subdomain}/voice-bots/create$`),
+  );
 });
 
-test('Voice Bot page, update voice-bot successfully', async ({ page }, testInfo) => {
-  const org = await createVoiceBotOrg(testInfo, ['sales_queue', 'service_queue']);
+test('Voice Bot page, update voice-bot successfully', async ({
+  page,
+}, testInfo) => {
+  const org = await createVoiceBotOrg(testInfo, [
+    'sales_queue',
+    'service_queue',
+  ]);
   const voiceBot: SeededVoiceBot = {
     id: uuid(),
     name: `car dealer ${uniqueSlug(testInfo)}`,
     instructions: 'search the car and book appointment',
-    notToDoInstructions: 'Only help with searching cars and booking appointments.',
-    greetingInstructions: 'Greet customers with good messages according to EST timezone.',
+    notToDoInstructions:
+      'Only help with searching cars and booking appointments.',
+    greetingInstructions:
+      'Greet customers with good messages according to EST timezone.',
     mcpServers: [DEFAULT_MCP_SERVER],
     isHangup: true,
     isEnqueue: true,
@@ -405,8 +470,10 @@ test('Voice Bot page, update voice-bot successfully', async ({ page }, testInfo)
   await fillVoiceBotForm(page, {
     name: `${voiceBot.name} updated`,
     instructions: 'search the cars and book appointment with specific date',
-    notToDoInstructions: 'Only help with car search and appointment booking for a specific date.',
-    greetingInstructions: 'Greet customers with the best EST-friendly welcome message.',
+    notToDoInstructions:
+      'Only help with car search and appointment booking for a specific date.',
+    greetingInstructions:
+      'Greet customers with the best EST-friendly welcome message.',
     mcpServer: { url: 'http://server:4000/mcp', token: 'abcdefghijklm' },
     isHangup: true,
     isEnqueue: true,
@@ -418,12 +485,20 @@ test('Voice Bot page, update voice-bot successfully', async ({ page }, testInfo)
   await expect(voiceBotRow(page, `${voiceBot.name} updated`)).toBeVisible();
 
   await openVoiceBotEditPage(page, org.subdomain, `${voiceBot.name} updated`);
-  await expect(page.getByPlaceholder('Voice Bot Name')).toHaveValue(`${voiceBot.name} updated`);
-  await expect(page.locator('input[placeholder="Authorization Token"]').first()).toHaveValue('abcdefghijklm');
-  await expect(page.locator('select#queueName').first()).toHaveValue(org.queues[1].name);
+  await expect(page.getByPlaceholder('Voice Bot Name')).toHaveValue(
+    `${voiceBot.name} updated`,
+  );
+  await expect(
+    page.locator('input[placeholder="Authorization Token"]').first(),
+  ).toHaveValue('abcdefghijklm');
+  await expect(page.locator('select#queueName').first()).toHaveValue(
+    org.queues[1].name,
+  );
 });
 
-test('Voice Bot page, update voice-bot with invalid input', async ({ page }, testInfo) => {
+test('Voice Bot page, update voice-bot with invalid input', async ({
+  page,
+}, testInfo) => {
   const org = await createVoiceBotOrg(testInfo, ['sales_queue']);
   const voiceBot: SeededVoiceBot = {
     id: uuid(),
@@ -455,7 +530,9 @@ test('Voice Bot page, update voice-bot with invalid input', async ({ page }, tes
   await expect(validationError(page)).toBeVisible();
 });
 
-test('Voice Bot page, delete the voice-bot successfully', async ({ page }, testInfo) => {
+test('Voice Bot page, delete the voice-bot successfully', async ({
+  page,
+}, testInfo) => {
   const org = await createVoiceBotOrg(testInfo);
   const voiceBot: SeededVoiceBot = {
     id: uuid(),
@@ -488,7 +565,9 @@ test('Voice Bot page, delete the voice-bot successfully', async ({ page }, testI
   await expect(row).toHaveCount(0);
 });
 
-test('Voice Bot page, deleting voice-bot present in numbers inbound flow graph should fail', async ({ page }, testInfo) => {
+test('Voice Bot page, deleting voice-bot present in numbers inbound flow graph should fail', async ({
+  page,
+}, testInfo) => {
   const org = await createVoiceBotOrg(testInfo);
   const protectedNumber = uniquePhone(testInfo, 72);
   const voiceBot: SeededVoiceBot = {
@@ -504,7 +583,12 @@ test('Voice Bot page, deleting voice-bot present in numbers inbound flow graph s
     pipeline: 'DEEPGRAM_AND_OPENAI',
   };
   await seedVoiceBot(org, voiceBot);
-  await seedNumberWithVoiceBot(org, voiceBot, 'Protected Number', protectedNumber);
+  await seedNumberWithVoiceBot(
+    org,
+    voiceBot,
+    'Protected Number',
+    protectedNumber,
+  );
 
   await gotoVoiceBotsPage(page, org.subdomain);
   const row = voiceBotRow(page, voiceBot.name);
@@ -514,7 +598,10 @@ test('Voice Bot page, deleting voice-bot present in numbers inbound flow graph s
 
   await expect(
     page.getByText(
-      new RegExp(`Cannot delete ${voiceBot.name} as it is used in inbound flow graph in numbers ${protectedNumber.replace('+', '\\+')}`, 'i'),
+      new RegExp(
+        `Cannot delete ${voiceBot.name} as it is used in inbound flow graph in numbers ${protectedNumber.replace('+', '\\+')}`,
+        'i',
+      ),
     ),
   ).toBeVisible();
   await expect(row).toHaveCount(1);

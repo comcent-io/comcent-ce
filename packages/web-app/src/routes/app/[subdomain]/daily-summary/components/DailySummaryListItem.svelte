@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { DailySummary } from './types';
-  import { formatDate } from './utils';
+  import { formatDate } from '$lib/format';
 
   interface Props {
     summary: DailySummary;

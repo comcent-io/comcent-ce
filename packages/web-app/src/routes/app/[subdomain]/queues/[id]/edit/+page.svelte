@@ -3,6 +3,8 @@
   import QueueForm from '../../QueueForm.svelte';
   import QueueMember from '../../QueueMember.svelte';
   import { page } from '$app/state';
+  import Card from '$lib/components/Card.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
 
   let data: any = $state();
   let formData = $state({});
@@ -20,15 +22,18 @@
   });
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Edit Queue</h3>
+<PageHeader
+  title="Edit queue"
+  description="How long agents rest between calls, and who takes this queue's calls."
+  backHref={`/app/${page.params.subdomain}/queues`}
+  backLabel="Queues"
+/>
 
 {#if data}
-  <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
-    <div
-      class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
-    >
+  <div class="grid gap-6 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+    <Card>
       <QueueForm {formData} queueId={data.queue.id} isUpdate={true} />
-    </div>
+    </Card>
     <QueueMember
       subdomain={data.subdomain}
       queueId={data.queueId}

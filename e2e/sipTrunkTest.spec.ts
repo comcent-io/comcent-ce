@@ -240,6 +240,31 @@ test('Sip trunk page, update sip trunk successfully', async ({ page }) => {
   await expect(sipTrunkRow(page, existingName)).toHaveCount(0);
 });
 
+// A trunk saved without credentials loads them as null, which the form's
+// check used to refuse even with the box unticked.
+test('Sip trunk page, update a sip trunk that has no outbound credentials', async ({
+  page,
+}) => {
+  const existingName = uniqueSipTrunkName('NoCredEdit');
+  const updatedName = uniqueSipTrunkName('NoCredEdited');
+
+  await createSipTrunkAndExpectSuccess(page, {
+    name: existingName,
+    provideOutboundCredentials: false,
+    proxyAddress: 'no-cred-edit.example.com',
+    inboundIps: ['3.15.8.1/26'],
+  });
+
+  await updateSipTrunk(page, existingName, {
+    name: updatedName,
+    provideOutboundCredentials: false,
+    proxyAddress: 'no-cred-edit.example.com',
+    inboundIps: ['3.15.8.1/26'],
+  });
+  await expect(page).toHaveURL('/app/acme/sip-trunks');
+  await expect(sipTrunkRow(page, updatedName)).toHaveCount(1);
+});
+
 test('Sip trunk page, update with invalid proxy address', async ({ page }) => {
   const existingName = uniqueSipTrunkName('InvalidProxyBase');
   const attemptedName = uniqueSipTrunkName('InvalidProxyTry');

@@ -3,7 +3,8 @@
   import { page } from '$app/state';
   import { getJson } from '$lib/http';
   import SipTrunkForm from '../../SipTrunkForm.svelte';
-  import ErrorMessage from '$lib/components/ErrorMessage.svelte';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
+  import SkeletonLoadingList from '$lib/components/SkeletonLoadingList.svelte';
 
   let sipTrunk: any = $state({});
   type PageError = { message: string; formErrors: { message: string; path: string[] }[] };
@@ -45,13 +46,16 @@
   });
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Sip Trunks Edit</h3>
+<PageHeader
+  title="Edit SIP trunk"
+  description="A SIP trunk connects Comcent to your phone carrier, for the numbers you bring and the calls your team makes through it."
+  backHref={`/app/${page.params.subdomain}/sip-trunks`}
+  backLabel="SIP trunks"
+/>
 
-<div class="w-1/2">
-  {#if error}
-    <ErrorMessage {error} />
-  {/if}
-  {#if !isLoading}
-    <SipTrunkForm formData={sipTrunk ?? {}} isUpdate={true} {showCredentialFields} bind:error />
-  {/if}
-</div>
+<!-- The form shows any error itself, including one loading the trunk. -->
+{#if isLoading}
+  <SkeletonLoadingList />
+{:else}
+  <SipTrunkForm formData={sipTrunk ?? {}} isUpdate={true} {showCredentialFields} bind:error />
+{/if}

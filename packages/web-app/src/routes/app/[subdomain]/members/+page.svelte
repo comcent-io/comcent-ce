@@ -4,6 +4,7 @@
   import { getJson, postJson } from '$lib/http';
   import Pagination from '$lib/components/Pagination.svelte';
   import toast from '$lib/toast';
+  import { formatDateTime } from '$lib/format';
   import Button from '$lib/components/Button.svelte';
   import CopyIcon from '$lib/components/Icons/CopyIcon.svelte';
 
@@ -138,11 +139,6 @@
     await fetchMembers();
     toast.success('Invite resent successfully');
     resendInProgressInviteId = null;
-  }
-
-  function formatInviteSentAt(timestamp: string | null) {
-    if (!timestamp) return 'Not sent';
-    return new Date(timestamp).toLocaleString();
   }
 </script>
 
@@ -349,7 +345,7 @@
               <td class="px-6 py-4">{invite.email}</td>
               <td class="px-6 py-4">{invite.role}</td>
               <td class="px-6 py-4">{invite.status}</td>
-              <td class="px-6 py-4">{formatInviteSentAt(invite.inviteEmailSentAt)}</td>
+              <td class="px-6 py-4">{formatDateTime(invite.inviteEmailSentAt, 'Not sent')}</td>
               <td class="px-6 py-4">{invite.inviteResendCount}</td>
               <td class="px-6 py-4">
                 <button

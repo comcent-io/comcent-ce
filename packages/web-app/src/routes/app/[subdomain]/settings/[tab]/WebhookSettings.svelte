@@ -7,6 +7,34 @@
   import WebhookForm from './WebhookForm.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Button from '$lib/components/Button.svelte';
+  import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import EmptyState from '$lib/components/form/EmptyState.svelte';
+  import FormSection from '$lib/components/form/FormSection.svelte';
+
+  // Which rows show their token in full.
+  let revealed: Record<string, boolean> = $state({});
+
+  const EVENT_LABELS: Record<string, string> = {
+    CALL_UPDATE: 'Call update',
+    PRESENCE_UPDATE: 'Presence update',
+  };
+
+  function eventLabel(event: string) {
+    return EVENT_LABELS[event] ?? event;
+  }
+
+  function maskToken(token: string | undefined) {
+    return token ? `${token.slice(0, 6)}${'•'.repeat(12)}` : '—';
+  }
+
+  async function copyToken(token: string) {
+    try {
+      await navigator.clipboard.writeText(token);
+      toast.success('Auth token copied');
+    } catch {
+      toast.error('Could not copy the token. Use Show and copy it by hand.');
+    }
+  }
 
   type OrgWebhook = {
     id: string;
@@ -70,6 +98,16 @@
     creatingProgress = false;
   }
 
+  // Deleting asks first: it can't be undone, and the receiver silently stops
+  // getting calls.
+  let webhookToDelete: OrgWebhook | null = $state(null);
+
+  async function confirmDelete() {
+    const webhook = webhookToDelete;
+    webhookToDelete = null;
+    if (webhook) await deleteWebhook(webhook);
+  }
+
   async function deleteWebhook(webhook: OrgWebhook) {
     const result = await deleteJson(
       `/api/v2/${page.params.subdomain}/settings/webhooks/${webhook.id}`,
@@ -104,146 +142,180 @@
   }
 </script>
 
-{#if loadingWebhook}
-  <SkeletonLoadingList className="my-4" />
-{:else}
-  <div class="relative overflow-x-auto shadow-md sm:rounded-lg mt-4">
-    <div>
-      <Button type="button" onclick={() => (showNewWebhookModal = true)}>New Webhook</Button>
-    </div>
+<FormSection
+  title="Webhooks"
+  description="We POST JSON to your URL when the events you choose happen, so your own systems can react to calls."
+  className="mt-4"
+>
+  {#snippet aside()}
+    <Button type="button" onclick={() => (showNewWebhookModal = true)}>New Webhook</Button>
+  {/snippet}
 
-    <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400 mb-20">
-      <caption>Webhooks</caption>
-      <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-        <tr>
-          <th scope="col" class="px-6 py-3">Name</th>
-          <th scope="col" class="px-6 py-3">URL</th>
-          <th scope="col" class="px-6 py-3">Auth Token</th>
-          <th scope="col" class="px-6 py-3">Events</th>
-          <th scope="col" class="px-6 py-3">
-            <span class="sr-only">Edit</span>
-          </th>
-          <th scope="col" class="px-6 py-3">
-            <span class="sr-only">Delete</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each webhooks as webhook}
-          <tr
-            class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-          >
-            <th
-              scope="row"
-              class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
-            >
-              {webhook.name}
-            </th>
-
-            <th
-              scope="row"
-              class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
-            >
-              {webhook.webhookUrl}
-            </th>
-
-            <td class="px-6 py-4">
-              <div class="flex">
-                <input
-                  type="password"
-                  autocomplete="off"
-                  readonly
-                  class="rounded-none rounded-l-lg bg-gray-300 border text-gray-900 focus:ring-blue-500 focus:border-blue-500 block flex-1 min-w-0 w-full text-sm border-gray-300 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                  value={webhook.authToken}
-                />
-                <button
-                  onclick={() => navigator.clipboard.writeText(webhook.authToken)}
-                  class="dark:text-gray-400 dark:border-gray-600 border border-l-0 border-gray-300 rounded-r-md px-3 text-gray-900 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium text-sm p-2.5 text-center inline-flex items-center mr-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-                >
-                  <svg
-                    class="w-6 h-6 text-gray-800 dark:text-white"
-                    aria-hidden="true"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="currentColor"
-                    viewBox="0 0 18 20"
-                  >
-                    <path
-                      d="M5 9V4.13a2.96 2.96 0 0 0-1.293.749L.879 7.707A2.96 2.96 0 0 0 .13 9H5Zm11.066-9H9.829a2.98 2.98 0 0 0-2.122.879L7 1.584A.987.987 0 0 0 6.766 2h4.3A3.972 3.972 0 0 1 15 6v10h1.066A1.97 1.97 0 0 0 18 14V2a1.97 1.97 0 0 0-1.934-2Z"
-                    />
-                    <path
-                      d="M11.066 4H7v5a2 2 0 0 1-2 2H0v7a1.969 1.969 0 0 0 1.933 2h9.133A1.97 1.97 0 0 0 13 18V6a1.97 1.97 0 0 0-1.934-2Z"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </td>
-
-            <th
-              scope="row"
-              class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
-            >
-              {webhook.events}
-            </th>
-
-            <td class="px-6 py-4 text-right">
-              <button
-                type="button"
-                onclick={() => {
-                  selectedWebhook = {
-                    id: webhook.id,
-                    name: webhook.name,
-                    webhookUrl: webhook.webhookUrl,
-                    callUpdate: webhook.events.includes('CALL_UPDATE'),
-                    presenceUpdate: webhook.events.includes('PRESENCE_UPDATE'),
-                  };
-                  showEditWebhookModal = true;
-                }}
-                class="font-medium text-green-600 dark:text-green-500 hover:underline mr-4"
-              >
-                Edit
-              </button>
-            </td>
-
-            <td class="px-6 py-4 text-right">
-              <button
-                type="submit"
-                class="font-medium text-blue-600 dark:text-blue-500 hover:underline"
-                onclick={() => deleteWebhook(webhook)}
-              >
-                Delete
-              </button>
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+  <div
+    class="rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-600 dark:bg-gray-900 dark:text-gray-300"
+  >
+    <p>
+      <span class="font-medium text-gray-900 dark:text-white">Call update event:</span>
+      sent when a call ends and its call story is ready. The body is
+      <code class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700">
+        {`{"type": "NEW_CALL_STORY", "data": …}`}
+      </code>
+      where data holds the call's details.
+    </p>
+    <p>
+      <span class="font-medium text-gray-900 dark:text-white">Presence update event:</span>
+      sent when a member's presence changes, for example from available to on a call. The body is
+      <code class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700">
+        {`{"type": "PRESENCE_UPDATE", "data": …}`}
+      </code>
+      where data holds the member, the new presence and the one before it.
+    </p>
+    <p class="mt-2">
+      Each request carries the webhook's auth token in the
+      <code class="rounded bg-gray-200 px-1 text-xs dark:bg-gray-700">X-Api-Token</code>
+      header. Check it before trusting the request.
+    </p>
   </div>
-{/if}
+
+  {#if loadingWebhook}
+    <SkeletonLoadingList />
+  {:else if webhooks.length === 0}
+    <EmptyState
+      title="No webhooks yet"
+      description="Add one to receive every finished call in your own systems, such as a CRM or a data warehouse."
+    >
+      {#snippet action()}
+        <Button type="button" onclick={() => (showNewWebhookModal = true)}>Add webhook</Button>
+      {/snippet}
+    </EmptyState>
+  {:else}
+    <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+      <table class="w-full text-left text-sm text-gray-600 dark:text-gray-300">
+        <thead
+          class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+        >
+          <tr>
+            <th scope="col" class="px-4 py-3">Webhook</th>
+            <th scope="col" class="px-4 py-3">Events</th>
+            <th scope="col" class="px-4 py-3">Auth token</th>
+            <th scope="col" class="px-4 py-3"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+          {#each webhooks as webhook (webhook.id)}
+            <tr class="bg-white align-top dark:bg-gray-800">
+              <th scope="row" class="px-4 py-3 font-normal">
+                <span class="block font-medium text-gray-900 dark:text-white">{webhook.name}</span>
+                <span class="block break-all text-xs text-gray-500 dark:text-gray-400">
+                  {webhook.webhookUrl}
+                </span>
+              </th>
+
+              <td class="px-4 py-3">
+                <!-- The raw event names for screen readers (and the e2e
+                     specs); the badges are the same, readable. -->
+                <span class="sr-only">{webhook.events}</span>
+                <span class="flex flex-wrap gap-1" aria-hidden="true">
+                  {#each webhook.events ?? [] as event (event)}
+                    <span
+                      class="rounded-full px-2 py-0.5 text-xs font-medium {event === 'CALL_UPDATE'
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                        : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}"
+                    >
+                      {eventLabel(event)}
+                    </span>
+                  {/each}
+                </span>
+              </td>
+
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <code
+                    class="max-w-[14rem] truncate rounded bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                  >
+                    {revealed[webhook.id] ? webhook.authToken : maskToken(webhook.authToken)}
+                  </code>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-blue-600 hover:underline dark:text-blue-500"
+                    aria-label={revealed[webhook.id] ? 'Hide auth token' : 'Show auth token'}
+                    onclick={() => (revealed[webhook.id] = !revealed[webhook.id])}
+                  >
+                    {revealed[webhook.id] ? 'Hide' : 'Show'}
+                  </button>
+                  <button
+                    type="button"
+                    class="text-xs font-medium text-blue-600 hover:underline dark:text-blue-500"
+                    aria-label="Copy auth token"
+                    onclick={() => copyToken(webhook.authToken)}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </td>
+
+              <td class="whitespace-nowrap px-4 py-3 text-right">
+                <button
+                  type="button"
+                  onclick={() => {
+                    selectedWebhook = {
+                      id: webhook.id,
+                      name: webhook.name,
+                      webhookUrl: webhook.webhookUrl,
+                      callUpdate: webhook.events.includes('CALL_UPDATE'),
+                      presenceUpdate: webhook.events.includes('PRESENCE_UPDATE'),
+                    };
+                    showEditWebhookModal = true;
+                  }}
+                  class="mr-4 font-medium text-blue-600 hover:underline dark:text-blue-500"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="font-medium text-red-600 hover:underline dark:text-red-500"
+                  onclick={() => (webhookToDelete = webhook)}
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {/if}
+</FormSection>
 
 <Dialog
-  title="New Webhook"
+  title="New webhook"
   showDialog={showNewWebhookModal}
   onClose={() => {
     showNewWebhookModal = false;
   }}
 >
-  <div class="px-6 py-6 lg:px-8">
-    <WebhookForm {formData} onSubmit={createWebhook} isProgress={creatingProgress} />
-  </div>
+  <WebhookForm {formData} onSubmit={createWebhook} isProgress={creatingProgress} />
 </Dialog>
 
 <Dialog
-  title="Update Webhook"
+  title="Edit webhook"
   showDialog={showEditWebhookModal}
   onClose={() => {
     showEditWebhookModal = false;
   }}
 >
-  <div class="px-6 py-6 lg:px-8">
-    <WebhookForm
-      formData={selectedWebhook}
-      onSubmit={onUpdateWebhook}
-      isProgress={updateProgress}
-    />
-  </div>
+  <WebhookForm
+    formData={selectedWebhook}
+    onSubmit={onUpdateWebhook}
+    isProgress={updateProgress}
+    buttonText="Save"
+  />
 </Dialog>
+
+{#if webhookToDelete}
+  <ConfirmDialog
+    message={`Delete the webhook "${webhookToDelete.name}"? Nothing more is sent to ${webhookToDelete.webhookUrl}. This can't be undone.`}
+    onCancel={() => (webhookToDelete = null)}
+    onConfirm={confirmDelete}
+  />
+{/if}

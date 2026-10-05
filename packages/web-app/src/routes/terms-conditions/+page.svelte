@@ -19,7 +19,8 @@
       return;
     }
 
-    await goto('/org');
+    // Where signing in lands: the last used org, or the organization list.
+    await goto('/app');
   }
 </script>
 

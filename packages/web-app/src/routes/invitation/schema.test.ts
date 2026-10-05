@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { USERNAME_RULE } from '$lib/schema/username';
 import { invitationFormData } from './schema';
 
 test('username in E.164 format is invalid', () => {
@@ -64,4 +65,12 @@ test('username starting with letter and followed by numbers is valid', () => {
 test('username starting with letter and mix of upper and lower case is valid', () => {
   const parseData = invitationFormData.safeParse({ username: 'UserName' });
   expect(parseData.success).toBe(true);
+});
+
+test('a bad username says the rule, the same one creating an org says', () => {
+  for (const username of ['ab', 'a'.repeat(21), '9lives']) {
+    const parseData = invitationFormData.safeParse({ username });
+    expect(parseData.success).toBe(false);
+    expect(parseData.error?.issues[0].message).toBe(USERNAME_RULE);
+  }
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import moment from 'moment-timezone';
+  import { formatDateTime } from '$lib/format';
 
   interface Props {
     caller: string;
@@ -98,7 +98,7 @@
           ></path>
         </svg>
         <span class="text-xs font-medium text-slate-700 dark:text-slate-300">
-          {moment(startAt).format('MMM DD, YYYY • hh:mm A')}
+          {formatDateTime(startAt)}
         </span>
       </div>
       <div class="bg-violet-600 rounded-lg px-3 py-2 shadow-sm">

@@ -1,16 +1,18 @@
 <script lang="ts">
-  import ErrorMessage from '$lib/components/ErrorMessage.svelte';
+  import { page } from '$app/state';
+  import PageHeader from '$lib/components/form/PageHeader.svelte';
   import SipTrunkForm from '../SipTrunkForm.svelte';
 
   type PageError = { message: string; formErrors: { message: string; path: string[] }[] };
   let error: PageError | null = $state(null);
 </script>
 
-<h3 class="text-3xl font-bold dark:text-white">Create Sip Trunks</h3>
+<PageHeader
+  title="Add SIP trunk"
+  description="A SIP trunk connects Comcent to your phone carrier, for the numbers you bring and the calls your team makes through it."
+  backHref={`/app/${page.params.subdomain}/sip-trunks`}
+  backLabel="SIP trunks"
+/>
 
-<div class="w-1/2">
-  {#if error}
-    <ErrorMessage {error} />
-  {/if}
-  <SipTrunkForm bind:error />
-</div>
+<!-- The form shows any error itself. -->
+<SipTrunkForm bind:error />

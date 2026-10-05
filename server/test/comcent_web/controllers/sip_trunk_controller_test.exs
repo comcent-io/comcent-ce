@@ -10,6 +10,7 @@ defmodule ComcentWeb.SipTrunkControllerTest do
     previous_signing_key = System.get_env("SIGNING_KEY")
     System.put_env("SIGNING_KEY", "test-signing-key")
     previous_sbc = Application.get_env(:comcent, :sbc)
+    previous_provisioning = Application.get_env(:comcent, :provisioning)
 
     on_exit(fn ->
       if previous_signing_key,
@@ -17,6 +18,7 @@ defmodule ComcentWeb.SipTrunkControllerTest do
         else: System.delete_env("SIGNING_KEY")
 
       Application.put_env(:comcent, :sbc, previous_sbc)
+      Application.put_env(:comcent, :provisioning, previous_provisioning)
     end)
 
     org =
@@ -48,11 +50,17 @@ defmodule ComcentWeb.SipTrunkControllerTest do
     %{org: org, token: Auth.sign_session_token(user, "password")}
   end
 
-  defp put_public_ip(public_ip) do
+  defp put_config(public_ip, sip_host) do
     Application.put_env(
       :comcent,
       :sbc,
       Keyword.put(Application.get_env(:comcent, :sbc) || [], :public_ip, public_ip)
+    )
+
+    Application.put_env(
+      :comcent,
+      :provisioning,
+      Keyword.put(Application.get_env(:comcent, :provisioning) || [], :sbc_sip_fqdn, sip_host)
     )
   end
 
@@ -62,22 +70,26 @@ defmodule ComcentWeb.SipTrunkControllerTest do
     |> get("/api/v2/#{org.subdomain}/sip-trunks/settings")
   end
 
-  test "returns the configured public SIP address", %{conn: conn, org: org, token: token} do
-    put_public_ip("203.0.113.10")
+  test "returns the configured public SIP address and host", %{conn: conn, org: org, token: token} do
+    put_config("203.0.113.10", "sip.example.com")
 
-    assert get_settings(conn, org, token) |> json_response(200) == %{"publicIp" => "203.0.113.10"}
+    assert get_settings(conn, org, token) |> json_response(200) == %{
+             "publicIp" => "203.0.113.10",
+             "sipHost" => "sip.example.com"
+           }
   end
 
-  test "returns nothing when the address is not configured", %{
+  test "returns nothing for values that are not configured", %{
     conn: conn,
     org: org,
     token: token
   } do
-    put_public_ip(nil)
-    assert get_settings(conn, org, token) |> json_response(200) == %{"publicIp" => nil}
+    put_config(nil, "  ")
 
-    put_public_ip("  ")
-    assert get_settings(conn, org, token) |> json_response(200) == %{"publicIp" => nil}
+    assert get_settings(conn, org, token) |> json_response(200) == %{
+             "publicIp" => nil,
+             "sipHost" => nil
+           }
   end
 
   test "requires authentication", %{conn: conn, org: org} do

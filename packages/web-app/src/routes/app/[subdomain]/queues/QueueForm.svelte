@@ -2,6 +2,10 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import toast from '$lib/toast';
+  import Button from '$lib/components/Button.svelte';
+  import Field from '$lib/components/form/Field.svelte';
+  import FormActions from '$lib/components/form/FormActions.svelte';
+  import Input from '$lib/components/form/Input.svelte';
 
   interface Props {
     isUpdate?: boolean;
@@ -68,83 +72,84 @@
   }
 </script>
 
-<form method="POST" onsubmit={handleSubmit}>
-  <div class="mb-6">
-    <label for="name" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-      Name
-    </label>
-    <input
+<form method="POST" class="space-y-5" onsubmit={handleSubmit}>
+  <Field
+    for="name"
+    label="Name"
+    hint="Letters, numbers, dots and underscores, starting with a letter."
+  >
+    <Input
       type="text"
       id="name"
       name="name"
-      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
       placeholder="Queue Name (e.g. sales, service)"
       required
       bind:value={formData.name}
     />
-  </div>
-  <div class="mb-6">
-    <label for="extension" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-      Extension
-    </label>
-    <input
+  </Field>
+
+  <Field
+    for="extension"
+    label="Extension"
+    optional
+    hint="2 to 5 digits, not used by another queue."
+  >
+    <Input
       type="text"
       id="extension"
       name="extension"
-      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+      inputmode="numeric"
       placeholder="Optional extension number"
       bind:value={formData.extension}
     />
-  </div>
-  <div>
-    <label for="wrapUpTime" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-      Wrap Up Time
-    </label>
-    <input
+  </Field>
+
+  <Field
+    for="wrapUpTime"
+    label="Wrap-up time (seconds)"
+    hint="After a queue call ends, how long an agent stays in Wrap Up before the next call is offered."
+  >
+    <Input
       type="number"
       id="wrapUpTime"
       name="wrapUpTime"
-      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+      min="0"
       placeholder="Wrap up time in seconds"
       bind:value={formData.wrapUpTime}
     />
-  </div>
+  </Field>
 
-  <div>
-    <label
-      for="rejectDelayTime"
-      class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-    >
-      Reject Delay Time
-    </label>
-    <input
+  <Field
+    for="rejectDelayTime"
+    label="Reject delay (seconds)"
+    hint="After an agent declines or misses a call, how long they're left Busy before calls are offered again."
+  >
+    <Input
       type="number"
       id="rejectDelayTime"
       name="rejectDelayTime"
-      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+      min="0"
       placeholder="Reject delay time in seconds"
       bind:value={formData.rejectDelayTime}
     />
-  </div>
+  </Field>
 
-  <div>
-    <label for="maxNoAnswers" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-      Max No Answers
-    </label>
-    <input
+  <Field
+    for="maxNoAnswers"
+    label="Missed calls before logout"
+    hint="An agent who misses this many offered calls is logged out of the queue."
+  >
+    <Input
       type="number"
       id="maxNoAnswers"
       name="maxNoAnswers"
-      class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+      min="0"
       placeholder="Max number of unanswered calls"
       bind:value={formData.maxNoAnswers}
     />
-  </div>
+  </Field>
 
-  <button
-    type="submit"
-    class="text-white bg-blue-700 mt-4 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-  >
-    {`${isUpdate ? 'Update' : 'Add'}`}
-  </button>
+  <FormActions cancelHref={`/app/${subdomain}/queues`}>
+    <Button type="submit">{isUpdate ? 'Update' : 'Add'}</Button>
+  </FormActions>
 </form>
