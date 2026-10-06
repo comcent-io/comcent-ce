@@ -27,7 +27,8 @@ defmodule Comcent.Search do
 
   # Chunks each transcription, generates embeddings, and stores them in CallSearchVector
   defp chunk_and_embed_transcriptions(call_story, transcript_text) do
-    if transcript_text != "" do
+    # Embeddings come from OpenAI; OPENAI_API_KEY is optional.
+    if transcript_text != "" and Comcent.OpenAI.configured?() do
       # Chunk the text using TextChunker
       opts = [
         chunk_size: 250,

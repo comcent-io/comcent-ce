@@ -17,6 +17,15 @@ defmodule Comcent.DailySummary do
   This is called by the Quantum scheduler.
   """
   def generate_daily_summaries do
+    if OpenAI.configured?() do
+      run_daily_summaries()
+    else
+      Logger.info("Daily summary job skipped: OPENAI_API_KEY is not set")
+      :ok
+    end
+  end
+
+  defp run_daily_summaries do
     Logger.info("Daily summary job started")
 
     case get_orgs_and_process() do
