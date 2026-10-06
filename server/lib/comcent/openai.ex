@@ -2,6 +2,14 @@ defmodule Comcent.OpenAI do
   require Logger
   alias HTTPoison
 
+  @doc """
+  Whether an OpenAI API key is set. It is optional (OPENAI_API_KEY): without
+  it, promises, labels, daily summaries and search indexing are skipped.
+  """
+  def configured? do
+    (Application.get_env(:comcent, :openai) || [])[:api_key] not in [nil, ""]
+  end
+
   def embed_text(text) do
     config = Application.get_env(:comcent, :openai)
     openai_api_key = config[:api_key]

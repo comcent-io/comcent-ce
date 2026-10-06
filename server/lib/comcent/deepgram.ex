@@ -6,6 +6,15 @@ defmodule Comcent.Deepgram do
   use HTTPoison.Base
   require Logger
 
+  @doc """
+  Whether a Deepgram API key is set. It is optional (DEEPGRAM_API_KEY):
+  without it, transcription and the AI steps that need a transcript are
+  skipped.
+  """
+  def configured? do
+    (Application.get_env(:comcent, :deepgram) || [])[:api_key] not in [nil, ""]
+  end
+
   @default_timeout 30_000
   # Receive timeout needs to be longer as Deepgram downloads and transcribes audio
   @default_recv_timeout 120_000

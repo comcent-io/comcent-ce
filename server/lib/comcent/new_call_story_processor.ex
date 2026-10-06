@@ -41,7 +41,13 @@ defmodule Comcent.NewCallStoryProcessor do
   end
 
   defp process_active_org_call(call_story, org) do
-    if org.enable_transcription do
+    if org.enable_transcription and not Deepgram.configured?() do
+      Logger.info(
+        "Skipping AI Insights for call_story #{call_story.id}: DEEPGRAM_API_KEY is not set"
+      )
+    end
+
+    if org.enable_transcription and Deepgram.configured?() do
       with {:ok, transcriptions} <-
              generate_transcript_and_save(call_story, org.enable_sentiment_analysis),
            # Reload call_story to get the newly saved transcripts
@@ -60,15 +66,27 @@ defmodule Comcent.NewCallStoryProcessor do
           generate_and_save_summary(call_story, transcript_text, transcriptions)
         end
 
+        # Promises and labels are OpenAI steps; OPENAI_API_KEY is optional.
+        openai? = Comcent.OpenAI.configured?()
+
+        if not openai? do
+          Logger.info(
+            "Skipping promises and labels for call_story #{call_story.id}: OPENAI_API_KEY is not set"
+          )
+        end
+
         agent_transcript = extract_agent_transcript(transcript_text)
         Logger.info("Agent transcript: #{inspect(agent_transcript)}")
-        generate_and_save_promise(call_story, agent_transcript)
+
+        if openai? do
+          generate_and_save_promise(call_story, agent_transcript)
+        end
 
         with vcon <- VCon.generate_vcon(reloaded_call_story) do
           WebhookPusher.push_to_webhook(reloaded_call_story, vcon)
         end
 
-        if org.enable_labels do
+        if org.enable_labels and openai? do
           generate_and_save_labels(org, call_story, transcript_text)
         end
 
