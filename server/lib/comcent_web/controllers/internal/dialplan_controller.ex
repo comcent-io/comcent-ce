@@ -115,7 +115,8 @@ defmodule ComcentWeb.Internal.DialplanController do
             member = get_member(caller_subdomain, destination_number)
 
             if member do
-              Logger.info("callerMember: #{inspect(caller_member)}")
+              # Not the whole member: it carries their SIP password.
+              Logger.info("callerMember: #{caller_member && caller_member.username}")
 
               {:ok,
                dial_member_dialplan(member, caller_subdomain, "default", %{

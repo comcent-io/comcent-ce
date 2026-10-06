@@ -5,9 +5,6 @@ defmodule ComcentWeb.Internal.SipTrunkController do
   alias Comcent.Repo
 
   def create(conn, params) do
-    Logger.info("Received POST request to /internal/number/sip-trunk")
-    Logger.info("params: #{inspect(params)}")
-
     %{"number" => number} = params
 
     query =

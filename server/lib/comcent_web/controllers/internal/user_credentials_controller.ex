@@ -2,10 +2,7 @@ defmodule ComcentWeb.Internal.UserCredentialsController do
   use ComcentWeb, :controller
   require Logger
 
-  def create(conn, %{"domain" => domain, "username" => username} = params) do
-    Logger.info("Received POST request to /internal/user/credentials")
-    Logger.info("params: #{inspect(params)}")
-
+  def create(conn, %{"domain" => domain, "username" => username}) do
     # Extract subdomain from domain
     sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
     [subdomain | _] = String.split(domain, ".#{sip_user_root_domain}")

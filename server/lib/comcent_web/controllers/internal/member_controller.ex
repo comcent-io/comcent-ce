@@ -6,11 +6,9 @@ defmodule ComcentWeb.Internal.MemberController do
 
   def update_presence(
         conn,
-        %{"subdomain" => subdomain, "action" => action, "username" => username} = params
+        %{"subdomain" => subdomain, "action" => action, "username" => username}
       ) do
-    Logger.info(
-      "Received POST request to /internal/user/presence with params: #{inspect(params)}"
-    )
+    Logger.info("Presence update for #{username}@#{subdomain}: #{action}")
 
     case OrgMember.get_user_id_by_username_and_subdomain(username, subdomain) do
       nil ->
