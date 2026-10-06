@@ -232,7 +232,10 @@ AUTH_PASSWORD_ENABLED=true
 # To upgrade: set the new release (https://github.com/${REPO}/releases),
 # then docker compose pull && docker compose up -d.
 COMCENT_VERSION=${COMCENT_VERSION}
-FREESWITCH_VERSION=latest
+# FreeSWITCH and the voice bot are pinned in docker-compose.yaml to the
+# versions this release was tested with. Set these only to override them.
+# FREESWITCH_VERSION=
+# VOICE_BOT_VERSION=
 
 # In-tree Go SBC pinned IP (matches docker-compose.yaml). Used by:
 #   - dial_utils → fs_path=sip:<IP>:5065

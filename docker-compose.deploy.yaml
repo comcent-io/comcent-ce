@@ -267,8 +267,11 @@ services:
   # ---------------------------------------------------------------------------
   # FreeSWITCH — media server for RTP. Not behind Traefik (raw RTP, not HTTP).
   # ---------------------------------------------------------------------------
+  # Pinned to an immutable image of comcent-io/freeswitch-ce, so a release
+  # always installs the FreeSWITCH it was tested with. Bumped by PR (see
+  # RELEASING.md); FREESWITCH_VERSION in .env overrides it.
   freeswitch:
-    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-latest}
+    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-sha-62db197}
     restart: unless-stopped
     env_file: .env
     environment:
@@ -299,8 +302,9 @@ services:
   # Voice bot (AI) — real-time AI voice agent.
   # Needs DEEPGRAM_API_KEY and OPENAI_API_KEY in .env.
   # ---------------------------------------------------------------------------
+  # Pinned like freeswitch above; VOICE_BOT_VERSION in .env overrides it.
   voice-bot:
-    image: ghcr.io/comcent-io/go-voice-bot-ce:${VOICE_BOT_VERSION:-latest}
+    image: ghcr.io/comcent-io/go-voice-bot-ce:${VOICE_BOT_VERSION:-sha-96bbd19}
     restart: unless-stopped
     env_file: .env
     environment:

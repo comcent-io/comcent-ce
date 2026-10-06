@@ -168,19 +168,19 @@ then call your number — it rings in your browser dialer.
 
 Your install stays on the release in `.env` until you change it. To upgrade,
 pick a newer [release](https://github.com/comcent-io/comcent-ce/releases), set
-`COMCENT_VERSION` in `~/comcent-ce/.env` to it (e.g. `COMCENT_VERSION=v2026.10.06`),
-then:
+`COMCENT_VERSION` in `~/comcent-ce/.env` to it (e.g. `COMCENT_VERSION=v2026.10.07`),
+fetch that release's compose file (it pins the FreeSWITCH and voice bot images
+the release was tested with), then pull and restart:
 
 ```bash
 cd ~/comcent-ce
+curl -fsSL https://raw.githubusercontent.com/comcent-io/comcent-ce/v2026.10.07/docker-compose.deploy.yaml -o docker-compose.yaml
 docker compose pull
 docker compose up -d
 ```
 
-Migrations run automatically on every server start. Read the release notes
-first: a release can also change `docker-compose.yaml`, which you can fetch
-for that version from
-`https://raw.githubusercontent.com/comcent-io/comcent-ce/<version>/docker-compose.deploy.yaml`.
+Use your release in the URL. Migrations run automatically on every server
+start. Read the release notes first.
 
 ## Troubleshooting
 
