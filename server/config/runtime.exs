@@ -394,62 +394,67 @@ config :comcent, :terms,
 # runs after it on every boot, so an unconditional SMTP adapter here would
 # replace it and send test emails to a server that isn't there.
 if config_env() != :test do
-  smtp_url =
-    System.get_env("SMTP_URL") ||
-      raise """
-      environment variable SMTP_URL is missing.
-      For example: smtp://username:password@mail.example.com:587
-      """
+  case String.trim(System.get_env("SMTP_URL") || "") do
+    # Email is optional: with no SMTP server, emails (invites, password
+    # resets) are written to the server log instead of being sent, so an
+    # admin can still pick an invite link out of `docker compose logs server`.
+    "" ->
+      config :comcent, Comcent.Mailer,
+        adapter: Swoosh.Adapters.Logger,
+        level: :info,
+        log_full_email: true
 
-  smtp_uri = URI.parse(smtp_url)
+    smtp_url ->
+      smtp_uri = URI.parse(smtp_url)
 
-  unless smtp_uri.scheme in ["smtp", "smtps"] and smtp_uri.host do
-    raise """
-    environment variable SMTP_URL is invalid.
-    Expected format: smtp://username:password@mail.example.com:587
-    """
-  end
+      unless smtp_uri.scheme in ["smtp", "smtps"] and smtp_uri.host do
+        raise """
+        environment variable SMTP_URL is invalid.
+        Expected format: smtp://username:password@mail.example.com:587
+        """
+      end
 
-  smtp_username =
-    if smtp_uri.userinfo,
-      do: URI.decode_www_form(smtp_uri.userinfo |> String.split(":") |> hd()),
-      else: ""
+      smtp_username =
+        if smtp_uri.userinfo,
+          do: URI.decode_www_form(smtp_uri.userinfo |> String.split(":") |> hd()),
+          else: ""
 
-  smtp_password =
-    case smtp_uri.userinfo do
-      nil ->
-        ""
+      smtp_password =
+        case smtp_uri.userinfo do
+          nil ->
+            ""
 
-      userinfo ->
-        case String.split(userinfo, ":", parts: 2) do
-          [_username, password] -> URI.decode_www_form(password)
-          [_username] -> ""
+          userinfo ->
+            case String.split(userinfo, ":", parts: 2) do
+              [_username, password] -> URI.decode_www_form(password)
+              [_username] -> ""
+            end
         end
-    end
 
-  smtp_port =
-    cond do
-      is_integer(smtp_uri.port) ->
-        smtp_uri.port
+      smtp_port =
+        cond do
+          is_integer(smtp_uri.port) ->
+            smtp_uri.port
 
-      smtp_uri.scheme == "smtps" ->
-        465
+          smtp_uri.scheme == "smtps" ->
+            465
 
-      true ->
-        587
-    end
+          true ->
+            587
+        end
 
-  config :comcent, Comcent.Mailer,
-    adapter: Swoosh.Adapters.SMTP,
-    relay: smtp_uri.host,
-    port: smtp_port,
-    username: smtp_username,
-    password: smtp_password,
-    ssl: smtp_uri.scheme == "smtps",
-    tls: if(smtp_uri.scheme == "smtps", do: :never, else: :if_available),
-    auth: :if_available,
-    retries: 2,
-    no_mx_lookups: false
+      config :comcent, Comcent.Mailer,
+        adapter: Swoosh.Adapters.SMTP,
+        relay: smtp_uri.host,
+        port: smtp_port,
+        username: smtp_username,
+        password: smtp_password,
+        ssl: smtp_uri.scheme == "smtps",
+        tls: if(smtp_uri.scheme == "smtps", do: :never, else: :if_available),
+        auth: :if_available,
+        retries: 2,
+        no_mx_lookups: false
+  end
 end
 
 config :swoosh, :api_client, false
