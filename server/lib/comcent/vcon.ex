@@ -374,8 +374,6 @@ defmodule Comcent.VCon do
   @spec get_analysis(CallStoryAssociation.t()) :: [VCon.analysis()]
   defp get_analysis(call_story) do
     try do
-      analysis = []
-
       call_transcripts =
         try do
           Repo.all(
@@ -396,56 +394,64 @@ defmodule Comcent.VCon do
             []
         end
 
-      if length(call_transcripts) > 0 do
-        try do
-          call_story_copy = Map.put(call_story, :call_transcripts, call_transcripts)
-          transcript_chat = Transcript.create_transcript_chat(call_story_copy)
+      transcript_analysis =
+        if length(call_transcripts) > 0 do
+          try do
+            call_story_copy = Map.put(call_story, :call_transcripts, call_transcripts)
+            transcript_chat = Transcript.create_transcript_chat(call_story_copy)
 
-          transcription = %{
-            type: "transcript",
-            vendor: "comcent",
-            schema: "comcent.deepgram.nova2.v1",
-            body: transcript_chat,
-            encoding: "json"
-          }
-
-          if get_in(hd(call_transcripts), [:transcript_data, "results", "sentiments"]) do
-            sentiments =
-              Enum.map(call_transcripts, fn t ->
-                transcript_data = t.transcript_data
-
-                %{
-                  current_party: t.current_party,
-                  sentiment:
-                    get_in(transcript_data, ["results", "sentiments", "average", "sentiment"]),
-                  sentiment_score:
-                    get_in(transcript_data, [
-                      "results",
-                      "sentiments",
-                      "average",
-                      "sentiment_score"
-                    ])
-                }
-              end)
-
-            sentiment = %{
-              type: "sentiment",
+            transcription = %{
+              type: "transcript",
               vendor: "comcent",
               schema: "comcent.deepgram.nova2.v1",
-              body: sentiments,
+              body: transcript_chat,
               encoding: "json"
             }
 
-            [sentiment, transcription]
-          else
-            [transcription]
+            if get_in(hd(call_transcripts), [:transcript_data, "results", "sentiments"]) do
+              sentiments =
+                Enum.map(call_transcripts, fn t ->
+                  transcript_data = t.transcript_data
+
+                  %{
+                    current_party: t.current_party,
+                    sentiment:
+                      get_in(transcript_data, ["results", "sentiments", "average", "sentiment"]),
+                    sentiment_score:
+                      get_in(transcript_data, [
+                        "results",
+                        "sentiments",
+                        "average",
+                        "sentiment_score"
+                      ])
+                  }
+                end)
+
+              sentiment = %{
+                type: "sentiment",
+                vendor: "comcent",
+                schema: "comcent.deepgram.nova2.v1",
+                body: sentiments,
+                encoding: "json"
+              }
+
+              [sentiment, transcription]
+            else
+              [transcription]
+            end
+          rescue
+            e ->
+              Logger.error("Error processing transcripts: #{inspect(e)}")
+              []
           end
-        rescue
-          e ->
-            Logger.error("Error processing transcripts: #{inspect(e)}")
-            []
+        else
+          []
         end
-      else
+
+      # The summary stands on its own. It used to be looked up only when the
+      # call had no transcripts, and a call without transcripts has no
+      # summary, so no vCon ever carried one.
+      summary_analysis =
         try do
           summary =
             Repo.one(
@@ -471,16 +477,17 @@ defmodule Comcent.VCon do
               encoding: "none"
             }
 
-            [summary_analysis | analysis]
+            [summary_analysis]
           else
-            analysis
+            []
           end
         rescue
           e ->
             Logger.error("Error processing summary: #{inspect(e)}")
-            analysis
+            []
         end
-      end
+
+      transcript_analysis ++ summary_analysis
     rescue
       e ->
         Logger.error("Error in get_analysis: #{inspect(e)}")
