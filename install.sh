@@ -10,9 +10,20 @@
 #   2. Verify the docker compose plugin.
 #   3. Detect the host's public IP.
 #   4. Generate strong random secrets for postgres / rabbit / API / signing.
-#   5. Download docker-compose.deploy.yaml.
-#   6. Write .env (mode 600) — known values filled in, unknowns marked replaceMe.
+#   5. Pick the version (the latest release) and download its
+#      docker-compose.deploy.yaml.
+#   6. Write .env (mode 600) — known values filled in, unknowns marked replaceMe,
+#      COMCENT_VERSION pinned to that version.
 #   7. Print clear next-steps the operator must do (edit .env, then docker compose up).
+#
+# Installs are pinned to the latest GitHub Release, not to main: a change
+# merged to main reaches new installs only once it has been released.
+# To install something else (e.g. to test an unreleased build before a
+# release, see RELEASING.md):
+#   curl -fsSL …/install.sh | COMCENT_VERSION=sha-1a2b3c4 bash
+# COMCENT_VERSION is an image tag (a release like v2026.10.06, or main /
+# sha-<7> for a tested main build); the compose file then comes from main
+# unless COMCENT_BRANCH names another branch or tag.
 #
 # This script does NOT pull images or start the stack. The operator runs
 # `docker compose up -d` themselves once .env has been edited.
@@ -21,8 +32,7 @@
 
 set -euo pipefail
 
-BRANCH="${COMCENT_BRANCH:-main}"
-REPO_RAW="https://raw.githubusercontent.com/comcent-io/comcent-ce/${BRANCH}"
+REPO="comcent-io/comcent-ce"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/comcent-ce}"
 
 # ---------- output helpers --------------------------------------------------
@@ -44,6 +54,28 @@ die()   { printf "\n%s✗%s %s\n" "$R" "$N" "$*" >&2; exit 1; }
 rand_url() { openssl rand -base64 48 | tr -d '\n+/=' | head -c 32; }
 rand_b64() { openssl rand -base64 64 | tr -d '\n'; }
 rand_hex() { openssl rand -hex 32; }
+
+# ---------- version helpers -------------------------------------------------
+# The tag of the latest GitHub Release, or nothing when there is none (or
+# GitHub can't be reached).
+latest_release() {
+  curl -fsSL --max-time 15 "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null \
+    | grep -m1 '"tag_name"' \
+    | sed -E 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
+    || true
+}
+
+# Where docker-compose.deploy.yaml comes from for a version: the release's own
+# tag, or main for an unreleased build, unless COMCENT_BRANCH says otherwise.
+compose_ref() {
+  if [ -n "${COMCENT_BRANCH:-}" ]; then
+    echo "$COMCENT_BRANCH"
+  elif [[ "$1" =~ ^v[0-9] ]]; then
+    echo "$1"
+  else
+    echo "main"
+  fi
+}
 
 # ---------- banner ----------------------------------------------------------
 cat <<BANNER
@@ -109,8 +141,21 @@ SECRET_KEY_BASE="$(rand_b64)"
 SIGNING_KEY="$(rand_hex)"
 ok "POSTGRES_PASSWORD, RABBITMQ_PASSWORD, INTERNAL_API_PASSWORD, RPC_API_TOKEN, SECRET_KEY_BASE, SIGNING_KEY"
 
-# ---------- step 5: prepare working dir + download compose -----------------
-step "Preparing working directory and downloading compose file"
+# ---------- step 5: pick the version, prepare working dir, download compose -
+step "Picking the version and downloading its compose file"
+
+if [ -n "${COMCENT_VERSION:-}" ]; then
+  ok "version: ${COMCENT_VERSION} (set by COMCENT_VERSION)"
+  [[ "$COMCENT_VERSION" =~ ^v[0-9] ]] || warn "${COMCENT_VERSION} is not a release — use it for testing, not production"
+else
+  COMCENT_VERSION="$(latest_release)"
+  [ -n "$COMCENT_VERSION" ] || die "Could not find a Comcent CE release at https://github.com/${REPO}/releases.
+  Check this host can reach api.github.com. If no release has been published
+  yet, an unreleased build can be installed for testing with
+  COMCENT_VERSION=main (see RELEASING.md)."
+  ok "version: ${COMCENT_VERSION} (latest release)"
+fi
+REPO_RAW="https://raw.githubusercontent.com/${REPO}/$(compose_ref "$COMCENT_VERSION")"
 
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
@@ -119,7 +164,7 @@ ok "working directory: ${INSTALL_DIR}"
 
 curl -fsSL "${REPO_RAW}/docker-compose.deploy.yaml" -o docker-compose.yaml \
   || die "Failed to download docker-compose.deploy.yaml from ${REPO_RAW}"
-ok "docker-compose.yaml downloaded"
+ok "docker-compose.yaml downloaded ($(compose_ref "$COMCENT_VERSION"))"
 
 # ---------- step 6: write .env ---------------------------------------------
 step "Writing .env"
@@ -181,8 +226,10 @@ S3_ENDPOINT_URL=
 S3_PROXY_DOWNLOADS=false
 AUTH_PASSWORD_ENABLED=true
 
-# Image tags. Change to a pinned version (e.g. v0.1.0) for prod stability.
-COMCENT_VERSION=latest
+# Comcent image version, pinned to the release this was installed from.
+# To upgrade: set the new release (https://github.com/${REPO}/releases),
+# then docker compose pull && docker compose up -d.
+COMCENT_VERSION=${COMCENT_VERSION}
 FREESWITCH_VERSION=latest
 
 # In-tree Go SBC pinned IP (matches docker-compose.yaml). Used by:
@@ -255,6 +302,8 @@ ${B}Required inbound firewall rules${N}
    UDP    19000-19100     RTP media
 
 ${B}Upgrade later${N}
-   cd ${INSTALL_DIR} && docker compose pull && docker compose up -d
+   This install is pinned to ${COMCENT_VERSION}. To move to a newer release
+   (https://github.com/${REPO}/releases), set COMCENT_VERSION in .env, then:
+     cd ${INSTALL_DIR} && docker compose pull && docker compose up -d
 
 EOF

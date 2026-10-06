@@ -50,6 +50,11 @@ Takes ~30 seconds: installs Docker if missing, generates secrets, and
 writes `docker-compose.yaml` + `.env` into `~/comcent-ce/`. It does **not**
 start anything yet.
 
+The install is pinned to the [latest release](https://github.com/comcent-io/comcent-ce/releases):
+`.env` gets `COMCENT_VERSION=<that release>`, and the compose file comes from
+the same release. Changes merged to `main` reach installs only once they are
+released.
+
 ### 4. Fill in `.env`
 
 ```bash
@@ -161,13 +166,21 @@ then call your number — it rings in your browser dialer.
 
 ## Upgrade
 
+Your install stays on the release in `.env` until you change it. To upgrade,
+pick a newer [release](https://github.com/comcent-io/comcent-ce/releases), set
+`COMCENT_VERSION` in `~/comcent-ce/.env` to it (e.g. `COMCENT_VERSION=v2026.10.06`),
+then:
+
 ```bash
 cd ~/comcent-ce
 docker compose pull
 docker compose up -d
 ```
 
-Migrations run automatically on every server start.
+Migrations run automatically on every server start. Read the release notes
+first: a release can also change `docker-compose.yaml`, which you can fetch
+for that version from
+`https://raw.githubusercontent.com/comcent-io/comcent-ce/<version>/docker-compose.deploy.yaml`.
 
 ## Troubleshooting
 

@@ -2,6 +2,11 @@ name: Integration tests
 on:
   push:
     branches: [main]
+  # Also on PRs, so a change that breaks them is seen before it is merged
+  # (running only after the merge is how main went red unnoticed). A pass on
+  # main is what lets Publish images run for that commit.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       workers:

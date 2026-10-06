@@ -1,0 +1,86 @@
+name: Release
+# Run by hand only, after the fresh-install test in RELEASING.md has passed.
+# It never builds anything: it gives an already-published (so already
+# tested) main commit's images a version tag and :latest, tags the commit and
+# creates the GitHub Release. install.sh installs whatever the latest Release
+# is, so this is the one step that changes what new installs get.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, vYYYY.MM.DD (add .N for a second release that day, e.g. v2026.10.06.1)'
+        required: true
+      sha:
+        description: 'main commit to release (blank = current main)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Check the inputs
+        id: inputs
+        env:
+          VERSION: ${{ inputs.version }}
+          SHA_INPUT: ${{ inputs.sha }}
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}(\.[0-9]+)?$ ]] \
+            || { echo "::error::version must look like v2026.10.06 or v2026.10.06.1, got '$VERSION'"; exit 1; }
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "::error::tag $VERSION already exists"; exit 1
+          fi
+          SHA=$(git rev-parse "${SHA_INPUT:-origin/main}^{commit}") \
+            || { echo "::error::'$SHA_INPUT' is not a commit"; exit 1; }
+          git merge-base --is-ancestor "$SHA" origin/main \
+            || { echo "::error::${SHA::7} is not on main"; exit 1; }
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Releasing ${SHA::7} as $VERSION"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # :sha-<7> exists only if Publish images ran for the commit, which it
+      # does only after the commit's unit and integration tests passed.
+      - name: Tag the tested images
+        env:
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ steps.inputs.outputs.sha }}
+        run: |
+          for image in comcent-ce-server comcent-ce-webapp comcent-ce-sbc; do
+            src="ghcr.io/comcent-io/${image}:sha-${SHA::7}"
+            docker buildx imagetools inspect "$src" >/dev/null 2>&1 \
+              || { echo "::error::$src not found: Publish images has not run (or failed) for ${SHA::7}"; exit 1; }
+          done
+          for image in comcent-ce-server comcent-ce-webapp comcent-ce-sbc; do
+            img="ghcr.io/comcent-io/${image}"
+            docker buildx imagetools create -t "${img}:${VERSION}" -t "${img}:latest" "${img}:sha-${SHA::7}"
+            echo "${img}:${VERSION} and :latest -> sha-${SHA::7}"
+          done
+
+      - name: Tag the commit and create the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ steps.inputs.outputs.sha }}
+        run: |
+          gh release create "$VERSION" --target "$SHA" --title "$VERSION" --generate-notes --latest
