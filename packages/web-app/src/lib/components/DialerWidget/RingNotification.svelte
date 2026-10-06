@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Invitation } from 'sip.js';
+  import { remoteParty } from '$lib/party';
 
   interface Props {
     primary: Invitation;
@@ -22,11 +23,11 @@
   }: Props = $props();
 
   function displayName(invitation: Invitation) {
-    return invitation.remoteIdentity.displayName || invitation.remoteIdentity.uri.aor;
+    return remoteParty(invitation.remoteIdentity).name;
   }
 
   function subAddress(invitation: Invitation) {
-    return invitation.remoteIdentity.displayName ? invitation.remoteIdentity.uri.aor : '';
+    return remoteParty(invitation.remoteIdentity).detail;
   }
 
   function viaNumber(invitation: Invitation) {

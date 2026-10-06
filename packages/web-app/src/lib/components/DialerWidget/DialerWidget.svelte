@@ -17,6 +17,7 @@
   import CurrentCall from '$lib/components/DialerWidget/CurrentCall.svelte';
   import CallTime from '$lib/components/DialerWidget/CallTime.svelte';
   import { isValidPhoneNumber } from 'libphonenumber-js';
+  import { remoteParty } from '$lib/party';
   import type { MemberSearchResult } from '$lib/types/MemberSearchResult';
   import Spinner from '../Icons/Spinner.svelte';
   import PresenceDot from '../PresenceDot.svelte';
@@ -106,7 +107,7 @@
   let presenceChannel: any;
 
   function sessionLabel(s: Session) {
-    return String(s.remoteIdentity.friendlyName ?? s.remoteIdentity.uri);
+    return remoteParty(s.remoteIdentity).name;
   }
 
   async function searchUser(searchText: string) {
@@ -128,7 +129,7 @@
   async function newCallNotification(invitation: Invitation) {
     let notification: Notification | undefined;
     const title = 'Incoming Call';
-    const fromString = invitation.remoteIdentity.displayName || invitation.remoteIdentity.uri.aor;
+    const fromString = remoteParty(invitation.remoteIdentity).name;
     const options = {
       body: `From ${fromString}`,
     };
@@ -857,7 +858,7 @@
                 >
                   <div class="min-w-0 flex-1">
                     <div class="truncate text-sm font-medium text-gray-800 dark:text-gray-100">
-                      {h.session.remoteIdentity.friendlyName ?? h.session.remoteIdentity.uri}
+                      {sessionLabel(h.session)}
                     </div>
                     <div class="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
                       <span>On hold</span>

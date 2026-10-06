@@ -368,7 +368,8 @@ defmodule Comcent.CallSession do
       start_at: date_from_unix(body["Event-Date-Timestamp"]),
       current_party: display,
       caller: body["Caller-Caller-ID-Number"],
-      callee: body["Caller-Destination-Number"],
+      # FreeSWITCH reports a dialed "+14155550199" percent-encoded ("%2B1...").
+      callee: URI.decode(body["Caller-Destination-Number"] || ""),
       direction: body["Call-Direction"]
     })
   end

@@ -11,6 +11,7 @@
   import type { Session } from 'sip.js';
   import type { SessionManager } from 'sip.js/lib/platform/web';
   import { isValidPhoneNumber } from 'libphonenumber-js';
+  import { remoteParty } from '$lib/party';
   import type { MemberSearchResult } from '$lib/types/MemberSearchResult';
 
   interface Props {
@@ -101,11 +102,11 @@
   }
 
   function callerLabel(s: Session) {
-    return s.remoteIdentity.friendlyName ?? s.remoteIdentity.uri;
+    return remoteParty(s.remoteIdentity).name;
   }
 
   function callerSub(s: Session) {
-    return s.remoteIdentity.friendlyName ? s.remoteIdentity.uri : '';
+    return remoteParty(s.remoteIdentity).detail;
   }
 
   onMount(() => {
