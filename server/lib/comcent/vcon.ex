@@ -73,11 +73,11 @@ defmodule Comcent.VCon do
                         [username, domain] ->
                           # Extract subdomain from the domain
                           subdomain =
-                            case String.split(domain, ".") do
-                              [subdomain, "comcent", "io"] ->
+                            case Comcent.SipDomain.subdomain(domain) do
+                              {:ok, subdomain} ->
                                 subdomain
 
-                              _ ->
+                              :error ->
                                 Logger.error("Invalid domain format: #{domain}")
                                 nil
                             end

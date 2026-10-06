@@ -19,22 +19,17 @@ defmodule ComcentWeb.Internal.DirectoryController do
       |> put_resp_content_type("text/xml")
       |> send_resp(200, not_found_response())
     else
-      sip_user_root_domain = Application.fetch_env!(:comcent, :sip_user_root_domain)
-
-      if !String.ends_with?(domain, sip_user_root_domain) do
-        conn
-        |> put_resp_content_type("text/xml")
-        |> send_resp(200, not_found_response())
-      else
-        domain_parts = String.split(domain, ".")
-
-        if length(domain_parts) != 3 do
+      # The org is what comes before the SIP user root domain. Counting dots
+      # instead (exactly three labels) failed for a root domain such as
+      # sip.example.com, so no agent was found and their calls lost
+      # user_context=default.
+      case Comcent.SipDomain.subdomain(domain) do
+        :error ->
           conn
           |> put_resp_content_type("text/xml")
           |> send_resp(200, not_found_response())
-        else
-          [subdomain | _] = domain_parts
 
+        {:ok, subdomain} ->
           member =
             from(m in "org_members",
               join: o in "orgs",
@@ -82,7 +77,6 @@ defmodule ComcentWeb.Internal.DirectoryController do
             |> put_resp_content_type("text/xml")
             |> send_resp(200, response)
           end
-        end
       end
     end
   end
