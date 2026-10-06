@@ -15,10 +15,10 @@ test('Home page, switch organization successfully', async ({ page }) => {
   await page.getByPlaceholder('your.name').fill('aiet');
   await page.getByPlaceholder('ACME Corp').fill('Alvas');
   await page.getByPlaceholder('acme', { exact: true }).fill('aiet');
-  // CE org creation has no billing address fields; success returns to the
-  // org picker rather than the billing page.
+  // CE org creation has no billing address fields; success opens the new
+  // org.
   await page.getByRole('button', { name: 'Create Organization' }).click();
-  await page.waitForURL('/org');
+  await page.waitForURL('/app/aiet');
   await page.goto('/app/acme');
   await page.getByRole('button', { name: 'Switch Organization' }).click();
   await page.locator('#switchOrganization').selectOption('aiet');
