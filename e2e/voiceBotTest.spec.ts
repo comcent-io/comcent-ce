@@ -552,15 +552,15 @@ test('Voice Bot page, delete the voice-bot successfully', async ({
   const row = voiceBotRow(page, voiceBot.name);
   await expect(row).toBeVisible();
 
-  await row.getByRole('button', { name: 'Delete' }).click();
+  await row.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByRole('button', { name: 'No, cancel' }).click();
   await expect(row).toHaveCount(1);
 
-  await row.getByRole('button', { name: 'Delete' }).click();
+  await row.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.locator('button[data-modal-hide="popup-modal"]').click();
   await expect(row).toHaveCount(1);
 
-  await row.getByRole('button', { name: 'Delete' }).click();
+  await row.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByRole('button', { name: "Yes, I'm sure" }).click();
   await expect(row).toHaveCount(0);
 });
@@ -593,7 +593,7 @@ test('Voice Bot page, deleting voice-bot present in numbers inbound flow graph s
   await gotoVoiceBotsPage(page, org.subdomain);
   const row = voiceBotRow(page, voiceBot.name);
   await expect(row).toBeVisible();
-  await row.getByRole('button', { name: 'Delete' }).click();
+  await row.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByRole('button', { name: "Yes, I'm sure" }).click();
 
   await expect(

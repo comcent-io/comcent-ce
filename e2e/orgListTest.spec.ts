@@ -29,9 +29,10 @@ test('the organization list shows, and marks the last used org, instead of openi
     page.getByRole('link', { name: /acme/i }).getByText('Last used'),
   ).toHaveCount(0);
 
-  // Create organization and back: still the list.
-  await page.getByRole('link', { name: /Create Organization/ }).click();
-  await page.waitForURL('/org/create');
+  // Create organization and back: still the list. Opened by URL, since the
+  // list hides its Create tile at 10 orgs and this admin joins many as the
+  // other specs run.
+  await page.goto('/org/create');
   await page.goBack();
   await expect(page).toHaveURL('/org');
   await expect(
