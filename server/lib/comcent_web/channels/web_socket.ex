@@ -1,5 +1,7 @@
 defmodule ComcentWeb.WebSocket do
-  use Phoenix.Socket
+  # No connect log: Phoenix would print the connect parameters, which carry
+  # the user's session token.
+  use Phoenix.Socket, log: false
   alias Comcent.Repo.OrgMember
 
   ## Channels

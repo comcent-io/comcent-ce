@@ -3,15 +3,12 @@ defmodule ComcentWeb.Internal.ConfigurationController do
   require Logger
 
   def create(conn, params) do
-    Logger.info("Received POST request to /internal/configuration")
-    Logger.info("params: #{inspect(params)}")
-
     key_value = params["key_value"]
-    Logger.info("keyValue: #{key_value}")
+    # Only which file FreeSWITCH asked for: the XML answer carries
+    # credentials (the RabbitMQ password in amqp.conf).
+    Logger.info("FreeSWITCH configuration requested: #{key_value}")
 
     response = generate_configuration(params)
-
-    Logger.info("Response: #{response}\n\n")
 
     conn
     |> put_resp_content_type("text/xml")

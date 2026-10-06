@@ -4,9 +4,6 @@ defmodule ComcentWeb.Internal.DirectoryController do
   import Ecto.Query
 
   def create(conn, params) do
-    Logger.info("Received POST request to /internal/directory")
-    Logger.info("params: #{inspect(params)}")
-
     username = params["user"]
     domain = params["domain"]
     purpose = params["purpose"]
