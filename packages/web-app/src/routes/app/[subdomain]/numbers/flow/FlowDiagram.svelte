@@ -579,8 +579,11 @@
     scrollbar-gutter: stable both-edges;
   }
 
-  :global(.dark) .flow-canvas {
-    background-color: rgba(15, 23, 42, 0.55);
+  /* Dark mode follows the system setting (Tailwind's default), not a .dark class. */
+  @media (prefers-color-scheme: dark) {
+    .flow-canvas {
+      background-color: rgba(15, 23, 42, 0.55);
+    }
   }
 
   .flow-canvas::-webkit-scrollbar {
@@ -600,12 +603,14 @@
     background-clip: padding-box;
   }
 
-  :global(.dark) .flow-canvas::-webkit-scrollbar-track {
-    background: rgba(51, 65, 85, 0.6);
-  }
+  @media (prefers-color-scheme: dark) {
+    .flow-canvas::-webkit-scrollbar-track {
+      background: rgba(51, 65, 85, 0.6);
+    }
 
-  :global(.dark) .flow-canvas::-webkit-scrollbar-thumb {
-    background: rgba(45, 212, 191, 0.7);
-    border-color: transparent;
+    .flow-canvas::-webkit-scrollbar-thumb {
+      background: rgba(45, 212, 191, 0.7);
+      border-color: transparent;
+    }
   }
 </style>

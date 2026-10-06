@@ -483,7 +483,9 @@ async function addFlowStep(
 
 async function connectStartToNode(page: Page, targetHeading: string) {
   await flowCanvas(page)
-    .getByRole('button', { name: /start begin here|connect from here start/i })
+    .getByRole('button', {
+      name: /start every call begins here|connect from here start/i,
+    })
     .first()
     .click();
 
