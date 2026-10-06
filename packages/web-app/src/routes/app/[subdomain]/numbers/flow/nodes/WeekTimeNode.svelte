@@ -7,10 +7,15 @@
   import CloseButton from '../utils/CloseButton.svelte';
   import EditButton from '../utils/EditButton.svelte';
   import moment from 'moment-timezone';
-  import ErrorMessage from '$lib/components/ErrorMessage.svelte';
-  import CloseIcon from '$lib/components/Icons/CloseIcon.svelte';
-  import PlusIcon from '$lib/components/Icons/PlusIcon.svelte';
-  import MinusSignIcon from '$lib/components/Icons/MinusSignIcon.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
+  import Checkbox from '$lib/components/form/Checkbox.svelte';
+  import Field from '$lib/components/form/Field.svelte';
+  import Hint from '$lib/components/form/Hint.svelte';
+  import Input from '$lib/components/form/Input.svelte';
+  import RemoveButton from '$lib/components/form/RemoveButton.svelte';
+  import SecondaryButton from '$lib/components/form/SecondaryButton.svelte';
+  import Select from '$lib/components/form/Select.svelte';
 
   let {
     node,
@@ -31,17 +36,23 @@
   let editing = $state(false);
 
   const weekdays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const weekdayNames: Record<string, string> = {
+    mon: 'Monday',
+    tue: 'Tuesday',
+    wed: 'Wednesday',
+    thu: 'Thursday',
+    fri: 'Friday',
+    sat: 'Saturday',
+    sun: 'Sunday',
+  };
   const timezones = moment.tz.names();
   function onEdit() {
     editing = true;
   }
 
-  let error = $state({
-    message: '',
-    formErrors: [] as { message: string; path: string[] }[],
-  });
+  let errorMessage = $state('');
   function onUpdate() {
-    error.message = '';
+    errorMessage = '';
     for (const weekday of weekdays) {
       let weekData = editData.data[weekday];
       if (weekData.include) {
@@ -59,11 +70,11 @@
             (fromHour === 24 && fromMinute > 0) ||
             (toHour === 24 && toMinute > 0)
           ) {
-            error.message = 'Enter valid time';
+            errorMessage = 'Enter valid time';
 
             // checking if the To time is greater than From time
           } else if (toHour < fromHour || (toHour === fromHour && toMinute < fromMinute)) {
-            error.message = 'To time is less than From time';
+            errorMessage = 'To time is less than From time';
           } else if (i + 1 < weekData.timeSlots.length) {
             const [nextFromHour, nextFromMinute] = weekData.timeSlots[i + 1].from
               .split(':')
@@ -75,21 +86,21 @@
               nextFromMinute > 59 ||
               (nextFromHour === 24 && nextFromMinute > 0)
             ) {
-              error.message = 'Enter valid time';
+              errorMessage = 'Enter valid time';
 
               // checking if the next From time is greater than current To time
             } else if (
               nextFromHour < toHour ||
               (nextFromHour === toHour && nextFromMinute < toMinute)
             ) {
-              error.message = 'Time Intersects at ' + weekday;
+              errorMessage = 'Time Intersects at ' + weekday;
             }
           }
         }
       }
     }
 
-    if (error.message.length === 0) {
+    if (errorMessage.length === 0) {
       node.data = $state.snapshot(editData);
       editing = false;
     }
@@ -150,144 +161,74 @@
   </Inlet>
 </Draggable>
 
-<!-- Edit modal -->
-{#if editing}
+<Dialog
+  showDialog={editing}
+  title="Week time"
+  description="Tick the days and hours that count as “true”. Any other time is “false”."
+  className="max-w-2xl"
+  onClose={() => (editing = false)}
+>
+  <Field for={`week-time-zone-${node.data.id}`} label="Timezone">
+    <Select id={`week-time-zone-${node.data.id}`} bind:value={editData.data.timezone}>
+      {#each timezones as timezone}
+        <option value={timezone}>{timezone}</option>
+      {/each}
+    </Select>
+  </Field>
+
   <div
-    tabindex="-1"
-    aria-hidden="true"
-    class="fixed top-0 left-0 right-0 z-50 w-full p-4 overflow-x-hidden overflow-y-auto md:inset-0 h-[calc(100%-1rem)] max-h-full flex justify-center items-center"
+    class="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-700 dark:border-gray-700"
   >
-    <div class="relative w-full max-w-2xl max-h-full">
-      <!-- Modal content -->
-      <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
-        <!-- Modal header -->
-        <div class="flex items-start justify-between p-4 border-b rounded-t dark:border-gray-600">
-          <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
-            Weekend Time Condition
-          </h3>
-          <button
-            type="button"
-            class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
-            onclick={() => (editing = false)}
-          >
-            <CloseIcon />
-          </button>
-        </div>
-        {#if error.message.length > 0}
-          <ErrorMessage {error} />
-        {/if}
-        <!-- Modal body -->
-        <div class="p-6 space-y-6">
-          <div>
-            <label
-              for="timezone"
-              class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-            >
-              Timezone
-            </label>
-            <select
-              id="timezone"
-              bind:value={editData.data.timezone}
-              class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-            >
-              {#each timezones as timezone}
-                <option value={timezone}>{timezone}</option>
-              {/each}
-            </select>
-          </div>
-          <div class="relative overflow-x-auto overflow-y-auto max-h-[545px]">
-            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-              <thead
-                class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400"
-              >
-                <tr>
-                  <th scope="col" class="px-6 py-3">Include</th>
-                  <th scope="col" class="px-6 py-3">Weekday</th>
-                  <th scope="col" class="px-6 py-3">Start</th>
-                  <th scope="col" class="px-6 py-3">End</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each weekdays as weekday}
-                  <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                    <td class="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        bind:checked={editData.data[weekday].include}
-                        class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                      />
-                    </td>
-                    <td class="px-6 py-4">{weekday}</td>
-                    <td class="px-6 py-4">
-                      {#each editData.data[weekday].timeSlots as timeSlot, idx}
-                        <input
-                          type="text"
-                          class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-24 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 my-4"
-                          placeholder="00:00"
-                          required
-                          bind:value={timeSlot.from}
-                        />
-                      {/each}
-                    </td>
-                    <td class="px-6 py-4">
-                      {#each editData.data[weekday].timeSlots as timeSlot, idx}
-                        <div class="flex items-center">
-                          <input
-                            type="text"
-                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-24 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 my-2"
-                            placeholder="23:59"
-                            required
-                            bind:value={timeSlot.to}
-                          />
-                          {#if editData.data[weekday].timeSlots.length > 1}
-                            <button
-                              type="button"
-                              onclick={() => removeSlot(weekday, idx)}
-                              class="text-blue-700 hover:bg-blue-700 hover:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 font-bold rounded-full text-sm p-1 text-center inline-flex items-center dark:border-blue-500 dark:text-blue-500 dark:hover:text-white dark:focus:ring-blue-800 dark:hover:bg-blue-500 ml-1"
-                            >
-                              <MinusSignIcon />
-                            </button>
-                          {/if}
-                          {#if idx === editData.data[weekday].timeSlots.length - 1}
-                            <button
-                              type="button"
-                              onclick={() => addNewSlot(weekday)}
-                              class="text-blue-700 hover:bg-blue-700 hover:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 font-bold rounded-full text-sm p-1 text-center inline-flex items-center dark:border-blue-500 dark:text-blue-500 dark:hover:text-white dark:focus:ring-blue-800 dark:hover:bg-blue-500 ml-1"
-                            >
-                              <PlusIcon />
-                            </button>
-                          {/if}
-                        </div>
-                      {/each}
-                    </td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <!-- Modal footer -->
-        <div
-          class="flex items-center p-6 space-x-2 border-t border-gray-200 rounded-b dark:border-gray-600"
+    {#each weekdays as weekday}
+      <div class="flex flex-wrap items-start gap-x-6 gap-y-2 px-4 py-3">
+        <label
+          class="flex w-32 shrink-0 cursor-pointer items-center gap-3 py-2.5 text-sm font-medium text-gray-900 dark:text-white"
         >
-          <button
-            data-modal-hide="defaultModal"
-            type="button"
-            onclick={onUpdate}
-            class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-          >
-            Save
-          </button>
-          <button
-            data-modal-hide="defaultModal"
-            type="button"
-            onclick={() => (editing = false)}
-            class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600"
-          >
-            Cancel
-          </button>
+          <Checkbox bind:checked={editData.data[weekday].include} />
+          {weekdayNames[weekday]}
+        </label>
+        <div class="space-y-2">
+          {#each editData.data[weekday].timeSlots as timeSlot, idx}
+            <div class="flex items-center gap-2">
+              <div class="w-24">
+                <Input
+                  type="text"
+                  placeholder="00:00"
+                  aria-label={`${weekdayNames[weekday]} from`}
+                  required
+                  bind:value={timeSlot.from}
+                />
+              </div>
+              <span class="text-sm text-gray-500 dark:text-gray-400">to</span>
+              <div class="w-24">
+                <Input
+                  type="text"
+                  placeholder="23:59"
+                  aria-label={`${weekdayNames[weekday]} to`}
+                  required
+                  bind:value={timeSlot.to}
+                />
+              </div>
+              {#if editData.data[weekday].timeSlots.length > 1}
+                <RemoveButton label="Remove these hours" onclick={() => removeSlot(weekday, idx)} />
+              {/if}
+              {#if idx === editData.data[weekday].timeSlots.length - 1}
+                <SecondaryButton size="sm" onclick={() => addNewSlot(weekday)}>
+                  + Add hours
+                </SecondaryButton>
+              {/if}
+            </div>
+          {/each}
         </div>
       </div>
-    </div>
+    {/each}
   </div>
-{/if}
+
+  {#if errorMessage}
+    <Hint error>{errorMessage}</Hint>
+  {/if}
+  <div class="flex flex-wrap items-center gap-3 pt-2">
+    <Button onclick={onUpdate}>Save</Button>
+    <SecondaryButton onclick={() => (editing = false)}>Cancel</SecondaryButton>
+  </div>
+</Dialog>
