@@ -16,6 +16,12 @@
   import { getPlaybackUrl } from '$lib/playback';
   import type { AudioChangePayload } from '../AudioChangedPayload';
   import { uploadRecording } from '../uploadRecording';
+  import Button from '$lib/components/Button.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
+  import Field from '$lib/components/form/Field.svelte';
+  import Input from '$lib/components/form/Input.svelte';
+  import Label from '$lib/components/form/Label.svelte';
+  import SecondaryButton from '$lib/components/form/SecondaryButton.svelte';
 
   let {
     node,
@@ -217,64 +223,40 @@
           </p>
         </div>
         {#if !addingOption}
-          <button
-            type="button"
-            class="inline-flex shrink-0 items-center rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/50"
-            onclick={showAddOption}
-          >
+          <SecondaryButton size="sm" class="shrink-0" onclick={showAddOption}>
             Add option
-          </button>
+          </SecondaryButton>
         {/if}
       </div>
 
       {#if addingOption}
-        <div
-          class="mb-3 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/70 p-3 dark:border-emerald-700 dark:bg-emerald-950/30"
-        >
-          <label
+        <div class="mb-3 space-y-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+          <Field
             for={`menu-option-${node.data.id}`}
-            class="block text-sm font-semibold text-slate-800 dark:text-slate-100"
+            label="Digits callers press"
+            hint="A single digit or a combination like 12. Each entry becomes its own route out."
+            error={errorMessage}
           >
-            Digits callers press
-          </label>
-          <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">
-            Use a single digit or a combination like <span class="font-semibold">12</span>
-            . Each entry becomes its own route out.
-          </p>
-          <div class="mt-3 flex items-center gap-2">
-            <input
+            <Input
               id={`menu-option-${node.data.id}`}
-              class="w-full rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:border-emerald-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-emerald-900"
               type="text"
               inputmode="numeric"
+              placeholder="1"
+              invalid={Boolean(errorMessage)}
               bind:value={newOutletKey}
               onkeydown={handleKeydown}
-              placeholder="1"
             />
-            <button
-              type="button"
-              class="inline-flex shrink-0 items-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
-              onclick={tryAddOutlet}
-            >
-              Add
-            </button>
-            <button
-              type="button"
-              class="inline-flex shrink-0 items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-              onclick={cancelAddOption}
-            >
-              Cancel
-            </button>
+          </Field>
+          <div class="flex items-center gap-2">
+            <Button onclick={tryAddOutlet}>Add</Button>
+            <SecondaryButton onclick={cancelAddOption}>Cancel</SecondaryButton>
           </div>
-          {#if errorMessage}
-            <p class="mt-2 text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
-          {/if}
         </div>
       {/if}
 
       {#if Object.keys(node.data.outlets).length === 0}
         <div
-          class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400"
+          class="rounded-lg border border-dashed border-gray-300 px-4 py-5 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400"
         >
           No digit routes yet. Add the first option to create a route callers can press.
         </div>
@@ -308,139 +290,59 @@
   </Inlet>
 </Draggable>
 
-{#if editing}
-  <div
-    tabindex="-1"
-    aria-hidden="true"
-    class="fixed top-0 left-0 right-0 z-50 w-full p-4 overflow-x-hidden overflow-y-auto md:inset-0 h-[calc(100%-1rem)] max-h-full flex justify-center items-center"
-  >
-    <div class="relative w-full max-w-2xl max-h-full">
-      <!-- Modal content -->
-      <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
-        <!-- Modal header -->
-        <div class="flex items-start justify-between p-4 border-b rounded-t dark:border-gray-600">
-          <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Auto Attendant</h3>
-          <button
-            type="button"
-            class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
-            onclick={() => (editing = false)}
-          >
-            <svg
-              class="w-3 h-3"
-              aria-hidden="true"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 14 14"
-            >
-              <path
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
-              />
-            </svg>
-            <span class="sr-only">Close modal</span>
-          </button>
-        </div>
-        <!-- Modal body -->
-        <div class="p-6 space-y-6">
-          <p class="text-left text-lg font-medium text-white">Prompt Audio:</p>
-          <div class="flex items-center space-x-6">
-            <MediaUploadRecord
-              audioUrl={audioRecordingURLs.promptAudioURL}
-              nodeId={node.data.id}
-              onAudioChange={onPromptAudioChange}
-            />
-          </div>
-          <p class="text-left text-lg font-medium text-white pb--2 mb--1">Error Audio:</p>
-          <div class="flex items-center space-x-6">
-            <!-- <p class="text-center text-lg font-medium">Upload audio file / record audio</p> Add this line just above the audio tag -->
-            <MediaUploadRecord
-              audioUrl={audioRecordingURLs.errorAudioURL}
-              nodeId={node.data.id}
-              onAudioChange={onErrorAudioChange}
-            />
-          </div>
-          <div class="space-y-6">
-            <label
-              for="repeat"
-              class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-            >
-              Repeat Error Audio
-            </label>
-            <input
-              type="number"
-              id="repeat"
-              class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-              placeholder="3"
-              required
-              bind:value={editData.data.repeat}
-            />
-            <label
-              for="multiDigitWaitTime"
-              class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-            >
-              Wait time after prompt
-            </label>
-            <input
-              type="number"
-              id="multiDigitWaitTime"
-              class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-              placeholder="3"
-              required
-              bind:value={editData.data.afterPromptWaitTime}
-            />
-            <label
-              for="multiDigitWaitTime"
-              class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-            >
-              Multi Digit wait time
-            </label>
-            <input
-              type="number"
-              id="multiDigitWaitTime"
-              class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-              placeholder="3"
-              required
-              bind:value={editData.data.multiDigitWaitTime}
-            />
-          </div>
-        </div>
-        <!-- Modal footer -->
-        <div
-          class="flex items-center p-6 space-x-2 border-t border-gray-200 rounded-b dark:border-gray-600"
-        >
-          <button
-            data-modal-hide="defaultModal"
-            type="button"
-            onclick={onUpdate}
-            class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
-          >
-            Save
-          </button>
-          <button
-            data-modal-hide="defaultModal"
-            type="button"
-            onclick={() => (editing = false)}
-            class="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+<Dialog
+  showDialog={editing}
+  title="Menu"
+  description="Plays a prompt and routes the caller by the digits they press."
+  onClose={() => (editing = false)}
+>
+  <div>
+    <Label tag="p">Prompt audio</Label>
+    <MediaUploadRecord
+      audioUrl={audioRecordingURLs.promptAudioURL}
+      nodeId={node.data.id}
+      onAudioChange={onPromptAudioChange}
+    />
   </div>
-{/if}
-
-<style>
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.5;
-    }
-  }
-</style>
+  <div>
+    <Label tag="p">Error audio</Label>
+    <MediaUploadRecord
+      audioUrl={audioRecordingURLs.errorAudioURL}
+      nodeId={node.data.id}
+      onAudioChange={onErrorAudioChange}
+    />
+  </div>
+  <div class="grid gap-4 sm:grid-cols-3">
+    <Field for={`menu-repeat-${node.data.id}`} label="Repeat error audio">
+      <Input
+        id={`menu-repeat-${node.data.id}`}
+        type="number"
+        placeholder="3"
+        required
+        bind:value={editData.data.repeat}
+      />
+    </Field>
+    <Field for={`menu-prompt-wait-${node.data.id}`} label="Wait time after prompt">
+      <Input
+        id={`menu-prompt-wait-${node.data.id}`}
+        type="number"
+        placeholder="3"
+        required
+        bind:value={editData.data.afterPromptWaitTime}
+      />
+    </Field>
+    <Field for={`menu-digit-wait-${node.data.id}`} label="Multi-digit wait time">
+      <Input
+        id={`menu-digit-wait-${node.data.id}`}
+        type="number"
+        placeholder="3"
+        required
+        bind:value={editData.data.multiDigitWaitTime}
+      />
+    </Field>
+  </div>
+  <div class="flex flex-wrap items-center gap-3 pt-2">
+    <Button onclick={onUpdate}>Save</Button>
+    <SecondaryButton onclick={() => (editing = false)}>Cancel</SecondaryButton>
+  </div>
+</Dialog>

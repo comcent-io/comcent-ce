@@ -8,6 +8,10 @@
 </script>
 
 <script lang="ts">
+  import SecondaryButton from '$lib/components/form/SecondaryButton.svelte';
+
+  // An audio clip to upload: a player for the current one, and buttons to
+  // choose a file or record a new one in the browser.
   interface Props {
     audioUrl?: string;
     nodeId?: string;
@@ -107,36 +111,22 @@
   }
 </script>
 
-<div class="flex items-center justify-between">
-  <audio src={changedAudioUrl || audioUrl} controls></audio>
+<div class="space-y-3">
+  <audio class="w-full" src={changedAudioUrl || audioUrl} controls></audio>
   <input type="file" bind:this={fileInput} onchange={fileChanged} accept="audio/*" hidden />
-  <button
-    class="ml-2 text-white bg-blue-500 hover:bg-blue-600 p-2 rounded"
-    onclick={(e) => {
-      e.preventDefault();
-      fileInput?.click();
-    }}
-    title="Select audio file from your computer"
-  >
-    Browse📂
-    <span class="sr-only">Select audio file</span>
-  </button>
-  <button
-    class="ml-2 text-white bg-red-500 hover:bg-red-600 p-2 rounded min-w-23 flex items-center justify-center"
-    onclick={(e) => {
-      e.preventDefault();
-      if (recording) stopRecording();
-      else startRecording();
-    }}
-    title={recording ? 'Stop recording' : 'Start recording'}
-  >
-    {recording ? 'Stop   ⏹️' : 'Record ⏺️'}
-    <span class="sr-only">{recording ? 'Stop recording' : 'Start recording'}</span>
-  </button>
-
-  {#if recording}
-    <span class="ml-0 text-sm font-semibold text-white p-4">
-      {formatDuration(recordingDuration)}
-    </span>
-  {/if}
+  <div class="flex flex-wrap items-center gap-3">
+    <SecondaryButton size="sm" onclick={() => fileInput?.click()}>Choose file</SecondaryButton>
+    <SecondaryButton
+      size="sm"
+      tone={recording ? 'danger' : 'default'}
+      onclick={() => (recording ? stopRecording() : startRecording())}
+    >
+      {recording ? 'Stop recording' : 'Record'}
+    </SecondaryButton>
+    {#if recording}
+      <span class="text-sm font-medium tabular-nums text-gray-700 dark:text-gray-300">
+        {formatDuration(recordingDuration)}
+      </span>
+    {/if}
+  </div>
 </div>
