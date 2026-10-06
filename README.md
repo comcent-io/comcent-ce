@@ -184,9 +184,12 @@ for that version from
 
 ## Troubleshooting
 
-**Sign-up email never arrives.** `SMTP_URL` is unset or wrong. For one-off
-testing you can run a [Mailhog](https://github.com/mailhog/MailHog)
-container and set `SMTP_URL=smtp://mailhog:1025`.
+**Sign-up email never arrives.** `SMTP_URL` is unset or wrong. With it unset,
+nothing is sent: each email is written to the server log instead
+(`docker compose logs server | grep -A 20 "Swoosh"`), so you can still copy an
+invite link from there. For one-off testing you can run a
+[Mailhog](https://github.com/mailhog/MailHog) container and set
+`SMTP_URL=smtp://mailhog:1025`.
 
 **`https://...` shows a Traefik default cert.** Let's Encrypt couldn't
 issue. Check `docker compose logs traefik` — usually DNS not yet pointing

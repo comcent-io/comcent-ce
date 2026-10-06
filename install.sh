@@ -192,7 +192,9 @@ SOURCE_EMAIL=Comcent <noreply@replaceMe>
 
 # SMTP for outbound email. Format: smtp://user:pass@host:port
 # Anything works (SES, SendGrid, Postmark, Mailgun, your own postfix).
-SMTP_URL=replaceMe
+# Optional: left blank, emails (invites, password resets) are not sent but
+# written to the server log (docker compose logs server).
+SMTP_URL=
 
 # S3 (or any S3-compatible) bucket for call recordings + uploads.
 STORAGE_BUCKET_NAME=replaceMe
@@ -272,8 +274,9 @@ ${B}1) Edit .env${N}
      • COMCENT_DOMAIN          (e.g. voice.example.com — DNS A → ${PUBLIC_IP})
      • LETSENCRYPT_EMAIL       (your address for cert-renewal alerts)
      • SOURCE_EMAIL            (sender for invites; the host part will likely match COMCENT_DOMAIN)
-     • SMTP_URL                (smtp://user:pass@host:587 — any provider)
      • STORAGE_BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+   Optional: SMTP_URL (smtp://user:pass@host:587 — any provider). Left
+   blank, emails are written to the server log instead of being sent.
 
 ${B}2) Start the stack${N}
      cd ${INSTALL_DIR}
