@@ -51,7 +51,21 @@ So a commit has published images only if its tests passed.
    tags the commit and creates the GitHub Release with generated notes. From
    then on `install.sh` installs that version.
 
-## Not covered yet
+## FreeSWITCH and the voice bot
 
 FreeSWITCH (`freeswitch-ce`) and the voice bot (`go-voice-bot-ce`) are built
-in their own repositories and still installed as `:latest`.
+in their own repositories. Each push to their `main` publishes `:latest` and
+an immutable `:sha-<7>`. This repository pins the `:sha-<7>` it installs, as
+the default in `docker-compose.deploy.yaml` (and FreeSWITCH also in
+`docker-compose-e2e.yaml`, so the integration tests run against it). A
+release's compose file therefore carries the versions that release was tested
+with; their `:latest` never reaches installs.
+
+To move to a newer build of either:
+
+1. Find its tag: the `sha-<7>` of the commit whose *Publish image* run passed
+   in that repository.
+2. Open a PR here changing the default in both compose files (voice bot: only
+   `docker-compose.deploy.yaml`). Its integration tests run against the new
+   FreeSWITCH.
+3. Merge, and cut the next release as above (fresh-install test included).
