@@ -4,6 +4,7 @@
   import { onMount } from 'svelte';
   import Pagination from '$lib/components/Pagination.svelte';
   import LabelFilter from '$lib/components/LabelFilter.svelte';
+  import { labelKey } from '$lib/labelFilter';
   import Button from '$lib/components/Button.svelte';
   import ErrorMessage from '$lib/components/ErrorMessage.svelte';
   import Pill from '$lib/components/Pill.svelte';
@@ -217,7 +218,7 @@
   <LabelFilter
     bind:this={labelFilterComponent}
     subdomain={routeParam('subdomain')}
-    appliedCount={appliedLabels.length}
+    appliedLabelIds={appliedLabels.map(labelKey)}
     onApply={handleLabelApply}
     onClear={handleLabelClear}
   />
