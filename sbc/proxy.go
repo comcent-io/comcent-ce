@@ -26,6 +26,32 @@ type callState struct {
 	userAORs    []string // comcent users pinned to this FS leg
 	isWebRTC    bool     // user is a WebRTC agent (needs ws transport)
 	spoofedUser string   // spoofed caller cached against the real SIP trunk
+	// Added to the CSeq of every request FS sends to the far end. When the
+	// SBC answers a trunk's digest challenge itself, the authenticated INVITE
+	// goes out with a higher CSeq than FS's; FS's ACK and BYE still carry its
+	// own numbers, so without this the trunk can't match the ACK to its 200
+	// OK, ignores it (and the BYE), and drops the call after 32 seconds.
+	// Responses to FS are built from FS's own request, so they keep FS's CSeq.
+	fsCSeqOffset uint32
+}
+
+// digestCSeqOffset is how far the trunk's CSeq runs ahead of FS's after a
+// digest retry. It must compare against FS's own request, not the forwarded
+// copy: sipgo's DoDigestAuth bumps the CSeq of the request it is given in
+// place, so the copy already carries the trunk's number and would yield 0.
+func digestCSeqOffset(fsReq *sip.Request, authResp *sip.Response) uint32 {
+	a, f := authResp.CSeq(), fsReq.CSeq()
+	if a == nil || f == nil || a.SeqNo <= f.SeqNo {
+		return 0
+	}
+	return a.SeqNo - f.SeqNo
+}
+
+// shiftCSeq adds offset to a request's CSeq number (see callState.fsCSeqOffset).
+func shiftCSeq(req *sip.Request, offset uint32) {
+	if cseq := req.CSeq(); cseq != nil && offset > 0 {
+		cseq.SeqNo += offset
+	}
 }
 
 type Proxy struct {
@@ -673,13 +699,15 @@ func (p *Proxy) handleInviteFromFSToTrunk(req *sip.Request, tx sip.ServerTransac
 					// Recorded before the 2xx goes upstream; see the note in the
 					// caller→FS path for why the order matters.
 					userURI := responseContactURI(authResp, trunkURI)
+					offset := digestCSeqOffset(req, authResp)
 					p.callsMu.Lock()
 					p.calls[callID] = &callState{
-						fsAddr:      fsAddr,
-						fsURI:       requestContactURI(req, sip.Uri{Host: strings.Split(fsAddr, ":")[0], Port: parsePort(fsAddr)}),
-						userAddr:    dest,
-						userURI:     userURI,
-						spoofedUser: spoofedUser,
+						fsAddr:       fsAddr,
+						fsURI:        requestContactURI(req, sip.Uri{Host: strings.Split(fsAddr, ":")[0], Port: parsePort(fsAddr)}),
+						userAddr:     dest,
+						userURI:      userURI,
+						spoofedUser:  spoofedUser,
+						fsCSeqOffset: offset,
 					}
 					p.callsMu.Unlock()
 					established = true
@@ -783,6 +811,7 @@ func (p *Proxy) relayInDialog(req *sip.Request, tx sip.ServerTransaction) {
 			tx.Respond(sip.NewResponseFromRequest(req, 483, "Too Many Hops", nil))
 			return
 		}
+		shiftCSeq(fwdReq, state.fsCSeqOffset)
 		if state.userAddr != "" {
 			fwdReq.SetDestination(state.userAddr)
 			if state.isWebRTC {
@@ -940,6 +969,7 @@ func (p *Proxy) handleAck(req *sip.Request, tx sip.ServerTransaction) {
 		if !ok {
 			return
 		}
+		shiftCSeq(fwdReq, state.fsCSeqOffset)
 		if state.userAddr != "" {
 			fwdReq.SetDestination(state.userAddr)
 			if state.isWebRTC {
