@@ -1,10 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { labelKey, selectionChanged } from '$lib/labelFilter';
 
   interface Props {
     subdomain: string;
     initialSelectedLabels?: any[];
-    appliedCount?: number;
+    // Keys (labelKey) of the labels the list is filtered by right now.
+    appliedLabelIds?: string[];
     onApply?: (labels: any[]) => void;
     onClear?: () => void;
   }
@@ -12,7 +14,7 @@
   let {
     subdomain,
     initialSelectedLabels = [],
-    appliedCount = 0,
+    appliedLabelIds = [],
     onApply,
     onClear,
   }: Props = $props();
@@ -27,6 +29,10 @@
   let filteredLabels: any[] = $derived(
     allLabels.filter((label) => label.name.toLowerCase().includes(labelSearchText.toLowerCase())),
   );
+  // Apply also takes an empty selection: unticking every label of an applied
+  // filter and applying shows all calls again, the same as Clear.
+  let canApply = $derived(selectionChanged(selectedLabels.map(labelKey), appliedLabelIds));
+  let canClear = $derived(selectedLabels.length > 0 || appliedLabelIds.length > 0);
 
   // Fetch organization labels
   async function fetchOrgLabels() {
@@ -48,17 +54,8 @@
 
   // Toggle label selection
   function toggleLabel(label: any) {
-    const labelId = label.id || label.name;
-    const isSelected = selectedLabels.some((l) => {
-      const id = l.id || l.name;
-      return id === labelId;
-    });
-
-    if (isSelected) {
-      selectedLabels = selectedLabels.filter((l) => {
-        const id = l.id || l.name;
-        return id !== labelId;
-      });
+    if (isLabelSelected(label)) {
+      selectedLabels = selectedLabels.filter((l) => labelKey(l) !== labelKey(label));
     } else {
       selectedLabels = [...selectedLabels, label];
     }
@@ -66,11 +63,7 @@
 
   // Check if a label is selected
   function isLabelSelected(label: any) {
-    const labelId = label.id || label.name;
-    return selectedLabels.some((l) => {
-      const id = l.id || l.name;
-      return id === labelId;
-    });
+    return selectedLabels.some((l) => labelKey(l) === labelKey(label));
   }
 
   // Toggle dropdown visibility
@@ -147,11 +140,11 @@
       />
     </svg>
     Labels
-    {#if appliedCount > 0}
+    {#if appliedLabelIds.length > 0}
       <span
         class="absolute -top-1 -right-1 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-blue-600 rounded-full dark:bg-blue-500"
       >
-        {appliedCount}
+        {appliedLabelIds.length}
       </span>
     {/if}
   </button>
@@ -234,7 +227,7 @@
           {selectedLabels.length} selected
         </div>
         <div class="flex gap-2">
-          {#if selectedLabels.length > 0}
+          {#if canClear}
             <button
               type="button"
               onclick={clearLabelFilters}
@@ -246,7 +239,7 @@
           <button
             type="button"
             onclick={applyLabelFilters}
-            disabled={selectedLabels.length === 0}
+            disabled={!canApply}
             class="px-3 py-1.5 text-xs font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed dark:bg-blue-600 dark:hover:bg-blue-700"
           >
             Apply
