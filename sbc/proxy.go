@@ -1353,6 +1353,31 @@ func (p *Proxy) filterRouteValue(value string) string {
 	return p.filterRouteValueForHop(value, "")
 }
 
+// routeHop is the host:port a Route entry sends to (port 5060 when unset),
+// read from its URI and not its parameters. Twilio's Record-Route names our
+// address in a twnat parameter (<sip:54.172.60.3;lr;twnat=sip:OUR_IP:5060>);
+// matching the whole entry as text took that for our own hop and dropped it,
+// so Twilio's edge could not match our ACK or BYE (it answered the BYE 481
+// and the far end stayed on the call).
+func routeHop(entry string) string {
+	s := strings.TrimSpace(entry)
+	if i := strings.IndexByte(s, '<'); i >= 0 {
+		s = s[i+1:]
+		if j := strings.IndexByte(s, '>'); j >= 0 {
+			s = s[:j]
+		}
+	}
+	var uri sip.Uri
+	if err := sip.ParseUri(s, &uri); err != nil {
+		return ""
+	}
+	port := uri.Port
+	if port == 0 {
+		port = 5060
+	}
+	return net.JoinHostPort(uri.Host, strconv.Itoa(port))
+}
+
 func (p *Proxy) filterRouteValueForHop(value, keepHop string) string {
 	if value == "" {
 		return ""
@@ -1367,8 +1392,9 @@ func (p *Proxy) filterRouteValueForHop(value, keepHop string) string {
 			continue
 		}
 
-		isPublic := strings.Contains(trimmed, publicMarker)
-		isPrivate := strings.Contains(trimmed, privateMarker)
+		hop := routeHop(trimmed)
+		isPublic := hop == publicMarker
+		isPrivate := hop == privateMarker
 		if isPublic || isPrivate {
 			switch keepHop {
 			case "public":
