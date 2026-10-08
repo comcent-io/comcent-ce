@@ -179,12 +179,18 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 		contactURI = extractContactURI(contactHeader.Value(), contactURI)
 	}
 
+	nat := isUDP(transport) && behindNAT(contactURI, sourceAddr)
+	if nat && p.cfg.NATMaxExpires > 0 && expires > p.cfg.NATMaxExpires {
+		expires = p.cfg.NATMaxExpires
+	}
+
 	p.reg.Register(aor, &Contact{
 		URI:       contactURI,
 		Address:   sourceAddr,
 		Transport: transport,
 		IsWebRTC:  isWebRTC,
 		ExpiresAt: time.Now().Add(time.Duration(expires) * time.Second),
+		NAT:       nat,
 	})
 
 	subdomain := strings.Split(domain, ".")[0]

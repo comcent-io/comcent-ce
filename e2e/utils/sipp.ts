@@ -164,7 +164,12 @@ export async function runSipp(options: SippRunOptions) {
  */
 export async function stopSippProcesses(
   targets: Array<{
-    service: 'sipp' | 'sipp-uas' | 'sipp-agent-a' | 'sipp-agent-b';
+    service:
+      | 'sipp'
+      | 'sipp-uas'
+      | 'sipp-agent-a'
+      | 'sipp-agent-b'
+      | 'sipp-nat-agent';
     port: number;
   }>,
 ) {
@@ -510,8 +515,26 @@ export async function unregisterSipAgentInline(params: {
   });
 }
 
+/**
+ * What `ip route get <ip>` says inside a service, e.g. that the agent behind
+ * nat-router reaches the SBC through the router and not some other way.
+ */
+export async function routeFromService(service: string, ip: string) {
+  const { stdout } = await runCompose(
+    [...composeArgs, 'exec', '-T', service, 'ip', 'route', 'get', ip],
+    10_000,
+  );
+  return stdout;
+}
+
 export async function killAllSippProcesses() {
-  const services = ['sipp', 'sipp-uas', 'sipp-agent-a', 'sipp-agent-b'];
+  const services = [
+    'sipp',
+    'sipp-uas',
+    'sipp-agent-a',
+    'sipp-agent-b',
+    'sipp-nat-agent',
+  ];
   await Promise.all(
     services.map((s) =>
       runCompose(

@@ -191,6 +191,9 @@ services:
       - INTERNAL_API_PASSWORD=${INTERNAL_API_PASSWORD:-}
       - RPC_API_TOKEN=${RPC_API_TOKEN:-}
       - SIP_USER_ROOT_DOMAIN=${SIP_USER_ROOT_DOMAIN:-localhost}
+      # Well under nat-router's 10 s mapping timeout. 0 turns the keepalive
+      # off, which natKeepaliveFlowSipp.spec.ts should then fail on.
+      - NAT_PING_INTERVAL=${E2E_NAT_PING_INTERVAL:-4}
     ports:
       - '${E2E_SBC_WS_PORT:-4180}:80'
     depends_on:
@@ -290,12 +293,55 @@ services:
     networks:
       - comcent-network
 
+  # A home router between nat-lan and comcent-network that forgets an idle UDP
+  # mapping after NAT_UDP_TIMEOUT seconds, for the NAT keepalive spec.
+  nat-router:
+    build:
+      context: docker/nat-router
+    environment:
+      - LAN_IP=10.200.0.2
+      - WAN_IP=172.29.17.20
+      - NAT_UDP_TIMEOUT=10
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.netfilter.nf_conntrack_udp_timeout=10
+      - net.netfilter.nf_conntrack_udp_timeout_stream=10
+    cap_add:
+      - NET_ADMIN
+    networks:
+      nat-lan:
+        ipv4_address: 10.200.0.2
+      comcent-network:
+        ipv4_address: 172.29.17.20
+
+  # A SIP phone behind nat-router: its only route out is through the router.
+  sipp-nat-agent:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-sipp
+    command: sh -c "ip route replace default via 10.200.0.2 && sleep infinity"
+    working_dir: /tmp
+    volumes:
+      - ./e2e/telephony/sipp:/scenarios:ro
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      - nat-router
+    networks:
+      nat-lan:
+        ipv4_address: 10.200.0.10
+
 networks:
   comcent-network:
     driver: bridge
     ipam:
       config:
         - subnet: 172.29.0.0/16
+  nat-lan:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.200.0.0/24
 
 volumes:
   sbc-go-cache:

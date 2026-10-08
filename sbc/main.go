@@ -96,19 +96,27 @@ func main() {
 	dispatcher := newDispatcher(cfg)
 	proxy := newProxy(publicClient, privateClient, reg, api, dispatcher, cfg)
 	go reg.reapExpired(ctx, proxy.registrationLapsed)
+	if cfg.NATPingInterval > 0 {
+		go proxy.natKeepalive(ctx, cfg.NATPingInterval, cfg.NATPingMaxMissed)
+	}
 
-	// Register handlers on both public and private servers
-	for _, s := range []*sipgo.Server{publicSrv, privateSrv} {
-		s.OnRequest(sip.REGISTER, proxy.handleRegister)
-		s.OnRequest(sip.INVITE, proxy.handleInvite)
-		s.OnRequest(sip.ACK, proxy.handleAck)
-		s.OnRequest(sip.BYE, proxy.handlePassthrough)
-		s.OnRequest(sip.CANCEL, proxy.handleCancel)
-		s.OnRequest(sip.OPTIONS, proxy.handleOptions)
-		s.OnRequest(sip.REFER, proxy.handlePassthrough)
-		s.OnRequest(sip.INFO, proxy.handlePassthrough)
-		s.OnRequest(sip.UPDATE, proxy.handlePassthrough)
-		s.OnRequest(sip.NOTIFY, proxy.handlePassthrough)
+	// Register handlers on both public and private servers. Only the public
+	// side faces clients behind NATs, so only it answers at the source port.
+	noWrap := func(h sipgo.RequestHandler) sipgo.RequestHandler { return h }
+	for _, s := range []struct {
+		srv  *sipgo.Server
+		wrap func(sipgo.RequestHandler) sipgo.RequestHandler
+	}{{publicSrv, symmetricResponses}, {privateSrv, noWrap}} {
+		s.srv.OnRequest(sip.REGISTER, s.wrap(proxy.handleRegister))
+		s.srv.OnRequest(sip.INVITE, s.wrap(proxy.handleInvite))
+		s.srv.OnRequest(sip.ACK, s.wrap(proxy.handleAck))
+		s.srv.OnRequest(sip.BYE, s.wrap(proxy.handlePassthrough))
+		s.srv.OnRequest(sip.CANCEL, s.wrap(proxy.handleCancel))
+		s.srv.OnRequest(sip.OPTIONS, s.wrap(proxy.handleOptions))
+		s.srv.OnRequest(sip.REFER, s.wrap(proxy.handlePassthrough))
+		s.srv.OnRequest(sip.INFO, s.wrap(proxy.handlePassthrough))
+		s.srv.OnRequest(sip.UPDATE, s.wrap(proxy.handlePassthrough))
+		s.srv.OnRequest(sip.NOTIFY, s.wrap(proxy.handlePassthrough))
 	}
 
 	g, ctx := errgroup.WithContext(ctx)

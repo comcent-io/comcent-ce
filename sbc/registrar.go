@@ -14,6 +14,11 @@ type Contact struct {
 	Transport string
 	IsWebRTC  bool
 	ExpiresAt time.Time
+	// NAT is set for a UDP contact that registered from behind a NAT; the
+	// keepalive pings it (see nat_keepalive.go).
+	NAT bool
+
+	missedPings int // consecutive keepalive pings it didn't answer
 }
 
 type Registrar struct {
