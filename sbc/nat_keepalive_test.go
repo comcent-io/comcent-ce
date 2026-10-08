@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
 )
 
@@ -86,6 +87,36 @@ func TestPingForAGoneContactIsIgnored(t *testing.T) {
 		t.Fatal("missed ping for an unknown contact reported an emptied AOR")
 	}
 	r.pingAnswered("nobody@acme.example.com", "203.0.113.7:40312")
+}
+
+// With a client that pins its local address (as the public client does), the
+// ping must still leave through the listener socket: sipgo's default build
+// would set Laddr and make the transport bind :5060 again, which fails.
+func TestPingBuildLeavesTheSocketToTheTransport(t *testing.T) {
+	ua, err := sipgo.NewUA()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ua.Close()
+	client, err := sipgo.NewClient(ua,
+		sipgo.WithClientHostname("203.0.113.1"),
+		sipgo.WithClientPort(5060),
+		sipgo.WithClientConnectionAddr("0.0.0.0:5060"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := sip.NewRequest(sip.OPTIONS, sip.Uri{User: "alice", Host: "192.168.1.20", Port: 5060})
+	if err := buildFromListener(client, req); err != nil {
+		t.Fatal(err)
+	}
+	if req.Laddr.IP != nil || req.Laddr.Port != 0 {
+		t.Errorf("Laddr = %v, want unset", req.Laddr)
+	}
+	if req.Via() == nil || req.From() == nil || req.To() == nil || req.CallID() == nil || req.CSeq() == nil {
+		t.Errorf("missing headers in\n%s", req)
+	}
 }
 
 type recordingTx struct {

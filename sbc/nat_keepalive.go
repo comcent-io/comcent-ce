@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
 )
 
@@ -65,16 +66,31 @@ func (p *Proxy) pingContact(ctx context.Context, c natContact, wait time.Duratio
 
 	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
-	if _, err := p.publicClient.Do(ctx, req); err == nil {
+	_, err := p.publicClient.Do(ctx, req, buildFromListener)
+	if err == nil {
 		p.reg.pingAnswered(c.aor, c.address)
 		return
 	}
 
 	if p.reg.pingMissed(c.aor, c.address, maxMissed) {
 		slog.Info("NAT keepalive: contact stopped answering, unregistered",
-			"aor", c.aor, "address", c.address, "missed", maxMissed)
+			"aor", c.aor, "address", c.address, "missed", maxMissed, "error", err)
 		p.registrationLapsed(c.aor)
 	}
+}
+
+// buildFromListener fills in the headers a request the SBC originates needs,
+// like sipgo's default, but leaves the local address to the transport. The
+// default also pins the client's configured local address, and binding that
+// a second time fails while the listener holds it. Left unset, sipgo sends
+// from the listener socket the contact's REGISTER arrived on, as it does for
+// INVITEs, which is the socket whose NAT mapping the ping must refresh.
+func buildFromListener(c *sipgo.Client, req *sip.Request) error {
+	if err := sipgo.ClientRequestBuild(c, req); err != nil {
+		return err
+	}
+	req.Laddr = sip.Addr{}
+	return nil
 }
 
 // natContact is a snapshot of a contact to ping, taken under the registrar's
