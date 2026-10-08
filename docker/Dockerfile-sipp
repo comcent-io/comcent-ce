@@ -8,6 +8,7 @@ RUN apt-get update \
     ca-certificates \
     cmake \
     git \
+    iproute2 \
     iputils-ping \
     libncurses-dev \
     libpcap-dev \

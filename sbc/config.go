@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"strconv"
+	"time"
 )
 
 type Config struct {
@@ -22,6 +23,17 @@ type Config struct {
 	WSSCertPath        string
 	WSSKeyPath         string
 	WSSPort            int
+
+	// How often UDP contacts behind a NAT are pinged to keep the router's
+	// mapping open; 0 turns the keepalive off. Routers drop an idle UDP
+	// mapping after 30 s at the earliest, so the default stays under that.
+	NATPingInterval time.Duration
+	// Consecutive unanswered pings after which a contact is unregistered.
+	NATPingMaxMissed int
+	// Longest registration a UDP contact behind a NAT is given, as a backstop
+	// for a phone whose pings get through but whose mapping still changed.
+	// 0 leaves the client's requested lifetime alone.
+	NATMaxExpires int
 }
 
 func loadConfig() Config {
@@ -38,6 +50,9 @@ func loadConfig() Config {
 		WSSCertPath:        os.Getenv("WSS_CERT_PATH"),
 		WSSKeyPath:         os.Getenv("WSS_KEY_PATH"),
 		WSSPort:            envIntOrDefault("WSS_PORT", 443),
+		NATPingInterval:    time.Duration(envIntOrDefault("NAT_PING_INTERVAL", 20)) * time.Second,
+		NATPingMaxMissed:   envIntOrDefault("NAT_PING_MAX_MISSED", 3),
+		NATMaxExpires:      envIntOrDefault("NAT_MAX_EXPIRES", 600),
 	}
 }
 

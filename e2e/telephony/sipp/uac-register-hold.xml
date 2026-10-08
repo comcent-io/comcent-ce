@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<!--
+  A SIP phone that registers and then stays up until it is killed, like a desk
+  phone left on. Everything sent to it meanwhile (the SBC's OPTIONS pings, the
+  call) has a Call-ID of its own, so SIPp hands it to the out-of-call
+  scenario, run with -oocsf ooc-answer-pings-and-calls.xml. Those keep SIPp
+  running, so the test stops it with stopSippProcesses.
+-->
+<scenario name="Register And Stay Up">
+  <send retrans="500">
+    <![CDATA[
+
+      REGISTER sip:[field2]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
+      Max-Forwards: 70
+      From: <sip:[field0]@[field2]>;tag=[call_number]
+      To: <sip:[field0]@[field2]>
+      Call-ID: [call_id]
+      CSeq: 1 REGISTER
+      Contact: <sip:[field0]@[local_ip]:[local_port];transport=udp>
+      Expires: 300
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <recv response="401" auth="true" />
+
+  <send retrans="500">
+    <![CDATA[
+
+      REGISTER sip:[field2]@[remote_ip]:[remote_port] SIP/2.0
+      Via: SIP/2.0/UDP [local_ip]:[local_port];branch=[branch]
+      Max-Forwards: 70
+      From: <sip:[field0]@[field2]>;tag=[call_number]
+      To: <sip:[field0]@[field2]>
+      Call-ID: [call_id]
+      CSeq: 2 REGISTER
+      Contact: <sip:[field0]@[local_ip]:[local_port];transport=udp>
+      Expires: 300
+      [authentication]
+      Content-Length: 0
+
+    ]]>
+  </send>
+
+  <recv response="200" />
+
+  <pause milliseconds="120000" />
+</scenario>

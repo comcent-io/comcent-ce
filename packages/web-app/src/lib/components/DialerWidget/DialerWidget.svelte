@@ -317,6 +317,10 @@
         sessionDescriptionHandlerFactoryOptions: {
           iceGatheringTimeout: 1000,
         },
+        // A double-CRLF every 25 s keeps an idle WebSocket open through
+        // proxies and NATs that close quiet connections (Cloudflare after
+        // 100 s). The SBC accepts it as a keepalive.
+        transportOptions: { server: wsUrl, keepAliveInterval: 25 },
       },
       // Re-register at 85% of the lifetime instead of sip.js's 99%: 6 s of
       // slack on a 600 s registration is less than a background tab's timers
