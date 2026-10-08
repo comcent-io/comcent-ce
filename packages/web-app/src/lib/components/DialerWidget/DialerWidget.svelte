@@ -212,6 +212,12 @@
     },
     onRegistered() {
       uaStatus = 'Registered';
+      registeredAt = Date.now();
+    },
+    onUnregistered() {
+      // The registration lapsed or was refused: calls can't reach this agent,
+      // and the server shows them Logged Out to everyone else.
+      uaStatus = 'Not registered';
     },
     async onCallAnswered(session) {
       onConnectedCallbacks.forEach((callback) => {
@@ -312,6 +318,10 @@
           iceGatheringTimeout: 1000,
         },
       },
+      // Re-register at 85% of the lifetime instead of sip.js's 99%: 6 s of
+      // slack on a 600 s registration is less than a background tab's timers
+      // can be held back, which let registrations run out (COM-11).
+      registererOptions: { refreshFrequency: 85 },
       media: {
         remote: {
           audio: remoteAudio,
@@ -322,6 +332,26 @@
     await sessionManager.register();
     checkPaymentError();
   });
+
+  // A background tab can miss its re-register and drop off. When the agent
+  // comes back to the tab, or the network comes back, register again instead
+  // of waiting on sip.js's own retries, which give up after a few failed
+  // reconnects. A registration that looks live is refreshed too when the last
+  // REGISTER we know of is older than REFRESH_AFTER_MS: sip.js's own expiry
+  // timer is held back in the background as well, so 'Registered' can be
+  // stale.
+  const REFRESH_AFTER_MS = 5 * 60_000;
+  let registeredAt = 0;
+
+  function registerAgain() {
+    if (!sessionManager || document.visibilityState !== 'visible') return;
+    if (uaStatus === 'Registered' && Date.now() - registeredAt < REFRESH_AFTER_MS) return;
+    registeredAt = Date.now();
+    const attempt = sessionManager.isConnected()
+      ? sessionManager.register()
+      : sessionManager.connect(); // registers again once connected
+    attempt.catch((error) => console.warn('Registering again failed', error));
+  }
 
   function checkPaymentError() {
     if (!sessionManager.userAgent.transport.onMessage) {
@@ -752,6 +782,9 @@
   }
 </script>
 
+<svelte:document onvisibilitychange={registerAgain} />
+<svelte:window ononline={registerAgain} />
+
 <div
   use:bindWidgetEl
   class="w-1/4 fixed block max-w-md z-[60] dialer-widget"
@@ -783,7 +816,16 @@
       onpointerdown={onDragHandlePointerDown}
     >
       <div class="relative">
-        {#if uaStatus !== 'Registered'}
+        {#if uaStatus === 'Not registered' || uaStatus === 'Disconnected'}
+          <!-- Not reachable: calls to this agent fail until it registers again. -->
+          <span
+            class="flex items-center gap-2 text-sm font-medium text-red-400"
+            title="Calls can't reach you. Registering again when you return to this tab."
+          >
+            <span class="h-2 w-2 shrink-0 rounded-full bg-red-500" aria-hidden="true"></span>
+            {uaStatus}
+          </span>
+        {:else if uaStatus !== 'Registered'}
           <span class="text-sm text-gray-400">{uaStatus}</span>
         {:else}
           <button

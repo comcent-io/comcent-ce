@@ -200,6 +200,20 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 	tx.Respond(resp)
 }
 
+// registrationLapsed tells the server that aor can no longer be reached
+// because its registration ran out or its last contact stopped answering,
+// not because the client unregistered. The server shows the member Logged
+// Out until they register again. An AOR that registered again in the
+// meantime is left alone.
+func (p *Proxy) registrationLapsed(aor string) {
+	if p.reg.IsRegistered(aor) {
+		return
+	}
+	user, domain, _ := strings.Cut(aor, "@")
+	subdomain := strings.Split(domain, ".")[0]
+	p.api.UpdateUserPresence(subdomain, "expired", user)
+}
+
 // ---------------------------------------------------------------------------
 // INVITE routing
 // ---------------------------------------------------------------------------
@@ -531,6 +545,7 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 				slog.Info("Fork branch failed; unregistering dead contact",
 					"aor", aor, "address", preps[r.idx].c.Address, "error", r.err)
 				p.reg.UnregisterContact(aor, preps[r.idx].c.Address)
+				go p.registrationLapsed(aor)
 				continue
 			}
 			resp := r.resp

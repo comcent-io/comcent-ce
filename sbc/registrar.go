@@ -21,12 +21,10 @@ type Registrar struct {
 	contacts map[string][]*Contact // key: user@domain → list of contacts
 }
 
-func newRegistrar(ctx context.Context) *Registrar {
-	r := &Registrar{
+func newRegistrar() *Registrar {
+	return &Registrar{
 		contacts: make(map[string][]*Contact),
 	}
-	go r.reapExpired(ctx)
-	return r
 }
 
 func (r *Registrar) Register(aor string, c *Contact) {
@@ -102,7 +100,9 @@ func (r *Registrar) IsRegistered(aor string) bool {
 	return len(r.LookupAll(aor)) > 0
 }
 
-func (r *Registrar) reapExpired(ctx context.Context) {
+// reapExpired drops lapsed registrations every 30 s and calls lapsed, in its
+// own goroutine, for each AOR left with no contact at all.
+func (r *Registrar) reapExpired(ctx context.Context, lapsed func(aor string)) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -111,25 +111,35 @@ func (r *Registrar) reapExpired(ctx context.Context) {
 			return
 		case <-ticker.C:
 		}
-		r.mu.Lock()
-		now := time.Now()
-		for aor, list := range r.contacts {
-			var live []*Contact
-			for _, c := range list {
-				if now.Before(c.ExpiresAt) {
-					live = append(live, c)
-				} else {
-					slog.Info("Registration expired", "aor", aor, "address", c.Address)
-				}
-			}
-			if len(live) == 0 {
-				delete(r.contacts, aor)
+		for _, aor := range r.reap(time.Now()) {
+			go lapsed(aor)
+		}
+	}
+}
+
+// reap removes the contacts whose registration ran out by now and returns the
+// AORs it left with none.
+func (r *Registrar) reap(now time.Time) []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var emptied []string
+	for aor, list := range r.contacts {
+		var live []*Contact
+		for _, c := range list {
+			if now.Before(c.ExpiresAt) {
+				live = append(live, c)
 			} else {
-				r.contacts[aor] = live
+				slog.Info("Registration expired", "aor", aor, "address", c.Address)
 			}
 		}
-		r.mu.Unlock()
+		if len(live) == 0 {
+			delete(r.contacts, aor)
+			emptied = append(emptied, aor)
+		} else {
+			r.contacts[aor] = live
+		}
 	}
+	return emptied
 }
 
 // isWebRTCSDP checks if an SDP body uses WebRTC transport (SAVP/SAVPF)
