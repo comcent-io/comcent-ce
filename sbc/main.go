@@ -92,9 +92,10 @@ func main() {
 	defer cancel()
 
 	api := newInternalAPI(cfg)
-	reg := newRegistrar(ctx)
+	reg := newRegistrar()
 	dispatcher := newDispatcher(cfg)
 	proxy := newProxy(publicClient, privateClient, reg, api, dispatcher, cfg)
+	go reg.reapExpired(ctx, proxy.registrationLapsed)
 
 	// Register handlers on both public and private servers
 	for _, s := range []*sipgo.Server{publicSrv, privateSrv} {

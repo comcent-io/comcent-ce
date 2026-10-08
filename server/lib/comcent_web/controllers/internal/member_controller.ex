@@ -20,8 +20,18 @@ defmodule ComcentWeb.Internal.MemberController do
 
       user_id ->
         case action do
-          "unregistered" -> OrgMember.update_member_presence(subdomain, user_id, "Logged Out")
-          _ -> OrgMember.revert_member_presence_from_logged_out(subdomain, username)
+          "unregistered" ->
+            OrgMember.forget_presence_before_lapse(subdomain, user_id)
+            OrgMember.update_member_presence(subdomain, user_id, "Logged Out")
+
+          # The registration ran out without the client unregistering.
+          "expired" ->
+            OrgMember.log_out_until_registered(subdomain, user_id)
+
+          _ ->
+            with :not_lapsed <- OrgMember.restore_presence_after_lapse(subdomain, user_id) do
+              OrgMember.revert_member_presence_from_logged_out(subdomain, username)
+            end
         end
 
         conn

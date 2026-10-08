@@ -1,6 +1,6 @@
 defmodule Comcent.Repo.OrgMember do
   import Ecto.Query
-  alias Comcent.{Repo, WebhookPusher}
+  alias Comcent.{RedisClient, Repo, WebhookPusher}
   alias Comcent.Schemas.{OrgMember, Org, User, QueueMembership}
   alias Phoenix.PubSub
   require Logger
@@ -142,6 +142,64 @@ defmodule Comcent.Repo.OrgMember do
     RedisClient.set(redis_key, "Logged Out")
     update_member_presence(subdomain, user_id, "Logged Out")
   end
+
+  @doc """
+  The SBC saw a member's SIP registration run out (or their last contact stop
+  answering) without the client unregistering, typically a browser tab that
+  was throttled in the background. Calls can't reach them, so they show as
+  Logged Out to everyone and queues stop offering them calls. The presence
+  they had is kept so `restore_presence_after_lapse/2` can give it back when
+  they register again.
+
+  A member On Call or Reserved is left alone: the call owns that presence.
+  """
+  def log_out_until_registered(subdomain, user_id) do
+    case get_current_presence(subdomain, user_id) do
+      presence when presence in ["Available", "On Break", "Busy", "Wrap Up"] ->
+        key = lapsed_presence_key(subdomain, user_id)
+        # Busy and Wrap Up would have turned into Available on their own.
+        RedisClient.set(key, if(presence == "On Break", do: presence, else: "Available"))
+
+        with {:error, _} = error <-
+               update_member_presence_if(subdomain, user_id, presence, "Logged Out") do
+          RedisClient.del(key)
+          error
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
+  @doc """
+  Gives a member back the presence they had when their registration lapsed,
+  if it did. Returns `:not_lapsed` when there was nothing to restore.
+  """
+  def restore_presence_after_lapse(subdomain, user_id) do
+    key = lapsed_presence_key(subdomain, user_id)
+
+    case RedisClient.get(key) do
+      {:ok, presence} when is_binary(presence) ->
+        RedisClient.del(key)
+        # Only if still Logged Out: they may have picked a presence since.
+        update_member_presence_if(subdomain, user_id, "Logged Out", presence)
+        :restored
+
+      _ ->
+        :not_lapsed
+    end
+  end
+
+  @doc """
+  Forgets the presence kept by `log_out_until_registered/2`: a member who
+  unregisters has left, and should not come back to it.
+  """
+  def forget_presence_before_lapse(subdomain, user_id) do
+    RedisClient.del(lapsed_presence_key(subdomain, user_id))
+  end
+
+  defp lapsed_presence_key(subdomain, user_id),
+    do: "presence_before_lapse:#{subdomain}:#{user_id}"
 
   @doc """
   Changes a member's presence to "On Call" and stores their previous presence state in Redis.
