@@ -18,6 +18,7 @@ defmodule ComcentWeb.AuthController do
   @password_reset_cooldown_seconds 60
   @verification_resend_limit_per_day 3
   @verification_resend_window_seconds 24 * 60 * 60
+  @email_registered "Email is already registered"
 
   def config(conn, _params) do
     json(conn, %{
@@ -345,7 +346,7 @@ defmodule ComcentWeb.AuthController do
       email == "" -> {:error, "Email is required"}
       password == "" -> {:error, "Password is required"}
       String.length(password) < 8 -> {:error, "Password must be at least 8 characters"}
-      Repo.exists?(from(u in User, where: u.email == ^email)) -> {:error, "Email already exists"}
+      Repo.exists?(from(u in User, where: u.email == ^email)) -> {:error, @email_registered}
       true -> :ok
     end
   end
@@ -366,7 +367,11 @@ defmodule ComcentWeb.AuthController do
             verification_resend_count: 0
           })
         )
-        |> Repo.insert!()
+        |> Repo.insert()
+        |> case do
+          {:ok, user} -> user
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
 
       case send_verification_email(user, token) do
         :ok -> user
@@ -374,8 +379,19 @@ defmodule ComcentWeb.AuthController do
       end
     end)
     |> case do
-      {:ok, user} -> {:ok, user}
-      {:error, _reason} -> {:error, "Unable to send verification email. Please try again."}
+      {:ok, user} ->
+        {:ok, user}
+
+      # Two sign-ups with the same address can both pass the check in
+      # validate_registration; the unique index turns the second one away.
+      {:error, %Ecto.Changeset{errors: [{:email, _} | _]}} ->
+        {:error, @email_registered}
+
+      {:error, %Ecto.Changeset{}} ->
+        {:error, "Unable to create your account. Please try again."}
+
+      {:error, _reason} ->
+        {:error, "Unable to send verification email. Please try again."}
     end
   end
 

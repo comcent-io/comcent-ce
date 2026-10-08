@@ -49,7 +49,8 @@ defmodule Comcent.Schemas.Number do
     ])
     |> validate_required([:name, :number, :org_id, :sip_trunk_id])
     |> validate_outbound_regex()
-    |> unique_constraint(:number)
+    # The index kept its original name, not Ecto's default `numbers_number_index`.
+    |> unique_constraint(:number, name: :numbers_number_key, message: "is already added")
   end
 
   # A pattern that doesn't compile would refuse every outbound call from this

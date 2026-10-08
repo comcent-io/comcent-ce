@@ -25,8 +25,11 @@ defmodule Comcent.Schemas.QueueMembership do
     |> cast(attrs, [:queue_id, :org_id, :user_id, :created_at, :updated_at])
     |> validate_required([:queue_id, :org_id, :user_id])
     |> foreign_key_constraint(:queue_id, name: :queue_memberships_queue_id_fkey)
-    |> foreign_key_constraint(:org_id, name: :queue_memberships_org_id_fkey)
-    |> foreign_key_constraint(:user_id, name: :queue_memberships_user_id_fkey)
+    # One composite key to org_members, not one per column.
+    |> foreign_key_constraint(:user_id,
+      name: :queue_memberships_org_id_user_id_fkey,
+      message: "is not a member of this organization"
+    )
     |> unique_constraint(:user_id,
       name: :queue_memberships_pkey,
       message: "is already a member of this queue"

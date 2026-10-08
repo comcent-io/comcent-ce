@@ -58,7 +58,7 @@ defmodule Comcent.Schemas.Queue do
         "must start with a letter and can only contain letters, numbers, dots, and underscores"
     )
     |> validate_format(:extension, ~r/^(\d{2,5})?$/, message: "must be between 2 and 5 digits")
-    |> unique_constraint([:org_id, :name], name: :queues_org_id_name_index)
+    |> unique_constraint(:name, name: :queues_org_id_name_key, message: "is already taken")
     |> foreign_key_constraint(:org_id)
   end
 end
