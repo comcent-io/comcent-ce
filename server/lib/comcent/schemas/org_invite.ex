@@ -29,6 +29,5 @@ defmodule Comcent.Schemas.OrgInvite do
       :invite_resend_window_started_at
     ])
     |> validate_required([:email, :role, :status, :org_id])
-    |> unique_constraint([:email, :org_id])
   end
 end

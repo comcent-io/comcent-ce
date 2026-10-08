@@ -49,7 +49,8 @@ defmodule Comcent.Schemas.PromiseAuditLog do
     ])
     |> validate_required([:id, :promise_id, :type, :old_value, :new_value, :org_id])
     |> validate_inclusion(:type, [:ASSIGNED_TO_CHANGED, :STATUS_CHANGED])
+    # promise_id has no foreign key in the database, so there is no constraint
+    # to name for it.
     |> foreign_key_constraint(:org_id)
-    |> foreign_key_constraint(:promise_id)
   end
 end

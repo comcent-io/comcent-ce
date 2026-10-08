@@ -51,7 +51,14 @@ defmodule Comcent.Schemas.OrgMember do
       :presence
     ])
     |> validate_required([:user_id, :org_id, :role, :username, :sip_password])
-    |> unique_constraint([:org_id, :username], name: :org_members_org_id_username_index)
+    |> unique_constraint(:username,
+      name: :org_members_org_id_username_key,
+      message: "is already taken in this organization"
+    )
+    |> unique_constraint(:user_id,
+      name: :org_members_pkey,
+      message: "is already a member of this organization"
+    )
     |> foreign_key_constraint(:user_id)
     |> foreign_key_constraint(:org_id)
     |> foreign_key_constraint(:number_id)

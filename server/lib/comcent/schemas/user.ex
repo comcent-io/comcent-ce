@@ -54,6 +54,7 @@ defmodule Comcent.Schemas.User do
       :accepted_terms_version
     ])
     |> validate_required([:name, :email])
-    |> unique_constraint(:email)
+    # The index kept its original name, not Ecto's default `users_email_index`.
+    |> unique_constraint(:email, name: :users_email_key, message: "is already registered")
   end
 end
