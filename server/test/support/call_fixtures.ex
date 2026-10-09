@@ -1,16 +1,57 @@
 defmodule Comcent.CallFixtures do
   @moduledoc """
-  Live calls for the Live Calls dashboard tests.
+  Orgs, numbers and live calls for the call-routing and Live Calls dashboard
+  tests.
 
-  Each helper drives the FreeSWITCH event the event router would, through a
-  real `Comcent.CallSession`, and returns once the call process has handled
+  Each call helper drives the FreeSWITCH event the event router would, through
+  a real `Comcent.CallSession`, and returns once the call process has handled
   it, rather than writing to the registry behind the session's back.
   """
 
   alias Comcent.CallSession
   alias Comcent.CallSession.Registry
+  alias Comcent.Repo
+  alias Comcent.Schemas.{Number, Org, SipTrunk}
 
   def subdomain, do: "acme-#{unique()}"
+
+  def org(attrs \\ []) do
+    defaults = [
+      id: Ecto.UUID.generate(),
+      name: "Acme",
+      subdomain: subdomain(),
+      use_custom_domain: false,
+      assign_ext_automatically: false,
+      is_active: true
+    ]
+
+    Repo.insert!(struct!(Org, Keyword.merge(defaults, attrs)))
+  end
+
+  @doc """
+  A DID pointed at the org, with the trunk the numbers table insists on.
+  `attrs` override the number's fields.
+  """
+  def number(org, attrs \\ []) do
+    trunk =
+      Repo.insert!(%SipTrunk{
+        id: Ecto.UUID.generate(),
+        org_id: org.id,
+        name: "Trunk",
+        outbound_contact: "trunk.example.com"
+      })
+
+    defaults = [
+      id: Ecto.UUID.generate(),
+      name: "Main",
+      number: "+1347826#{1000 + rem(unique(), 9000)}",
+      org_id: org.id,
+      sip_trunk_id: trunk.id,
+      inbound_flow_graph: %{}
+    ]
+
+    Repo.insert!(struct!(Number, Keyword.merge(defaults, attrs)))
+  end
 
   @doc """
   Puts one call up for `subdomain` and returns its call story id.

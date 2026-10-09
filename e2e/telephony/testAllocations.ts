@@ -58,6 +58,7 @@ export const allocations = {
   // own port, never 5060, so a dropped port cannot reach it by accident.
   outboundContactSipUri: alloc('+14155552728', 6350),
   outboundContactHostPort: alloc('+14155552729', 6360),
+  notConfigured: alloc('+14155552730', 6370),
   natKeepalive: alloc('+14155552731', 6380),
   // Queue stress tests use two queues and need wider, non-overlapping ranges
   // so large caller bursts and many SIP agents can run concurrently.
