@@ -232,8 +232,9 @@ AUTH_PASSWORD_ENABLED=true
 # To upgrade: set the new release (https://github.com/${REPO}/releases),
 # then docker compose pull && docker compose up -d.
 COMCENT_VERSION=${COMCENT_VERSION}
-# FreeSWITCH and the voice bot are pinned in docker-compose.yaml to the
-# versions this release was tested with. Set these only to override them.
+# FreeSWITCH and the voice bot are released separately; docker-compose.yaml
+# pins the releases of them this release was tested with. Set these only to
+# override them.
 # FREESWITCH_VERSION=
 # VOICE_BOT_VERSION=
 

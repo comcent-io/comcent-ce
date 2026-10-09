@@ -267,11 +267,12 @@ services:
   # ---------------------------------------------------------------------------
   # FreeSWITCH — media server for RTP. Not behind Traefik (raw RTP, not HTTP).
   # ---------------------------------------------------------------------------
-  # Pinned to an immutable image of comcent-io/freeswitch-ce, so a release
-  # always installs the FreeSWITCH it was tested with. Bumped by PR (see
-  # RELEASING.md); FREESWITCH_VERSION in .env overrides it.
+  # Pinned to a release of comcent-io/freeswitch-ce, so a release always
+  # installs the FreeSWITCH it was tested with. Bumped by PR after a
+  # FreeSWITCH release (see RELEASING.md); FREESWITCH_VERSION in .env
+  # overrides it.
   freeswitch:
-    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-sha-abc4090}
+    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-v2026.10.09}
     restart: unless-stopped
     env_file: .env
     environment:
@@ -304,7 +305,7 @@ services:
   # ---------------------------------------------------------------------------
   # Pinned like freeswitch above; VOICE_BOT_VERSION in .env overrides it.
   voice-bot:
-    image: ghcr.io/comcent-io/go-voice-bot-ce:${VOICE_BOT_VERSION:-sha-96bbd19}
+    image: ghcr.io/comcent-io/go-voice-bot-ce:${VOICE_BOT_VERSION:-v2026.07.05}
     restart: unless-stopped
     env_file: .env
     environment:
