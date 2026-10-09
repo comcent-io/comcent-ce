@@ -52,42 +52,53 @@ defmodule ComcentWeb.Internal.HttpapiController do
 
         IO.puts("SIP Number: #{inspect(sip_number)}")
 
-        if is_nil(sip_number) || is_nil(sip_number.inbound_flow_graph) do
-          Logger.info("No number found or graph not found")
-          hangup_response()
-        else
-          # Set toName if not present
-          httapi_params = Map.put_new(httapi_params, "toName", sip_number.name)
+        cond do
+          is_nil(sip_number) ->
+            Logger.info("No number found")
+            hangup_response()
 
-          # Process the inbound flow graph
-          inbound_flow_graph = decode_inbound_flow_graph(sip_number.inbound_flow_graph)
-          nodes = inbound_flow_graph["nodes"]
-          previous_node = nodes[previous_node_id]
+          is_nil(sip_number.inbound_flow_graph) ->
+            not_configured_response(sip_number.number, "it has no call flow")
 
-          if previous_node do
-            case previous_node["type"] do
-              "Dial" ->
-                Logger.info("Previous Node is Dial node")
-                after_dial_response(params, sip_number)
+          true ->
+            # Set toName if not present
+            httapi_params = Map.put_new(httapi_params, "toName", sip_number.name)
 
-              "DialGroup" ->
-                Logger.info("Previous Node is Dial group node")
-                after_dial_response(params, sip_number)
+            # Process the inbound flow graph
+            inbound_flow_graph = decode_inbound_flow_graph(sip_number.inbound_flow_graph)
+            nodes = inbound_flow_graph["nodes"]
+            previous_node = nodes[previous_node_id]
 
-              "Menu" ->
-                Logger.info("Previous Node is Menu node")
-                after_menu_response(params, sip_number)
+            if previous_node do
+              case previous_node["type"] do
+                "Dial" ->
+                  Logger.info("Previous Node is Dial node")
+                  after_dial_response(params, sip_number)
 
-              _ ->
-                Logger.info("No match for the previous node's type #{previous_node["type"]}")
-                hangup_response()
+                "DialGroup" ->
+                  Logger.info("Previous Node is Dial group node")
+                  after_dial_response(params, sip_number)
+
+                "Menu" ->
+                  Logger.info("Previous Node is Menu node")
+                  after_menu_response(params, sip_number)
+
+                _ ->
+                  Logger.info("No match for the previous node's type #{previous_node["type"]}")
+                  hangup_response()
+              end
+            else
+              Logger.info("Previous Node is null starting from start node")
+              start_node_id = inbound_flow_graph["start"]
+              httapi_params = Map.put(httapi_params, "pathCount", 20)
+
+              # An imported number starts with an empty flow (no nodes, no start).
+              if is_nil(nodes[start_node_id]) do
+                not_configured_response(sip_number.number, "its call flow has no start step")
+              else
+                traverse_graph(inbound_flow_graph, start_node_id, httapi_params, sip_number)
+              end
             end
-          else
-            Logger.info("Previous Node is null starting from start node")
-            start_node_id = inbound_flow_graph["start"]
-            httapi_params = Map.put(httapi_params, "pathCount", 20)
-            traverse_graph(inbound_flow_graph, start_node_id, httapi_params, sip_number)
-          end
         end
     end
   end
@@ -119,62 +130,99 @@ defmodule ComcentWeb.Internal.HttpapiController do
   defp traverse_graph(inbound_flow_graph, node_id, params, sip_number) do
     node = inbound_flow_graph["nodes"][node_id]
 
-    if is_nil(node) || params["pathCount"] <= 0 do
-      hangup_response()
-    else
-      case node["type"] do
-        "Dial" ->
-          Logger.info("Dial node")
-          params = Map.put(params, "nodeId", node["id"])
-          params = Map.update!(params, "pathCount", &(&1 - 1))
-          dial_response(params, node, sip_number)
+    cond do
+      is_nil(node) || params["pathCount"] <= 0 ->
+        hangup_response()
 
-        "DialGroup" ->
-          Logger.info("Dial Group node")
-          params = Map.put(params, "nodeId", node["id"])
-          params = Map.update!(params, "pathCount", &(&1 - 1))
-          dial_group_response(params, node, sip_number)
+      reason = missing_node_data(node) ->
+        not_configured_response(sip_number.number, reason)
 
-        "Play" ->
-          Logger.info("Play node")
-          params = Map.put(params, "nodeId", node["id"])
-          params = Map.update!(params, "pathCount", &(&1 - 1))
-          play_response(params, node["data"]["media"])
+      true ->
+        case node["type"] do
+          "Dial" ->
+            Logger.info("Dial node")
+            params = Map.put(params, "nodeId", node["id"])
+            params = Map.update!(params, "pathCount", &(&1 - 1))
+            dial_response(params, node, sip_number)
 
-        "WeekTime" ->
-          Logger.info("WeekTime node")
-          params = Map.update!(params, "pathCount", &(&1 - 1))
-          next_node_id = handle_week_time_node(node)
-          traverse_graph(inbound_flow_graph, next_node_id, params, sip_number)
+          "DialGroup" ->
+            Logger.info("Dial Group node")
+            params = Map.put(params, "nodeId", node["id"])
+            params = Map.update!(params, "pathCount", &(&1 - 1))
+            dial_group_response(params, node, sip_number)
 
-        "Queue" ->
-          Logger.info("Queue node")
-          params = Map.put(params, "nodeId", node["id"])
-          params = Map.update!(params, "pathCount", &(&1 - 1))
+          "Play" ->
+            Logger.info("Play node")
+            params = Map.put(params, "nodeId", node["id"])
+            params = Map.update!(params, "pathCount", &(&1 - 1))
+            play_response(params, node["data"]["media"])
 
-          queue_response(
-            params,
-            sip_number.org.subdomain,
-            node["data"]["queue"]
-          )
+          "WeekTime" ->
+            Logger.info("WeekTime node")
+            params = Map.update!(params, "pathCount", &(&1 - 1))
+            next_node_id = handle_week_time_node(node)
+            traverse_graph(inbound_flow_graph, next_node_id, params, sip_number)
 
-        "Menu" ->
-          Logger.info("Menu node")
-          params = Map.put(params, "nodeId", node["id"])
-          params = Map.update!(params, "pathCount", &(&1 - 1))
-          menu_response(params, sip_number)
+          "Queue" ->
+            Logger.info("Queue node")
+            params = Map.put(params, "nodeId", node["id"])
+            params = Map.update!(params, "pathCount", &(&1 - 1))
 
-        "VoiceBot" ->
-          Logger.info("VoiceBot node")
-          params = Map.put(params, "nodeId", node["id"])
-          params = Map.update!(params, "pathCount", &(&1 - 1))
-          voice_bot_response(params, node, sip_number)
+            queue_response(
+              params,
+              sip_number.org.subdomain,
+              node["data"]["queue"]
+            )
 
-        _ ->
-          hangup_response()
-      end
+          "Menu" ->
+            Logger.info("Menu node")
+            params = Map.put(params, "nodeId", node["id"])
+            params = Map.update!(params, "pathCount", &(&1 - 1))
+            menu_response(params, sip_number)
+
+          "VoiceBot" ->
+            Logger.info("VoiceBot node")
+            params = Map.put(params, "nodeId", node["id"])
+            params = Map.update!(params, "pathCount", &(&1 - 1))
+            voice_bot_response(params, node, sip_number)
+
+          type ->
+            not_configured_response(
+              sip_number.number,
+              "its call flow has an unknown step #{type}"
+            )
+        end
     end
   end
+
+  # Why a step saved without the data it needs can't be followed, or nil when
+  # it has what it needs.
+  defp missing_node_data(node) do
+    data = node["data"] || %{}
+
+    case node["type"] do
+      "Dial" ->
+        if blank?(data["to"]), do: "its Dial step has nobody to dial"
+
+      "DialGroup" ->
+        if Enum.all?(List.wrap(data["to"]), &blank?/1),
+          do: "its Dial Group step has nobody to dial"
+
+      "Queue" ->
+        if blank?(data["queue"]), do: "its Queue step has no queue"
+
+      "VoiceBot" ->
+        if is_nil(voice_bot_id_from_node(node)), do: "its Voice Bot step has no bot"
+
+      "Play" ->
+        if blank?(data["media"]), do: "its Play step has no audio"
+
+      _ ->
+        nil
+    end
+  end
+
+  defp blank?(value), do: not is_binary(value) or String.trim(value) == ""
 
   # Handle week time node
   defp handle_week_time_node(node) do
@@ -276,6 +324,26 @@ defmodule ComcentWeb.Internal.HttpapiController do
       </params>
       <work>
         <execute application="hangup" data="NORMAL_CLEARING" />
+      </work>
+    </document>
+    """
+  end
+
+  # The number's call flow can't route the call, so tell the caller instead of
+  # giving them a busy tone. The prompt ships with the server (priv/prompts),
+  # so playing it needs no TTS call or credit.
+  defp not_configured_response(number, reason) do
+    Logger.warning("Number #{number} is not configured: #{reason}")
+    base_url = Application.fetch_env!(:comcent, :internal_api_base_url)
+
+    """
+    <document type="xml/freeswitch-httapi">
+      <params>
+        <currentNodeId>hangup</currentNodeId>
+      </params>
+      <work>
+        <playback file="#{base_url}/prompts/number-not-configured.wav" />
+        <hangup cause='NORMAL_CLEARING' />
       </work>
     </document>
     """
@@ -436,6 +504,14 @@ defmodule ComcentWeb.Internal.HttpapiController do
     # Add call to queue using QueueManager
     queue = Queue.get_queue_by_name_and_subdomain(queue_name, subdomain)
 
+    if is_nil(queue) do
+      not_configured_response(params["toUser"], "its Queue step's queue #{queue_name} is gone")
+    else
+      add_call_to_queue_response(params, subdomain, queue_name, queue)
+    end
+  end
+
+  defp add_call_to_queue_response(params, subdomain, queue_name, queue) do
     case QueueManager.add_call_to_queue(%Comcent.QueueManager.QueuedCallDetails{
            subdomain: subdomain,
            queue_id: queue.id,
@@ -532,18 +608,16 @@ defmodule ComcentWeb.Internal.HttpapiController do
     voice_bot_id = voice_bot_id_from_node(node)
 
     if is_nil(voice_bot_id) do
-      Logger.error("No voice bot ID specified in node data")
-      hangup_response()
+      not_configured_response(sip_number.number, "its Voice Bot step has no bot")
     else
       # Find the voice bot in the database
       voice_bot = find_voice_bot(voice_bot_id, sip_number.org.subdomain)
 
       if is_nil(voice_bot) do
-        Logger.error(
-          "Voice bot with ID #{voice_bot_id} not found for org #{sip_number.org.subdomain}"
+        not_configured_response(
+          sip_number.number,
+          "its Voice Bot step's bot #{voice_bot_id} is gone"
         )
-
-        hangup_response()
       else
         # Get a voice bot IP address
         case get_voice_bot_ip_address() do

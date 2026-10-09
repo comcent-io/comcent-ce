@@ -414,6 +414,26 @@ export async function setNumberInboundFlowToMenuDial(params: {
   }
 }
 
+/** The flow a number gets on import: no steps and no start. */
+export async function setNumberInboundFlowToEmpty(number: string) {
+  const client = createClient();
+  await client.connect();
+
+  try {
+    await client.query(
+      `
+        UPDATE numbers
+        SET inbound_flow_graph = $2::jsonb,
+            updated_at = NOW()
+        WHERE number = $1
+      `,
+      [number, JSON.stringify({ nodes: {}, start: null })],
+    );
+  } finally {
+    await client.end();
+  }
+}
+
 export async function setNumberInboundFlowToVoiceBot(
   number: string,
   voiceBotId: string,

@@ -33,6 +33,15 @@ defmodule ComcentWeb.Endpoint do
     only: ComcentWeb.static_paths()
   )
 
+  # System prompts FreeSWITCH plays from a call flow (e.g. "This number is not
+  # configured"). They ship in the server image, and FreeSWITCH fetches them
+  # over the internal API base URL without credentials, like uploaded prompts.
+  plug(Plug.Static,
+    at: "/internal-api/prompts",
+    from: {:comcent, "priv/prompts"},
+    gzip: false
+  )
+
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
   if code_reloading? do
