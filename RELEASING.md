@@ -51,6 +51,11 @@ So a commit has published images only if its tests passed.
    tags the commit and creates the GitHub Release with generated notes. From
    then on `install.sh` installs that version.
 
+   Never create a Release any other way (the Releases page, `gh release
+   create`). `install.sh` installs the newest Release, but only this workflow
+   gives the images its version tag, so a Release made by hand points new
+   installs at images that don't exist.
+
 ## FreeSWITCH and the voice bot
 
 FreeSWITCH (`freeswitch-ce`) and the voice bot (`go-voice-bot-ce`) are built
