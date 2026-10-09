@@ -109,7 +109,7 @@ services:
   # Comcent Elixir API server
   # ---------------------------------------------------------------------------
   server:
-    image: ghcr.io/comcent-io/comcent-ce-server:${COMCENT_VERSION:-latest}
+    image: ghcr.io/comcent-io/comcent-ce-server:${COMCENT_VERSION:?set COMCENT_VERSION in .env to a release tag, e.g. v2026.10.09}
     # Fallback to local build if image not yet published to GHCR:
     build:
       context: .
@@ -160,7 +160,7 @@ services:
   # Comcent web-app (SvelteKit SSR)
   # ---------------------------------------------------------------------------
   web-app:
-    image: ghcr.io/comcent-io/comcent-ce-webapp:${COMCENT_VERSION:-latest}
+    image: ghcr.io/comcent-io/comcent-ce-webapp:${COMCENT_VERSION:?set COMCENT_VERSION in .env to a release tag, e.g. v2026.10.09}
     build:
       context: .
       dockerfile: docker/Dockerfile-web-app
@@ -195,7 +195,7 @@ services:
   # source addr from sipgo and break BYE relay back to the WebRTC agent.
   # ---------------------------------------------------------------------------
   sbc:
-    image: ghcr.io/comcent-io/comcent-ce-sbc:${COMCENT_VERSION:-latest}
+    image: ghcr.io/comcent-io/comcent-ce-sbc:${COMCENT_VERSION:?set COMCENT_VERSION in .env to a release tag, e.g. v2026.10.09}
     build:
       context: .
       dockerfile: docker/Dockerfile-sbc
@@ -271,7 +271,7 @@ services:
   # always installs the FreeSWITCH it was tested with. Bumped by PR (see
   # RELEASING.md); FREESWITCH_VERSION in .env overrides it.
   freeswitch:
-    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-sha-62db197}
+    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-sha-abc4090}
     restart: unless-stopped
     env_file: .env
     environment:
