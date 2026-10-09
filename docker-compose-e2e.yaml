@@ -218,7 +218,7 @@ services:
   freeswitch:
     # The same pinned FreeSWITCH as docker-compose.deploy.yaml, so the tests
     # run against what installs get.
-    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-sha-abc4090}
+    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-v2026.10.09}
     env_file:
       - .env.e2e
     environment:

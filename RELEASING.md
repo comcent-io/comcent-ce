@@ -59,18 +59,24 @@ So a commit has published images only if its tests passed.
 ## FreeSWITCH and the voice bot
 
 FreeSWITCH (`freeswitch-ce`) and the voice bot (`go-voice-bot-ce`) are built
-in their own repositories. Each push to their `main` publishes `:latest` and
-an immutable `:sha-<7>`. This repository pins the `:sha-<7>` it installs, as
-the default in `docker-compose.deploy.yaml` (and FreeSWITCH also in
+and released in their own repositories, the same way as here: each push to
+their `main` publishes `:main` and an immutable `:sha-<7>`, and their own
+**Release** workflow gives a tested build a `vYYYY.MM.DD` tag. Each repository
+releases on its own schedule, so the versions differ (e.g. FreeSWITCH
+`v2026.10.09` with the app at `v2026.10.09.2`), but every image an install
+runs is a release.
+
+This repository pins those version tags, as the default in
+`docker-compose.deploy.yaml` (and FreeSWITCH also in
 `docker-compose-e2e.yaml`, so the integration tests run against it). A
 release's compose file therefore carries the versions that release was tested
 with; their `:latest` never reaches installs.
 
 To move to a newer build of either:
 
-1. Find its tag: the `sha-<7>` of the commit whose *Publish image* run passed
-   in that repository.
-2. Open a PR here changing the default in both compose files (voice bot: only
-   `docker-compose.deploy.yaml`). Its integration tests run against the new
-   FreeSWITCH.
+1. Release it in its own repository first (Actions → **Release** there, see
+   its README).
+2. Open a PR here changing the pinned version in both compose files (voice
+   bot: only `docker-compose.deploy.yaml`). Its integration tests run against
+   the new FreeSWITCH.
 3. Merge, and cut the next release as above (fresh-install test included).
