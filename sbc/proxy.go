@@ -132,22 +132,8 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 		return
 	}
 
-	expires := 300
-	if expiresHeader := req.GetHeader("Expires"); expiresHeader != nil {
-		if v, err := strconv.Atoi(expiresHeader.Value()); err == nil {
-			expires = v
-		}
-	}
-
 	contactHeader := req.GetHeader("Contact")
-
-	// RFC 3261: an `expires` parameter on the Contact header takes precedence
-	// over the Expires header. SIP.js (and most WS clients) only set the param.
-	if contactHeader != nil {
-		if v, ok := contactExpiresParam(contactHeader.Value()); ok {
-			expires = v
-		}
-	}
+	expires := registerExpires(headerValue(req, "Contact"), headerValue(req, "Expires"))
 
 	// Contact: * with Expires: 0 → unregister all contacts for this AOR
 	if contactHeader != nil && contactHeader.Value() == "*" && expires == 0 {
@@ -158,7 +144,8 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 		return
 	}
 
-	// Expires: 0 with a specific contact → unregister just that contact
+	// Expires 0 (header or Contact parameter) with a specific contact →
+	// unregister just that contact. SIP.js unregisters with ;expires=0.
 	if expires == 0 {
 		sourceAddr := req.Source()
 		p.reg.UnregisterContact(aor, sourceAddr)
@@ -198,9 +185,9 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 
 	resp := sip.NewResponseFromRequest(req, 200, "OK", nil)
 	if contactHeader != nil {
-		resp.AppendHeader(sip.NewHeader("Contact", contactHeader.Value()))
+		resp.AppendHeader(sip.NewHeader("Contact", contactWithExpires(contactHeader.Value(), expires)))
 	} else {
-		resp.AppendHeader(sip.NewHeader("Contact", "<"+contactURI+">"))
+		resp.AppendHeader(sip.NewHeader("Contact", contactWithExpires("<"+contactURI+">", expires)))
 	}
 	resp.AppendHeader(sip.NewHeader("Expires", strconv.Itoa(expires)))
 	tx.Respond(resp)
@@ -1413,24 +1400,96 @@ func (p *Proxy) filterRouteValueForHop(value, keepHop string) string {
 	return strings.Join(kept, ", ")
 }
 
-// contactExpiresParam parses an `expires=N` parameter from a Contact header
-// value. RFC 3261 §10.2.1 says this param overrides the Expires header.
-func contactExpiresParam(value string) (int, bool) {
-	rest := value
-	if idx := strings.IndexByte(rest, '>'); idx >= 0 {
-		rest = rest[idx+1:]
-	}
-	for _, raw := range strings.Split(rest, ";") {
-		p := strings.TrimSpace(raw)
-		if !strings.HasPrefix(strings.ToLower(p), "expires=") {
-			continue
-		}
-		v := strings.TrimSpace(p[len("expires="):])
-		if n, err := strconv.Atoi(v); err == nil {
-			return n, true
+// defaultRegisterExpires is the registration lifetime when a REGISTER names none.
+const defaultRegisterExpires = 300
+
+// registerExpires is the lifetime, in seconds, a REGISTER asks for. The
+// Contact's expires parameter wins over the Expires header (RFC 3261
+// 10.2.1.1). SIP.js sends only the parameter, so a registrar reading just the
+// header would store its 600 s registration for 300 s and miss its
+// ;expires=0 unregister.
+func registerExpires(contact, expiresHeader string) int {
+	if v, ok := contactParam(contact, "expires"); ok {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			return n
 		}
 	}
-	return 0, false
+	if n, err := strconv.Atoi(strings.TrimSpace(expiresHeader)); err == nil && n >= 0 {
+		return n
+	}
+	return defaultRegisterExpires
+}
+
+// contactWithExpires returns the Contact value with its expires parameter set
+// to the lifetime granted. Clients such as SIP.js take the parameter over the
+// Expires header, so echoing what they sent would keep them on their own
+// schedule instead of ours (for example after NAT_MAX_EXPIRES lowers it).
+func contactWithExpires(contact string, expires int) string {
+	uri, params := splitContact(contact)
+	kept := make([]string, 0, len(params)+1)
+	for _, param := range params {
+		name, _, _ := strings.Cut(param, "=")
+		if !strings.EqualFold(strings.TrimSpace(name), "expires") {
+			kept = append(kept, param)
+		}
+	}
+	kept = append(kept, "expires="+strconv.Itoa(expires))
+	return uri + ";" + strings.Join(kept, ";")
+}
+
+// contactParam returns a header parameter of a single Contact value, such as
+// the expires in `<sip:a@b;transport=ws>;expires=600`.
+func contactParam(contact, name string) (string, bool) {
+	_, params := splitContact(contact)
+	for _, param := range params {
+		key, value, _ := strings.Cut(param, "=")
+		if strings.EqualFold(strings.TrimSpace(key), name) {
+			return strings.Trim(strings.TrimSpace(value), `"`), true
+		}
+	}
+	return "", false
+}
+
+// splitContact splits a single Contact value into its address and its header
+// parameters. Parameters inside <...> belong to the URI and stay with it;
+// without angle brackets every parameter is a header parameter (RFC 3261
+// 20.10). Quoted values, like +sip.instance="<urn:uuid:...>", are kept whole.
+func splitContact(contact string) (string, []string) {
+	contact = strings.TrimSpace(contact)
+	rest := ""
+	if start := strings.IndexByte(contact, '<'); start >= 0 {
+		end := strings.IndexByte(contact[start:], '>')
+		if end < 0 {
+			return contact, nil
+		}
+		rest = contact[start+end+1:]
+		contact = contact[:start+end+1]
+	} else if idx := strings.IndexByte(contact, ';'); idx >= 0 {
+		rest = contact[idx:]
+		contact = contact[:idx]
+	}
+
+	var params []string
+	var current strings.Builder
+	quoted := false
+	for _, r := range rest {
+		switch {
+		case r == '"':
+			quoted = !quoted
+			current.WriteRune(r)
+		case r == ';' && !quoted:
+			if p := strings.TrimSpace(current.String()); p != "" {
+				params = append(params, p)
+			}
+			current.Reset()
+		default:
+			current.WriteRune(r)
+		}
+	}
+	if p := strings.TrimSpace(current.String()); p != "" {
+		params = append(params, p)
+	}
+	return strings.TrimSpace(contact), params
 }
 
 func extractContactURI(value, fallback string) string {
