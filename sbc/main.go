@@ -102,11 +102,12 @@ func main() {
 
 	// Register handlers on both public and private servers. Only the public
 	// side faces clients behind NATs, so only it answers at the source port.
-	noWrap := func(h sipgo.RequestHandler) sipgo.RequestHandler { return h }
+	// Both sides check every request and response for CRLF injection.
+	publicWrap := func(h sipgo.RequestHandler) sipgo.RequestHandler { return symmetricResponses(validateMessages(h)) }
 	for _, s := range []struct {
 		srv  *sipgo.Server
 		wrap func(sipgo.RequestHandler) sipgo.RequestHandler
-	}{{publicSrv, symmetricResponses}, {privateSrv, noWrap}} {
+	}{{publicSrv, publicWrap}, {privateSrv, validateMessages}} {
 		s.srv.OnRequest(sip.REGISTER, s.wrap(proxy.handleRegister))
 		s.srv.OnRequest(sip.INVITE, s.wrap(proxy.handleInvite))
 		s.srv.OnRequest(sip.ACK, s.wrap(proxy.handleAck))
