@@ -45,6 +45,28 @@ jobs:
       - name: Type-check the web app
         run: npm run check --prefix packages/web-app
 
+  sbc:
+    name: sbc (go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sbc
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sbc/go.mod
+          cache-dependency-path: sbc/go.sum
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
   # The Elixir tests boot the full OTP application, so they need the services
   # its supervision tree connects to: Postgres, Redis and RabbitMQ. They need
   # none of the docker compose stack the integration workflow builds.
