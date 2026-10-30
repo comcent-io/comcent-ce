@@ -279,7 +279,7 @@ func (p *Proxy) handleInviteToFS(req *sip.Request, tx sip.ServerTransaction, sou
 	p.addRecordRoute(fwdReq, "to_fs")
 
 	// Forward via private client (SBC→FS link)
-	clientTx, err := p.privateClient.TransactionRequest(context.Background(), fwdReq, sipgo.ClientRequestAddVia)
+	clientTx, err := p.privateClient.TransactionRequest(context.Background(), fwdReq, sipgo.ClientRequestAddVia, validateOutgoing)
 	if err != nil {
 		slog.Error("Failed to forward INVITE to FS", "error", err)
 		tx.Respond(sip.NewResponseFromRequest(req, 502, "Bad Gateway", nil))
@@ -445,7 +445,7 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 				"aor", aor, "branch", i, "address", p2.c.Address, "webrtc", p2.c.IsWebRTC,
 				"transport", p2.fwdReq.Transport(), "destination", p2.fwdReq.Destination(),
 				"r-uri", p2.fwdReq.Recipient.String())
-			clientTx, err := p.publicClient.TransactionRequest(branchCtx, p2.fwdReq, sipgo.ClientRequestAddVia)
+			clientTx, err := p.publicClient.TransactionRequest(branchCtx, p2.fwdReq, sipgo.ClientRequestAddVia, validateOutgoing)
 			if err != nil {
 				slog.Error("Fork branch send failed", "aor", aor, "branch", i, "address", p2.c.Address, "error", err)
 				results <- branchResult{idx: i, err: err}
@@ -504,11 +504,12 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 		cancelReq.SetSource(b.fwdReq.Source())
 		cancelReq.SetDestination(b.fwdReq.Destination())
 		cancelReq.SetTransport(b.fwdReq.Transport())
-		// Pass noopClientOption so sipgo skips clientRequestBuildReq, which
-		// would stamp req.Laddr with the public client's bind addr
-		// (0.0.0.0:5060) and break pooled-connection lookup — fatal for WS to
-		// the registered WebRTC agent (would try to bind 0.0.0.0:5060 again).
-		if err := p.publicClient.WriteRequest(cancelReq, noopClientOption); err != nil {
+		// Passing any option (validateOutgoing only checks) makes sipgo skip
+		// clientRequestBuildReq, which would stamp req.Laddr with the public
+		// client's bind addr (0.0.0.0:5060) and break pooled-connection
+		// lookup — fatal for WS to the registered WebRTC agent (would try to
+		// bind 0.0.0.0:5060 again).
+		if err := p.publicClient.WriteRequest(cancelReq, validateOutgoing); err != nil {
 			slog.Error("CANCEL on fork sibling failed", "address", b.contact.Address, "error", err)
 		}
 	}
@@ -656,7 +657,7 @@ func (p *Proxy) handleInviteFromFSToTrunk(req *sip.Request, tx sip.ServerTransac
 	p.addRecordRoute(fwdReq, "from_fs")
 
 	// Forward via public client
-	clientTx, err := p.publicClient.TransactionRequest(context.Background(), fwdReq, sipgo.ClientRequestAddVia)
+	clientTx, err := p.publicClient.TransactionRequest(context.Background(), fwdReq, sipgo.ClientRequestAddVia, validateOutgoing)
 	if err != nil {
 		slog.Error("Failed to forward INVITE to trunk", "error", err)
 		tx.Respond(sip.NewResponseFromRequest(req, 502, "Bad Gateway", nil))
@@ -878,7 +879,7 @@ func (p *Proxy) relayInDialog(req *sip.Request, tx sip.ServerTransaction) {
 	defer cancel()
 
 	startedAt := time.Now()
-	resp, err := client.Do(ctx, fwdReq, sipgo.ClientRequestAddVia)
+	resp, err := client.Do(ctx, fwdReq, sipgo.ClientRequestAddVia, validateOutgoing)
 	elapsed := time.Since(startedAt)
 	if err != nil {
 		slog.Error("In-dialog relay failed",
@@ -995,7 +996,7 @@ func (p *Proxy) handleAck(req *sip.Request, tx sip.ServerTransaction) {
 	}
 
 	// ACK is non-transactional — send directly
-	if err := client.WriteRequest(fwdReq, sipgo.ClientRequestAddVia); err != nil {
+	if err := client.WriteRequest(fwdReq, sipgo.ClientRequestAddVia, validateOutgoing); err != nil {
 		slog.Error("Failed to forward ACK", "error", err)
 	}
 }
@@ -1041,17 +1042,14 @@ func (p *Proxy) cancelOutgoing(callID string) {
 	cancelReq.SetSource(entry.req.Source())
 	cancelReq.SetDestination(entry.req.Destination())
 
-	if err := entry.client.WriteRequest(cancelReq, noopClientOption); err != nil {
+	// Passing any option (validateOutgoing only checks) makes sipgo skip
+	// clientRequestBuildReq, which otherwise stamps req.Laddr with the
+	// client's bind addr and breaks pooled connection lookup for already-open
+	// inbound transports (notably WS to a registered WebRTC agent).
+	if err := entry.client.WriteRequest(cancelReq, validateOutgoing); err != nil {
 		slog.Error("Failed to send CANCEL", "callid", callID, "error", err)
 	}
 }
-
-// noopClientOption is a do-nothing sipgo.ClientRequestOption. Passing any
-// option to WriteRequest causes sipgo to skip clientRequestBuildReq, which
-// otherwise stamps req.Laddr with the client's bind addr and breaks pooled
-// connection lookup for already-open inbound transports (notably WS to a
-// registered WebRTC agent).
-func noopClientOption(_ *sipgo.Client, _ *sip.Request) error { return nil }
 
 // ---------------------------------------------------------------------------
 // OPTIONS (respond locally)
