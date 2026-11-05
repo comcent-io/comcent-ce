@@ -109,6 +109,43 @@ defmodule Comcent.CallFixtures do
     })
   end
 
+  @doc """
+  Rings an agent (`username@<subdomain>.<sip domain>`) on a new leg of the
+  call and returns the leg's channel id.
+  """
+  def ring_agent(call_story_id, agent) do
+    channel = Ecto.UUID.generate()
+
+    dispatch(call_story_id, %{
+      "Event-Name" => "CHANNEL_CREATE",
+      "Event-UUID" => Ecto.UUID.generate(),
+      "Event-Date-Timestamp" => Integer.to_string(System.system_time(:microsecond)),
+      "Unique-ID" => channel,
+      "Channel-Call-UUID" => call_story_id,
+      "Call-Direction" => "outbound",
+      "Caller-Context" => "default",
+      "Channel-Name" => "sofia/internal/#{agent}"
+    })
+
+    channel
+  end
+
+  @doc """
+  Ends a ringing agent leg unanswered, with FreeSWITCH's `hangup_cause`.
+  """
+  def ringing_leg_ends(call_story_id, channel, hangup_cause) do
+    dispatch(call_story_id, %{
+      "Event-Name" => "CHANNEL_DESTROY",
+      "Event-UUID" => Ecto.UUID.generate(),
+      "Event-Date-Timestamp" => Integer.to_string(System.system_time(:microsecond)),
+      "Unique-ID" => channel,
+      "Channel-Call-UUID" => call_story_id,
+      "Call-Direction" => "outbound",
+      "Answer-State" => "hangup",
+      "Hangup-Cause" => hangup_cause
+    })
+  end
+
   def stop_call(call_story_id) do
     case Registry.whereis(call_story_id) do
       nil ->

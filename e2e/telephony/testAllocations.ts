@@ -60,6 +60,8 @@ export const allocations = {
   outboundContactHostPort: alloc('+14155552729', 6360),
   notConfigured: alloc('+14155552730', 6370),
   natKeepalive: alloc('+14155552731', 6380),
+  // One agent signed in on two tabs, declining on one.
+  declineEveryTab: alloc('+14155552740', 6470),
   // Queue stress tests use two queues and need wider, non-overlapping ranges
   // so large caller bursts and many SIP agents can run concurrently.
   queueStressQ1: alloc('+14155552722', 6210, {

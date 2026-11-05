@@ -62,3 +62,28 @@ func TestContactWithExpires(t *testing.T) {
 		})
 	}
 }
+
+// A Decline on one tab stops the call ringing on the agent's other tabs and
+// devices; an unavailable or busy one doesn't.
+func TestIsGlobalFailure(t *testing.T) {
+	cases := []struct {
+		status int
+		want   bool
+	}{
+		{200, false},
+		{404, false},
+		{480, false}, // SIP.js's default reject: only this tab
+		{486, false},
+		{487, false},
+		{500, false},
+		{600, true},
+		{603, true}, // the dialer's Decline
+		{604, true},
+		{606, true},
+	}
+	for _, c := range cases {
+		if got := isGlobalFailure(c.status); got != c.want {
+			t.Errorf("isGlobalFailure(%d) = %v, want %v", c.status, got, c.want)
+		}
+	}
+}
