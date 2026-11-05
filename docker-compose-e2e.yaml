@@ -194,6 +194,14 @@ services:
       # Well under nat-router's 10 s mapping timeout. 0 turns the keepalive
       # off, which natKeepaliveFlowSipp.spec.ts should then fail on.
       - NAT_PING_INTERVAL=${E2E_NAT_PING_INTERVAL:-4}
+      # A source IP with BAN_FAILURES 403s or failed digest auths within
+      # BAN_WINDOW seconds is dropped silently for BAN_TIME seconds, doubling
+      # on repeat; 0 in any of them turns banning off. These are the defaults.
+      # Private addresses (this whole stack), trunk inbound IPs and registered
+      # phones are never banned, so the e2e specs can't trip it.
+      - BAN_FAILURES=${E2E_BAN_FAILURES:-10}
+      - BAN_WINDOW=${E2E_BAN_WINDOW:-60}
+      - BAN_TIME=${E2E_BAN_TIME:-900}
     ports:
       - '${E2E_SBC_WS_PORT:-4180}:80'
     depends_on:

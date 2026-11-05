@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -19,13 +21,23 @@ type InternalAPI struct {
 
 	credCache  sync.Map // key: "user@domain" → *credCacheEntry
 	trunkCache sync.Map // key: number → *trunkCacheEntry
+
+	// Every trunk inbound CIDR seen since startup. These sources are never
+	// banned (see ip_ban.go), even after their numbers drop out of trunkCache.
+	trunkNetsMu sync.RWMutex
+	trunkNets   map[string]*net.IPNet
 }
+
+// errNotFound is a 404 from the internal API: the user or number doesn't
+// exist, as opposed to the API being unreachable.
+var errNotFound = errors.New("not found")
 
 type credCacheEntry struct {
 	password  string
 	expiresAt time.Time
 }
 
+// trunkCacheEntry with nil data caches a number the server doesn't know.
 type trunkCacheEntry struct {
 	data      *TrunkData
 	expiresAt time.Time
@@ -39,6 +51,11 @@ type TrunkData struct {
 }
 
 const cacheTTL = 5 * time.Minute
+
+// unknownTrunkTTL is how long a number with no trunk is remembered, so a
+// scanner dialling made-up numbers doesn't query the server on every INVITE,
+// while a number just added in the app works within a minute.
+const unknownTrunkTTL = time.Minute
 
 func newInternalAPI(cfg Config) *InternalAPI {
 	return &InternalAPI{
@@ -68,6 +85,9 @@ func (a *InternalAPI) GetUserPassword(username, domain string) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return "", fmt.Errorf("credentials for %s: %w", key, errNotFound)
+	}
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("credentials API returned %d", resp.StatusCode)
 	}
@@ -93,6 +113,9 @@ func (a *InternalAPI) GetSIPTrunk(number string) (*TrunkData, error) {
 	if v, ok := a.trunkCache.Load(number); ok {
 		entry := v.(*trunkCacheEntry)
 		if time.Now().Before(entry.expiresAt) {
+			if entry.data == nil {
+				return nil, fmt.Errorf("sip trunk for %s: %w", number, errNotFound)
+			}
 			return entry.data, nil
 		}
 		a.trunkCache.Delete(number)
@@ -106,6 +129,10 @@ func (a *InternalAPI) GetSIPTrunk(number string) (*TrunkData, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		a.trunkCache.Store(number, &trunkCacheEntry{expiresAt: time.Now().Add(unknownTrunkTTL)})
+		return nil, fmt.Errorf("sip trunk for %s: %w", number, errNotFound)
+	}
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("sip-trunk API returned %d for %s", resp.StatusCode, number)
 	}
@@ -119,7 +146,41 @@ func (a *InternalAPI) GetSIPTrunk(number string) (*TrunkData, error) {
 		data:      &data,
 		expiresAt: time.Now().Add(cacheTTL),
 	})
+	a.rememberTrunkNets(data.InboundIPs)
 	return &data, nil
+}
+
+func (a *InternalAPI) rememberTrunkNets(cidrs []string) {
+	a.trunkNetsMu.Lock()
+	defer a.trunkNetsMu.Unlock()
+	if a.trunkNets == nil {
+		a.trunkNets = make(map[string]*net.IPNet)
+	}
+	for _, cidr := range cidrs {
+		if _, ok := a.trunkNets[cidr]; ok {
+			continue
+		}
+		if _, network, err := net.ParseCIDR(cidr); err == nil {
+			a.trunkNets[cidr] = network
+		}
+	}
+}
+
+// IsTrunkIP reports whether ip is inside the inbound IPs of any trunk looked
+// up since startup.
+func (a *InternalAPI) IsTrunkIP(ip string) bool {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return false
+	}
+	a.trunkNetsMu.RLock()
+	defer a.trunkNetsMu.RUnlock()
+	for _, network := range a.trunkNets {
+		if network.Contains(parsed) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *InternalAPI) UpdateUserPresence(subdomain, action, username string) {

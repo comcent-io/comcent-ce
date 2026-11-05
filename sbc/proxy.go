@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -75,6 +76,11 @@ type Proxy struct {
 	// User → FreeSWITCH stickiness used while calls are active.
 	affinityMu sync.RWMutex
 	affinity   map[string]map[string]string // user AOR → call-id → fsAddr
+
+	// Sources dropped for failing too often (nil when banning is off), and
+	// INVITEs the SBC rejected itself (see ip_ban.go).
+	ban      *IPBan
+	rejected rejectedCalls
 }
 
 type activeTxEntry struct {
@@ -84,7 +90,7 @@ type activeTxEntry struct {
 }
 
 func newProxy(publicClient, privateClient *sipgo.Client, reg *Registrar, api *InternalAPI, disp *Dispatcher, cfg Config) *Proxy {
-	return &Proxy{
+	p := &Proxy{
 		publicClient:  publicClient,
 		privateClient: privateClient,
 		reg:           reg,
@@ -94,6 +100,8 @@ func newProxy(publicClient, privateClient *sipgo.Client, reg *Registrar, api *In
 		calls:         make(map[string]*callState),
 		affinity:      make(map[string]map[string]string),
 	}
+	p.ban = newIPBan(cfg.BanFailures, cfg.BanWindow, cfg.BanTime, p.neverBan)
+	return p
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +120,7 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 	aor := user + "@" + domain
 
 	if !strings.HasSuffix(domain, p.cfg.SIPUserRootDomain) {
+		p.failed(req)
 		tx.Respond(sip.NewResponseFromRequest(req, 403, "Forbidden", nil))
 		return
 	}
@@ -119,6 +128,7 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 	password, err := p.api.GetUserPassword(user, domain)
 	if err != nil || password == "" {
 		slog.Info("No password, sending challenge", "user", user, "error", err)
+		p.failedAuth(req, err)
 		sendAuthChallenge(tx, req, domain)
 		return
 	}
@@ -128,6 +138,7 @@ func (p *Proxy) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 		if authHeader == nil {
 			slog.Info("No auth header, sending challenge", "user", user)
 		}
+		p.failedAuth(req, nil)
 		sendAuthChallenge(tx, req, domain)
 		return
 	}
@@ -947,13 +958,6 @@ func (p *Proxy) handleAck(req *sip.Request, tx sip.ServerTransaction) {
 	sourceIP := sourceIPFromRequest(req)
 	isFS := p.dispatcher.IsFromFS(sourceIP)
 
-	slog.Info("Handle ACK",
-		"callid", callID,
-		"fromFS", isFS,
-		"recipient", req.Recipient.String(),
-		"route", headerValue(req, "Route"),
-	)
-
 	p.callsMu.RLock()
 	state, found := p.calls[callID]
 	p.callsMu.RUnlock()
@@ -964,10 +968,27 @@ func (p *Proxy) handleAck(req *sip.Request, tx sip.ServerTransaction) {
 		// INVITE path stores its call state before relaying the 200, because a
 		// dropped 2xx ACK strands the callee retransmitting its answer. Logged at
 		// Info, not Debug, so that if that ordering ever regresses the evidence
-		// is in the collected logs.
-		slog.Info("ACK for a call with no dialog, not forwarded", "callid", callID, "fromFS", isFS)
+		// is in the collected logs. Only the ACK to an INVITE the SBC rejected
+		// itself is logged at Debug: scanners send those every second.
+		level := slog.LevelInfo
+		if p.rejected.has(callID) {
+			level = slog.LevelDebug
+		}
+		slog.Log(context.Background(), level, "ACK for a call with no dialog, not forwarded",
+			"callid", callID,
+			"fromFS", isFS,
+			"recipient", req.Recipient.String(),
+			"route", headerValue(req, "Route"),
+		)
 		return
 	}
+
+	slog.Info("Handle ACK",
+		"callid", callID,
+		"fromFS", isFS,
+		"recipient", req.Recipient.String(),
+		"route", headerValue(req, "Route"),
+	)
 
 	var client *sipgo.Client
 	var fwdReq *sip.Request
@@ -1231,10 +1252,14 @@ func (p *Proxy) authenticateExternalRequest(req *sip.Request, tx sip.ServerTrans
 		user := req.From().Address.User
 		password, err := p.api.GetUserPassword(user, fromDomain)
 		if err != nil || password == "" {
+			p.failedAuth(req, err)
+			p.rejected.add(req)
 			sendAuthChallenge(tx, req, fromDomain)
 			return false
 		}
 		if !validateDigestAuth(req, password) {
+			p.failedAuth(req, nil)
+			p.rejected.add(req)
 			sendAuthChallenge(tx, req, fromDomain)
 			return false
 		}
@@ -1247,14 +1272,37 @@ func (p *Proxy) authenticateExternalRequest(req *sip.Request, tx sip.ServerTrans
 	}
 	trunk, err := p.api.GetSIPTrunk(trunkNumber)
 	if err != nil || trunk == nil {
+		// Only a number the server doesn't know counts against the source;
+		// an unreachable API must not get callers banned.
+		if errors.Is(err, errNotFound) {
+			p.failed(req)
+		}
+		p.rejected.add(req)
 		tx.Respond(sip.NewResponseFromRequest(req, 403, "Forbidden", nil))
 		return false
 	}
 	if !isIPAllowed(sourceIP, trunk.InboundIPs) {
+		p.failed(req)
+		p.rejected.add(req)
 		tx.Respond(sip.NewResponseFromRequest(req, 403, "Forbidden", nil))
 		return false
 	}
 	return true
+}
+
+// failedAuth counts a challenged request that carried credentials which
+// didn't work, for a user that exists with a wrong password or one that
+// doesn't exist (err wrapping errNotFound). The first, credential-less
+// request of every login is challenged too and doesn't count, nor does a
+// lookup that failed because the API was unreachable.
+func (p *Proxy) failedAuth(req *sip.Request, lookupErr error) {
+	if req.GetHeader("Authorization") == nil {
+		return
+	}
+	if lookupErr != nil && !errors.Is(lookupErr, errNotFound) {
+		return
+	}
+	p.failed(req)
 }
 
 func (p *Proxy) authorizeExternalInDialog(req *sip.Request, tx sip.ServerTransaction, state *callState, sourceIP string) bool {

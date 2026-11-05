@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -103,6 +104,22 @@ func (r *Registrar) LookupByType(aor string, webrtc bool) []*Contact {
 
 func (r *Registrar) IsRegistered(aor string) bool {
 	return len(r.LookupAll(aor)) > 0
+}
+
+// HasSourceIP reports whether any live registration came from ip, whatever
+// the port: an office router can put several phones behind one address.
+func (r *Registrar) HasSourceIP(ip string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	now := time.Now()
+	for _, list := range r.contacts {
+		for _, c := range list {
+			if host, _, err := net.SplitHostPort(c.Address); err == nil && host == ip && now.Before(c.ExpiresAt) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // reapExpired drops lapsed registrations every 30 s and calls lapsed, in its
