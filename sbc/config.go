@@ -34,6 +34,13 @@ type Config struct {
 	// for a phone whose pings get through but whose mapping still changed.
 	// 0 leaves the client's requested lifetime alone.
 	NATMaxExpires int
+
+	// A source IP with BanFailures failed requests (403s, failed digest
+	// auth) within BanWindow is dropped silently for BanTime, doubling on
+	// each repeat (see ip_ban.go). Any of them 0 turns banning off.
+	BanFailures int
+	BanWindow   time.Duration
+	BanTime     time.Duration
 }
 
 func loadConfig() Config {
@@ -53,6 +60,9 @@ func loadConfig() Config {
 		NATPingInterval:    time.Duration(envIntOrDefault("NAT_PING_INTERVAL", 20)) * time.Second,
 		NATPingMaxMissed:   envIntOrDefault("NAT_PING_MAX_MISSED", 3),
 		NATMaxExpires:      envIntOrDefault("NAT_MAX_EXPIRES", 600),
+		BanFailures:        envIntOrDefault("BAN_FAILURES", 10),
+		BanWindow:          time.Duration(envIntOrDefault("BAN_WINDOW", 60)) * time.Second,
+		BanTime:            time.Duration(envIntOrDefault("BAN_TIME", 900)) * time.Second,
 	}
 }
 

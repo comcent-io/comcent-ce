@@ -22,6 +22,8 @@ import (
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
+	// sipgo's transaction layer logs at creation time, so set this before any UA.
+	sip.SetDefaultLogger(slog.New(quietScannerLogs{logger.Handler()}))
 
 	cfg := loadConfig()
 
@@ -99,11 +101,19 @@ func main() {
 	if cfg.NATPingInterval > 0 {
 		go proxy.natKeepalive(ctx, cfg.NATPingInterval, cfg.NATPingMaxMissed)
 	}
+	if proxy.ban != nil {
+		slog.Info("SIP source banning", "failures", cfg.BanFailures, "window", cfg.BanWindow, "banTime", cfg.BanTime)
+	} else {
+		slog.Info("SIP source banning off")
+	}
 
 	// Register handlers on both public and private servers. Only the public
-	// side faces clients behind NATs, so only it answers at the source port.
+	// side faces clients behind NATs, so only it answers at the source port,
+	// and only it drops banned sources.
 	// Both sides check every request and response for CRLF injection.
-	publicWrap := func(h sipgo.RequestHandler) sipgo.RequestHandler { return symmetricResponses(validateMessages(h)) }
+	publicWrap := func(h sipgo.RequestHandler) sipgo.RequestHandler {
+		return proxy.dropBanned(symmetricResponses(validateMessages(h)))
+	}
 	for _, s := range []struct {
 		srv  *sipgo.Server
 		wrap func(sipgo.RequestHandler) sipgo.RequestHandler

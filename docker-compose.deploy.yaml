@@ -217,6 +217,14 @@ services:
       # public listener. Without this, default 127.0.0.1 leaks into
       # outbound headers toward the PSTN trunk.
       PUBLIC_IP: ${PUBLIC_IP}
+      # SIP scanners: a source IP with BAN_FAILURES 403s or failed digest
+      # logins within BAN_WINDOW seconds is dropped silently for BAN_TIME
+      # seconds, doubling on repeat. 0 in any of them turns banning off.
+      # Private addresses, trunk inbound IPs, FreeSWITCH and registered
+      # phones are never banned.
+      BAN_FAILURES: ${BAN_FAILURES:-10}
+      BAN_WINDOW: ${BAN_WINDOW:-60}
+      BAN_TIME: ${BAN_TIME:-900}
     ports:
       - '5060:5060/udp'
       - '5060:5060/tcp'
