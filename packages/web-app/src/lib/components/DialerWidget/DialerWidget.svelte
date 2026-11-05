@@ -407,7 +407,9 @@
 
   function onDecline(invitation: Invitation) {
     if (!invitation) return;
-    sessionManager.decline(invitation);
+    // 603 Decline, not SIP.js's default 480: a 6xx tells the SBC to stop
+    // ringing the agent's other tabs and devices too.
+    invitation.reject({ statusCode: 603, reasonPhrase: 'Decline' });
   }
 
   function onIgnore(invitation: Invitation) {

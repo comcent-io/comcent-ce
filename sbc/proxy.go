@@ -571,6 +571,20 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 				continue
 			}
 			pending--
+			if isGlobalFailure(resp.StatusCode) {
+				// The agent pressed Decline (603) on one tab or device: stop
+				// ringing all the others and tell FreeSWITCH.
+				slog.Info("Proxy: FS→user declined everywhere", "aor", aor,
+					"address", preps[r.idx].c.Address, "status", resp.StatusCode, "callID", callID)
+				for i, sib := range branches {
+					if i != r.idx {
+						cancelBranch(sib)
+					}
+				}
+				tx.Respond(sip.NewResponseFromRequest(req, resp.StatusCode, resp.Reason, nil))
+				cancelAll()
+				return
+			}
 			if resp.StatusCode < 300 {
 				winner := branches[r.idx]
 				relay := sip.NewResponseFromRequest(req, resp.StatusCode, resp.Reason, resp.Body())
@@ -615,6 +629,14 @@ func (p *Proxy) handleInviteFromFSToUser(req *sip.Request, tx sip.ServerTransact
 	} else {
 		tx.Respond(sip.NewResponseFromRequest(req, 480, "Temporarily Unavailable", nil))
 	}
+}
+
+// isGlobalFailure reports whether one contact's final response ends the whole
+// fan-out. A 6xx means the user refused the call everywhere (RFC 3261
+// §16.7.10), so the proxy cancels the other branches; a 4xx or 5xx only says
+// this one tab or device can't take it.
+func isGlobalFailure(statusCode int) bool {
+	return statusCode >= 600 && statusCode < 700
 }
 
 func (p *Proxy) handleInviteFromFSToTrunk(req *sip.Request, tx sip.ServerTransaction, toUser string) {

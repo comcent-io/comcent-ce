@@ -446,7 +446,7 @@ defmodule Comcent.CallSession do
            ((body["Call-Direction"] == "inbound" &&
                body["Hangup-Cause"] == "ORIGINATOR_CANCEL") or
               (body["Call-Direction"] == "outbound" &&
-                 body["Hangup-Cause"] == "NO_USER_RESPONSE")) do
+                 body["Hangup-Cause"] in ["NO_USER_RESPONSE", "CALL_REJECTED"])) do
         %{state | hangup_party: span.current_party}
       else
         state
