@@ -280,7 +280,7 @@ services:
   # FreeSWITCH release (see RELEASING.md); FREESWITCH_VERSION in .env
   # overrides it.
   freeswitch:
-    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-v2026.10.09}
+    image: ghcr.io/comcent-io/freeswitch-ce:${FREESWITCH_VERSION:-sha-f3bd6ab}
     restart: unless-stopped
     env_file: .env
     environment:
